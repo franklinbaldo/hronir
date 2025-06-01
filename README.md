@@ -52,6 +52,10 @@ Example Elo ranking for Chapter 2 variants:
 
 ---
 
+### 📂 File Structure & Naming
+See [File & Folder Naming Conventions](#file--folder-naming-conventions) for how to add new chapters or versions.
+
+---
 ## 🗂️ Repository Structure
 
 book/ ├── 00_tlon_uqbar.md             # Seed chapter (position 0) ├── 01/ │   ├── 01_a.md │   └── 01_b.md ├── 02/ │   ├── 02_a.md │   └── 02_b.md ├── book_index.json              # Detailed narrative tree ratings/ └── position_002.csv             # Elo ratings per chapter position
@@ -99,6 +103,29 @@ In this encyclopedia, infinite narrative multiplication redefines literary truth
 
 The Hrönir Encyclopedia exists at the intersection of imagination and reality, possibility and inevitability, continually expanding within the reader's consciousness.
 
+## File & Folder Naming Conventions
+
+1.  **Chapter folders** use a zero-padded integer (`int16`) so that alphabetical order = chronological order.
+    *   E.g. `00000/`, `00001/`, … up to `65535/`.
+2.  Within each folder, filenames start with `UUIDv5(<raw-text-content>)` (hex form, lowercase), a hyphen, then an optional “slug” or suffix.
+    *   Example:
+        ```
+        book/00000/0ce2f7b3-cd4a-5e92-b3e1-2b1f4d123456-base.md
+        book/00000/9b52de11-1c8f-5a66-8e7d-4c3f8a789abc-alt-temp0.8.md
+        ```
+    *   This ensures:
+        1.  Deterministic deduplication (same text → same filename).
+        2.  Human-readable hints after the UUID (e.g. `-temp0.8` or `-alice.patch`).
+3.  **Metadata lives inside each file** (YAML front-matter at top).
+    *   Always embed the UUID, parent UUID(s), model name, temperature, timestamp, etc.
+    *   The UUID in front-matter must match the filename’s UUID.
+4.  Helper scripts will handle all padding, hashing, and front-matter injection—never rename files manually.
+
+### Troubleshooting
+
+If two files have identical UUIDs but different text, the helper must error out.
+
+Changing any character (even whitespace) changes the hash and hence the filename.
 
 ---
 
