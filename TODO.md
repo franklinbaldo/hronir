@@ -24,8 +24,8 @@ This document outlines the tasks required to implement the **Hrönir Encyclopedi
   - [x] Created `cli.py` with basic argparse structure.
   - [x] Added placeholder for `continue` command.
   - [x] Added placeholder for `book_index.json` update logic.
-  - [ ] Generate initial branches (`continue` command) - *Actual implementation pending*
-  - [ ] Update `book_index.json` - *Initial structure for seed chapter added, dynamic updates pending*
+  - [ ] Generate initial branches (`continue` command) - *Basic functionality to create first variant (e.g., 01_a) added.*
+  - [ ] Update `book_index.json` - *CLI can now add first variant (e.g., 01_a) to index. Dynamic/complex updates pending.*
 
 ---
 
