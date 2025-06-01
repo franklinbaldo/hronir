@@ -1,4 +1,5 @@
 import argparse
+from .semantic_extractor import extract_themes_from_chapters
 
 def main():
     parser = argparse.ArgumentParser(description="Hrönir Encyclopedia CLI")
@@ -29,11 +30,20 @@ def main():
 def handle_continue(args):
     """Handles the 'continue' subcommand."""
     print(f"Executing 'continue' command with position: {args.position} and variant_id: {args.variant_id}")
+
+    # Simulate reading previous chapters and extracting themes
+    # TODO: Dynamically determine previous chapters based on args.position or book_index.json
+    previous_chapter_files = ["book/00_tlon_uqbar.md"]
+    print(f"Attempting to extract themes from hardcoded previous chapters: {previous_chapter_files}")
+    # This will call the placeholder function from semantic_extractor.py
+    extracted_data = extract_themes_from_chapters(previous_chapter_files)
+    print(f"CLI: Extracted themes (placeholder data): {extracted_data}")
+
     # Placeholder for generating the new chapter filename or path
     new_chapter_filename = f"{args.position:02d}_{args.variant_id}.md"
     print(f"Placeholder for new chapter filename: {new_chapter_filename}")
 
-    # TODO: Implement actual logic to generate the new chapter content here.
+    # TODO: Implement actual logic to generate the new chapter content here, possibly using extracted_data.
 
     # Placeholder for updating the book index
     # This function does not exist yet and will need to be implemented.

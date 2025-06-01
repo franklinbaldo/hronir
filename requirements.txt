@@ -1,3 +1,8 @@
 # This file lists the Python package dependencies for The Hrönir Encyclopedia.
 # Add project dependencies here, one per line.
 # e.g., click>=8.0
+
+# For semantic analysis (Phase 2+):
+# e.g., sentence-transformers
+# e.g., spacy
+# e.g., nltk
