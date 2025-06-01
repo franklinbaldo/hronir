@@ -1,4 +1,10 @@
 {
   "title": "The Hrönir Encyclopedia",
-  "chapters": {}
+  "chapters": {
+    "00": {
+      "title": "Tlön, Uqbar, Orbis Tertius",
+      "path": "book/00_tlon_uqbar.md",
+      "variants": {}
+    }
+  }
 }

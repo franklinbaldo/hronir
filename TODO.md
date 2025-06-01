@@ -25,7 +25,7 @@ This document outlines the tasks required to implement the **Hrönir Encyclopedi
   - [x] Added placeholder for `continue` command.
   - [x] Added placeholder for `book_index.json` update logic.
   - [ ] Generate initial branches (`continue` command) - *Actual implementation pending*
-  - [ ] Update `book_index.json` - *Actual implementation pending*
+  - [ ] Update `book_index.json` - *Initial structure for seed chapter added, dynamic updates pending*
 
 ---
 
