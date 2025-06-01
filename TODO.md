@@ -4,22 +4,22 @@ This document outlines the tasks required to implement the **Hrönir Encyclopedi
 
 ## ✅ Phase 0 — Repository Setup
 
-- [ ] Initialize git repository structure:
-  - [ ] `hronir_encyclopedia/` (Python package)
-  - [ ] `book/` (storage for chapters)
-  - [ ] `ratings/` (Elo rankings)
-  - [ ] `.github/workflows/` (for CI/CD)
-- [ ] Create essential files:
-  - [ ] `.gitignore`
-  - [ ] `LICENSE` (MIT)
-  - [ ] `requirements.txt`
-  - [ ] `book_index.json` (initial narrative tree)
+- [x] Initialize git repository structure:
+  - [x] `hronir_encyclopedia/` (Python package)
+  - [x] `book/` (storage for chapters)
+  - [x] `ratings/` (Elo rankings)
+  - [x] `.github/workflows/` (for CI/CD)
+- [x] Create essential files:
+  - [x] `.gitignore`
+  - [x] `LICENSE` (MIT)
+  - [x] `requirements.txt`
+  - [x] `book_index.json` (initial narrative tree)
 
 ---
 
 ## 🚧 Phase 1 — Seed Chapter & Basic CLI
 
-- [ ] Write Chapter 0 seed (`00_tlon_uqbar.md`)  
+- [x] Write Chapter 0 seed (`00_tlon_uqbar.md`)
 - [ ] Implement minimal CLI (`cli.py`):
   - [ ] Generate initial branches (`continue` command)
   - [ ] Update `book_index.json`
