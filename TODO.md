@@ -20,9 +20,12 @@ This document outlines the tasks required to implement the **Hrönir Encyclopedi
 ## 🚧 Phase 1 — Seed Chapter & Basic CLI
 
 - [x] Write Chapter 0 seed (`00_tlon_uqbar.md`)
-- [ ] Implement minimal CLI (`cli.py`):
-  - [ ] Generate initial branches (`continue` command)
-  - [ ] Update `book_index.json`
+- [ ] Implement minimal CLI (`cli.py`) - In Progress:
+  - [x] Created `cli.py` with basic argparse structure.
+  - [x] Added placeholder for `continue` command.
+  - [x] Added placeholder for `book_index.json` update logic.
+  - [ ] Generate initial branches (`continue` command) - *Actual implementation pending*
+  - [ ] Update `book_index.json` - *Actual implementation pending*
 
 ---
 
