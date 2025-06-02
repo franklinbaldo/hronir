@@ -36,6 +36,11 @@ def main():
     # Placeholder for the 'continue' command
     continue_parser = subparsers.add_parser("continue", help="Generate initial branches from the seed chapter.")
 
+    # Parser for the 'synthesize' command
+    synthesize_parser = subparsers.add_parser("synthesize", help="Synthesize a new chapter variant for a given position.")
+    synthesize_parser.add_argument("--position", type=str, required=True, help="The chapter position (e.g., '00', '01').")
+    synthesize_parser.add_argument("--variant_id", type=str, required=True, help="The specific variant ID to create (e.g., 'a', 'b', 'custom_id').")
+
     args = parser.parse_args()
 
     if args.command == "continue":
@@ -80,6 +85,39 @@ def main():
 
         # This will be updated later to use the actual new chapter details
         update_book_index(position=next_position, variant_id=variant_id, title=file_title, path=file_path)
+
+    elif args.command == "synthesize":
+        position = args.position
+        variant_id = args.variant_id
+        print(f"Processing 'synthesize' command for position {position}, variant {variant_id}...")
+
+        book_index_path = "book/book_index.json"
+        try:
+            with open(book_index_path, "r") as f:
+                index_data = json.load(f)
+        except FileNotFoundError:
+            print(f"Error: {book_index_path} not found. Please ensure the encyclopedia is initialized.")
+            return
+
+        if position not in index_data.get("chapters", {}):
+            print(f"Error: Position {position} not found in {book_index_path}. Use 'continue' to create new chapter positions or ensure the position exists.")
+            return
+
+        if variant_id in index_data["chapters"][position].get("variants", {}):
+            print(f"Error: Variant {variant_id} already exists for position {position} in {book_index_path}.")
+            return
+
+        chapter_dir = os.path.join("book", position)
+        os.makedirs(chapter_dir, exist_ok=True)
+
+        file_path = os.path.join(chapter_dir, f"{position}_{variant_id}.md")
+        file_title = f"Chapter {position}{variant_id}" # Consistent title format
+
+        with open(file_path, "w") as f:
+            f.write(f"# {file_title}\n")
+        print(f"Created new chapter file: {file_path}")
+
+        update_book_index(position, variant_id, file_title, file_path)
 
     elif args.command is None:
         parser.print_help()

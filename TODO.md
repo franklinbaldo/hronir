@@ -26,6 +26,7 @@ This document outlines the tasks required to implement the **Hrönir Encyclopedi
   - [x] Added placeholder for `book_index.json` update logic.
   - [ ] Generate initial branches (`continue` command) - *Now dynamically determines next chapter position (e.g., 01, 02) and creates its 'a' variant.*
   - [ ] Update `book_index.json` - *CLI can now add first variant (e.g., 01_a) to index. Dynamic/complex updates pending.*
+  - [x] Added basic `synthesize` command (`--position <pos> --variant_id <id>`).
 
 ---
 
