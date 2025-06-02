@@ -39,10 +39,34 @@ def main():
     args = parser.parse_args()
 
     if args.command == "continue":
-        print("Placeholder: This command will generate initial branches.")
+        print("Processing 'continue' command...") # Changed placeholder
 
-        next_position = "01"
-        variant_id = "a"
+        book_index_path = "book/book_index.json"
+        try:
+            with open(book_index_path, "r") as f:
+                index_data = json.load(f)
+        except FileNotFoundError:
+            print(f"Error: {book_index_path} not found. Please ensure the encyclopedia is initialized (e.g., with a seed chapter).")
+            return
+
+        # Determine the next chapter position
+        numeric_keys = [k for k in index_data.get("chapters", {}).keys() if k.isdigit()]
+        if not numeric_keys:
+            # This implies not even "00" (seed chapter) is present or correctly formatted.
+            # For 'continue' to work, we expect "00" to be there.
+            # If truly empty, starting at "01" might be desired for a first chapter *after* a potential "00".
+            # However, if "00" is the base, the next should be "01".
+            # Let's assume "00" should exist. If no numeric keys, implies something is wrong or it's the very first run.
+            print("Warning: No numeric chapter keys found in book_index.json. Defaulting to create chapter '01'.")
+            current_max_pos_num = 0 # Results in next_chapter_number = 1
+        else:
+            current_max_pos_num = max(int(k) for k in numeric_keys)
+
+        next_chapter_number = current_max_pos_num + 1
+        next_position = f"{next_chapter_number:02d}"
+        variant_id = "a" # 'continue' always creates the 'a' variant of the next chapter
+
+        print(f"Determined next chapter position: {next_position}, variant: {variant_id}")
 
         chapter_dir = os.path.join("book", next_position)
         os.makedirs(chapter_dir, exist_ok=True)
