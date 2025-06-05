@@ -1,0 +1,11 @@
+name: Daily Chapter Generation
+on:
+  schedule:
+    - cron: '0 6 * * *'  # 06:00 UTC daily
+    - cron: '0 18 * * *' # 18:00 UTC daily
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder generation step
+        run: echo 'generate chapter'
