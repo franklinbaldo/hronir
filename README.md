@@ -18,6 +18,11 @@ cd hronir_encyclopedia
 pip install -r requirements.txt
 ```
 
+The `requirements.txt` file lists the core Python libraries used in the project,
+such as [**click**](https://palletsprojects.com/p/click/) for the command-line
+interface and [**pandas**](https://pandas.pydata.org/) for Elo ranking data
+manipulation.
+
 ---
 
 ## 🔮 How It Works
