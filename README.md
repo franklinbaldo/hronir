@@ -13,7 +13,7 @@ Among infinite possibilities, one version will ultimately prove itself authentic
 ## 📦 Installation
 
 ```bash
-git clone https://github.com/[user]/hronir_encyclopedia
+git clone https://github.com/franklinbaldo/hronir
 cd hronir_encyclopedia
 pip install -r requirements.txt
 ```
