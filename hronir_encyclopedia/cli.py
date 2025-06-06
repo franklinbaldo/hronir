@@ -1,4 +1,5 @@
 import argparse
+import csv
 import json
 from pathlib import Path
 
@@ -29,6 +30,47 @@ def _cmd_validate(args):
     print("chapter looks valid")
 
 
+def _cmd_vote(args):
+    ratings_dir = Path("ratings")
+    ratings_dir.mkdir(exist_ok=True)
+    rating_file = ratings_dir / f"position_{args.position:03d}.csv"
+
+    hronirs_path = Path("hronirs/index.txt")
+    hronirs_path.parent.mkdir(exist_ok=True)
+    if hronirs_path.exists():
+        known_hronirs = set(hronirs_path.read_text().splitlines())
+    else:
+        known_hronirs = set()
+
+    for h in args.hronirs:
+        if h not in known_hronirs:
+            known_hronirs.add(h)
+    hronirs_path.write_text("\n".join(sorted(known_hronirs)) + "\n")
+
+    entries = []
+    if rating_file.exists():
+        with rating_file.open() as fh:
+            for row in csv.reader(fh):
+                entries.append([row[0], int(row[1])])
+
+    for path, _ in entries:
+        if path == args.path:
+            print("path already exists; vote rejected")
+            return
+
+    entries.append([args.path, 1])
+    entries.sort(key=lambda x: (-x[1], x[0]))
+
+    with rating_file.open("w", newline="") as fh:
+        writer = csv.writer(fh)
+        writer.writerows(entries)
+
+    if entries[0][0] == args.path:
+        print("vote counted")
+    else:
+        print("vote recorded but not counted")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Hr\u00f6nir Encyclopedia CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -52,6 +94,12 @@ def main(argv=None):
 
     export = subparsers.add_parser("export", help="in development")
     export.set_defaults(func=_placeholder_handler("export"))
+
+    vote = subparsers.add_parser("vote", help="submit a vote with proof of work")
+    vote.add_argument("--position", type=int, required=True, help="chapter position")
+    vote.add_argument("--path", required=True, help="unique forking path")
+    vote.add_argument("--hronirs", nargs=2, required=True, help="two discovered hronirs")
+    vote.set_defaults(func=_cmd_vote)
 
     args = parser.parse_args(argv)
     args.func(args)
