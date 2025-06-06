@@ -1,4 +1,9 @@
 # Chapter 0
+```
+.-""-.
+(     )
+ `-.-'
+```
 
 A antiga enciclopédia de Uqbar descrevia uma terra inexistente, cujas fronteiras surgiam e desapareciam conforme a vontade dos copistas. Esta obra nasceu da mesma inquietação: se um mundo imaginário poderia subverter o real, também poderíamos criar narrativas que se multiplicassem indefinidamente até tornar-se inevitáveis. Aqui apresentamos o primeiro capítulo dessa experiência, inspirado em *Tlön, Uqbar, Orbis Tertius* de Borges.
 

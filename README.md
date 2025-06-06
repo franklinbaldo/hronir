@@ -1,5 +1,11 @@
 # The Hrönir Encyclopedia
 
+```
+╭─╮╭─╮
+├─┤├─┤
+╰─╯╰─╯
+```
+
 > *"The true version will be the one that, upon being read, reveals itself as inevitable."*
 
 The **Hrönir Encyclopedia** is a computational literary project creating an infinitely branching, self-reflective narrative inspired by Jorge Luis Borges' **Tlön, Uqbar, Orbis Tertius**.
