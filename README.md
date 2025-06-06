@@ -179,7 +179,16 @@ python -m hronir_encyclopedia.cli submit --chapter book/03/03_human.md --author 
 
 # Export the highest-ranked path as EPUB
 python -m hronir_encyclopedia.cli export --format epub --path canonical
+
+# Submit a vote with proof of work
+python -m hronir_encyclopedia.cli vote --position 1 --path "0->1" --hronirs key stone
 ```
+
+## 🔏 Proof-of-Work Voting
+
+Each vote must present a new forking path accompanied by two undiscovered hrönirs. This ingenious proof-of-work not only protects the ranking system from frivolous votes, it actively expands the encyclopedia's universe. Votes only count once their submitted path rises to the top of its position—rewarding readers who boldly chart unexplored territory.
+
+For a deeper look at the rationale behind this system, see [docs/proof_of_work_voting.md](docs/proof_of_work_voting.md).
 
 ### Vote on a literary duel:
 
