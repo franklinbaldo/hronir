@@ -177,6 +177,13 @@ python -m hronir_encyclopedia.cli validate --chapter book/03/03_human.md
 # Submit human contribution to ranking system
 python -m hronir_encyclopedia.cli submit --chapter book/03/03_human.md --author "human"
 
+# Store chapter using UUID layout
+python -m hronir_encyclopedia.cli store book/03/03_human.md --prev 123e4567-e89b-12d3-a456-426614174000
+
+# Validate and repair stored chapters
+python -m hronir_encyclopedia.cli audit
+# Each forking entry receives a deterministic UUID
+
 # Export the highest-ranked path as EPUB
 python -m hronir_encyclopedia.cli export --format epub --path canonical
 ```
@@ -184,9 +191,7 @@ python -m hronir_encyclopedia.cli export --format epub --path canonical
 ### Vote on a literary duel:
 
 ```bash
-curl -X POST /vote \
-  -H "Content-Type: application/json" \
-  -d '{ "position": 3, "winner": "3_a", "loser": "3_b" }'
+python -m hronir_encyclopedia.cli vote --position 3 --winner 3_a --loser 3_b
 ```
 
 ---

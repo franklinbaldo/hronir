@@ -1,6 +1,7 @@
 import argparse
 import json
 from pathlib import Path
+from . import storage, ratings
 
 
 def _placeholder_handler(name):
@@ -29,6 +30,29 @@ def _cmd_validate(args):
     print("chapter looks valid")
 
 
+def _cmd_store(args):
+    chapter = Path(args.chapter)
+    prev_uuid = args.prev
+    uuid_str = storage.store_chapter(chapter, prev_uuid)
+    print(uuid_str)
+
+
+def _cmd_vote(args):
+    ratings.record_vote(args.position, args.winner, args.loser)
+    print("vote recorded")
+
+
+def _cmd_audit(args):
+    book_dir = Path("book")
+    for chapter in book_dir.glob("**/*.md"):
+        storage.validate_or_move(chapter)
+
+    fork_dir = Path("forking_path")
+    if fork_dir.exists():
+        for csv in fork_dir.glob("*.csv"):
+            storage.audit_forking_csv(csv)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Hr\u00f6nir Encyclopedia CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -50,8 +74,22 @@ def main(argv=None):
     ranking = subparsers.add_parser("ranking", help="in development")
     ranking.set_defaults(func=_placeholder_handler("ranking"))
 
+    vote = subparsers.add_parser("vote", help="record a duel result")
+    vote.add_argument("--position", type=int, required=True, help="chapter position")
+    vote.add_argument("--winner", required=True, help="winning chapter id")
+    vote.add_argument("--loser", required=True, help="losing chapter id")
+    vote.set_defaults(func=_cmd_vote)
+
     export = subparsers.add_parser("export", help="in development")
     export.set_defaults(func=_placeholder_handler("export"))
+
+    store = subparsers.add_parser("store", help="store chapter by UUID")
+    store.add_argument("chapter", help="path to chapter markdown file")
+    store.add_argument("--prev", help="uuid of previous chapter")
+    store.set_defaults(func=_cmd_store)
+
+    audit = subparsers.add_parser("audit", help="validate and repair storage")
+    audit.set_defaults(func=_cmd_audit)
 
     args = parser.parse_args(argv)
     args.func(args)
