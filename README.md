@@ -149,7 +149,7 @@ book/
 │   └── 02_b.md
 ├── book_index.json              # Detailed narrative tree
 ratings/
-└── position_002.csv             # Elo ratings per chapter position
+└── position_002.csv             # Recorded votes per chapter position
 ```
 
 ---
@@ -177,11 +177,21 @@ python -m hronir_encyclopedia.cli validate --chapter book/03/03_human.md
 # Submit human contribution to ranking system
 python -m hronir_encyclopedia.cli submit --chapter book/03/03_human.md --author "human"
 
+# Store chapter using UUID layout
+python -m hronir_encyclopedia.cli store book/03/03_human.md --prev 123e4567-e89b-12d3-a456-426614174000
+
+# Validate and repair stored chapters
+python -m hronir_encyclopedia.cli audit
+# Each forking entry receives a deterministic UUID
+
 # Export the highest-ranked path as EPUB
 python -m hronir_encyclopedia.cli export --format epub --path canonical
 
 # Submit a vote with proof of work
-python -m hronir_encyclopedia.cli vote --position 1 --path "0->1" --hronirs key stone
+python -m hronir_encyclopedia.cli vote 
+  --position 1 
+  --voter 01234567-89ab-cdef-0123-456789abcdef 
+  --path "0->1" --hronirs keystone
 ```
 
 ## 🔏 Proof-of-Work Voting
@@ -193,9 +203,10 @@ For a deeper look at the rationale behind this system, see [docs/proof_of_work_v
 ### Vote on a literary duel:
 
 ```bash
-curl -X POST /vote \
-  -H "Content-Type: application/json" \
-  -d '{ "position": 3, "winner": "3_a", "loser": "3_b" }'
+python -m hronir_encyclopedia.cli vote \
+  --position 3 \
+  --voter 89abcdef-0123-4567-89ab-cdef01234567 \
+  --winner 3_a --loser 3_b
 ```
 
 ---

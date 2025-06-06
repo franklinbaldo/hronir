@@ -13,9 +13,12 @@ In a system with limitless branching paths, it would be trivial to submit endles
 3. **Submit** the vote along with the two hr\u00f6nirs via the CLI:
 
    ```bash
-   python -m hronir_encyclopedia.cli vote --position 1 --path "0->1" --hronirs a b
+   python -m hronir_encyclopedia.cli vote \
+     --position 1 \
+     --voter 01234567-89ab-cdef-0123-456789abcdef \
+     --path "0->1" --hronirs a b
    ```
-4. The vote is recorded in `ratings/position_001.csv`. Each vote counts unless its forking path ends up with the greatest **distance** in the graph. The distance is calculated as the difference in path length from the current leader plus the path's ranking position. Paths with the maximum distance remain on record but their votes do not influence the standings.
+4. The vote is recorded in `ratings/position_001.csv`. Each row stores the voter uuid along with the winning and losing paths. The CSV uses three columns: `voter`, `winner`, and `loser`. Votes are tallied immediately unless their forking path has the greatest **distance** in the graph. Distance equals the difference in path length from the current leader plus the path's ranking position. Paths with the maximum distance remain recorded but their votes do not influence the standings.
 
 ## A Self-Expanding Canon
 
