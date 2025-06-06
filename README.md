@@ -186,7 +186,7 @@ python -m hronir_encyclopedia.cli vote --position 1 --path "0->1" --hronirs key 
 
 ## 🔏 Proof-of-Work Voting
 
-Each vote must present a new forking path accompanied by two undiscovered hrönirs. This ingenious proof-of-work not only protects the ranking system from frivolous votes, it actively expands the encyclopedia's universe. Votes only count once their submitted path rises to the top of its position—rewarding readers who boldly chart unexplored territory.
+Each vote must present a new forking path accompanied by two undiscovered hrönirs. This ingenious proof-of-work not only protects the ranking system from frivolous votes, it actively expands the encyclopedia's universe. Votes are tallied immediately unless their forking path has the greatest **distance** in the graph. Distance equals the difference in path length from the current leader plus the path's ranking position. Paths with the maximum distance remain recorded but their votes do not affect the rankings.
 
 For a deeper look at the rationale behind this system, see [docs/proof_of_work_voting.md](docs/proof_of_work_voting.md).
 

@@ -61,14 +61,28 @@ def _cmd_vote(args):
     entries.append([args.path, 1])
     entries.sort(key=lambda x: (-x[1], x[0]))
 
+    def _distance(p, top, rank):
+        return abs(len(p.split("->")) - len(top.split("->"))) + rank
+
+    top_path = entries[0][0]
+    distances = []
+    for idx, (p, c) in enumerate(entries, start=1):
+        distances.append(_distance(p, top_path, idx))
+
+    max_distance = max(distances)
+    new_idx = next(i for i, (p, _) in enumerate(entries) if p == args.path)
+
+    if distances[new_idx] == max_distance:
+        entries[new_idx][1] = 0
+        result = "vote recorded but too distant to count"
+    else:
+        result = "vote counted"
+
     with rating_file.open("w", newline="") as fh:
         writer = csv.writer(fh)
         writer.writerows(entries)
 
-    if entries[0][0] == args.path:
-        print("vote counted")
-    else:
-        print("vote recorded but not counted")
+    print(result)
 
 
 def main(argv=None):

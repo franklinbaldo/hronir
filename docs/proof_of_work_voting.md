@@ -15,7 +15,7 @@ In a system with limitless branching paths, it would be trivial to submit endles
    ```bash
    python -m hronir_encyclopedia.cli vote --position 1 --path "0->1" --hronirs a b
    ```
-4. The vote is recorded in `ratings/position_001.csv`. If the submitted path ranks first after sorting, the vote is counted immediately; otherwise it remains on record until that path rises to the top.
+4. The vote is recorded in `ratings/position_001.csv`. Each vote counts unless its forking path ends up with the greatest **distance** in the graph. The distance is calculated as the difference in path length from the current leader plus the path's ranking position. Paths with the maximum distance remain on record but their votes do not influence the standings.
 
 ## A Self-Expanding Canon
 
