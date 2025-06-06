@@ -165,13 +165,13 @@ python -m hronir_encyclopedia.cli synthesize --position 3 --variant_id 3_a
 # Generate multiple variants at once
 python -m hronir_encyclopedia.cli synthesize --position 3 --variants 3
 
-# View the current narrative tree
+# View the current narrative tree (prints a simple list for now)
 python -m hronir_encyclopedia.cli tree
 
 # Check Elo rankings for a specific position
 python -m hronir_encyclopedia.cli ranking --position 2
 
-# Validate a human-contributed chapter
+# Validate a human-contributed chapter (checks file location only)
 python -m hronir_encyclopedia.cli validate --chapter book/03/03_human.md
 
 # Submit human contribution to ranking system
