@@ -1,5 +1,6 @@
 import argparse
 import json
+import subprocess
 from pathlib import Path
 from . import storage, ratings, gemini_util
 
@@ -58,6 +59,32 @@ def _cmd_auto_vote(args):
     print("auto vote recorded")
 
 
+def _git_remove_deleted():
+    """Stage deleted files in git if available."""
+    try:
+        output = subprocess.check_output(["git", "ls-files", "--deleted"], text=True)
+    except Exception:
+        return
+    for path in output.splitlines():
+        if path:
+            subprocess.run(["git", "rm", "-r", "--ignore-unmatch", path])
+
+
+def _cmd_clean(args):
+    storage.purge_fake_hronirs()
+    fork_dir = Path("forking_path")
+    if fork_dir.exists():
+        for csv in fork_dir.glob("*.csv"):
+            storage.purge_fake_forking_csv(csv)
+    rating_dir = Path("ratings")
+    if rating_dir.exists():
+        for csv in rating_dir.glob("*.csv"):
+            storage.purge_fake_votes_csv(csv)
+    if getattr(args, "git", False):
+        _git_remove_deleted()
+    print("cleanup complete")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Hr\u00f6nir Encyclopedia CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -102,6 +129,14 @@ def main(argv=None):
     autovote.add_argument("--prev", required=True, help="uuid of previous chapter")
     autovote.add_argument("--voter", required=True, help="uuid of forking path casting the vote")
     autovote.set_defaults(func=_cmd_auto_vote)
+
+    clean = subparsers.add_parser("clean", help="remove invalid entries")
+    clean.add_argument(
+        "--git",
+        action="store_true",
+        help="also remove deleted files from the git index",
+    )
+    clean.set_defaults(func=_cmd_clean)
 
     args = parser.parse_args(argv)
     args.func(args)
