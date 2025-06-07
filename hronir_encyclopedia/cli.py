@@ -1,7 +1,7 @@
 import argparse
-import csv
 import json
 from pathlib import Path
+from . import storage, ratings, gemini_util
 
 
 def _placeholder_handler(name):
@@ -30,59 +30,32 @@ def _cmd_validate(args):
     print("chapter looks valid")
 
 
+def _cmd_store(args):
+    chapter = Path(args.chapter)
+    prev_uuid = args.prev
+    uuid_str = storage.store_chapter(chapter, prev_uuid)
+    print(uuid_str)
+
+
 def _cmd_vote(args):
-    ratings_dir = Path("ratings")
-    ratings_dir.mkdir(exist_ok=True)
-    rating_file = ratings_dir / f"position_{args.position:03d}.csv"
+    ratings.record_vote(args.position, args.voter, args.winner, args.loser)
+    print("vote recorded")
 
-    hronirs_path = Path("hronirs/index.txt")
-    hronirs_path.parent.mkdir(exist_ok=True)
-    if hronirs_path.exists():
-        known_hronirs = set(hronirs_path.read_text().splitlines())
-    else:
-        known_hronirs = set()
 
-    for h in args.hronirs:
-        if h not in known_hronirs:
-            known_hronirs.add(h)
-    hronirs_path.write_text("\n".join(sorted(known_hronirs)) + "\n")
+def _cmd_audit(args):
+    book_dir = Path("book")
+    for chapter in book_dir.glob("**/*.md"):
+        storage.validate_or_move(chapter)
 
-    entries = []
-    if rating_file.exists():
-        with rating_file.open() as fh:
-            for row in csv.reader(fh):
-                entries.append([row[0], int(row[1])])
+    fork_dir = Path("forking_path")
+    if fork_dir.exists():
+        for csv in fork_dir.glob("*.csv"):
+            storage.audit_forking_csv(csv)
 
-    for path, _ in entries:
-        if path == args.path:
-            print("path already exists; vote rejected")
-            return
 
-    entries.append([args.path, 1])
-    entries.sort(key=lambda x: (-x[1], x[0]))
-
-    def _distance(p, top, rank):
-        return abs(len(p.split("->")) - len(top.split("->"))) + rank
-
-    top_path = entries[0][0]
-    distances = []
-    for idx, (p, c) in enumerate(entries, start=1):
-        distances.append(_distance(p, top_path, idx))
-
-    max_distance = max(distances)
-    new_idx = next(i for i, (p, _) in enumerate(entries) if p == args.path)
-
-    if distances[new_idx] == max_distance:
-        entries[new_idx][1] = 0
-        result = "vote recorded but too distant to count"
-    else:
-        result = "vote counted"
-
-    with rating_file.open("w", newline="") as fh:
-        writer = csv.writer(fh)
-        writer.writerows(entries)
-
-    print(result)
+def _cmd_auto_vote(args):
+    gemini_util.auto_vote(args.position, args.prev, args.voter)
+    print("auto vote recorded")
 
 
 def main(argv=None):
@@ -106,14 +79,29 @@ def main(argv=None):
     ranking = subparsers.add_parser("ranking", help="in development")
     ranking.set_defaults(func=_placeholder_handler("ranking"))
 
+    vote = subparsers.add_parser("vote", help="record a duel result")
+    vote.add_argument("--position", type=int, required=True, help="chapter position")
+    vote.add_argument("--voter", required=True, help="uuid of forking path casting the vote")
+    vote.add_argument("--winner", required=True, help="winning chapter id")
+    vote.add_argument("--loser", required=True, help="losing chapter id")
+    vote.set_defaults(func=_cmd_vote)
+
     export = subparsers.add_parser("export", help="in development")
     export.set_defaults(func=_placeholder_handler("export"))
 
-    vote = subparsers.add_parser("vote", help="submit a vote with proof of work")
-    vote.add_argument("--position", type=int, required=True, help="chapter position")
-    vote.add_argument("--path", required=True, help="unique forking path")
-    vote.add_argument("--hronirs", nargs=2, required=True, help="two discovered hronirs")
-    vote.set_defaults(func=_cmd_vote)
+    store = subparsers.add_parser("store", help="store chapter by UUID")
+    store.add_argument("chapter", help="path to chapter markdown file")
+    store.add_argument("--prev", help="uuid of previous chapter")
+    store.set_defaults(func=_cmd_store)
+
+    audit = subparsers.add_parser("audit", help="validate and repair storage")
+    audit.set_defaults(func=_cmd_audit)
+
+    autovote = subparsers.add_parser("autovote", help="generate chapters with Gemini and vote")
+    autovote.add_argument("--position", type=int, required=True, help="chapter position")
+    autovote.add_argument("--prev", required=True, help="uuid of previous chapter")
+    autovote.add_argument("--voter", required=True, help="uuid of forking path casting the vote")
+    autovote.set_defaults(func=_cmd_auto_vote)
 
     args = parser.parse_args(argv)
     args.func(args)
