@@ -184,6 +184,13 @@ python -m hronir_encyclopedia.cli store book/03/03_human.md --prev 123e4567-e89b
 python -m hronir_encyclopedia.cli audit
 # Each forking entry receives a deterministic UUID
 
+# Automatically generate two chapters with Gemini and cast a vote
+python -m hronir_encyclopedia.cli autovote \
+  --position 1 \
+  --prev 123e4567-e89b-12d3-a456-426614174000 \
+  --voter 01234567-89ab-cdef-0123-456789abcdef
+# GEMINI_API_KEY must be set in your environment
+
 # Export the highest-ranked path as EPUB
 python -m hronir_encyclopedia.cli export --format epub --path canonical
 

@@ -1,7 +1,7 @@
 import argparse
 import json
 from pathlib import Path
-from . import storage, ratings
+from . import storage, ratings, gemini_util
 
 
 def _placeholder_handler(name):
@@ -53,6 +53,11 @@ def _cmd_audit(args):
             storage.audit_forking_csv(csv)
 
 
+def _cmd_auto_vote(args):
+    gemini_util.auto_vote(args.position, args.prev, args.voter)
+    print("auto vote recorded")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Hr\u00f6nir Encyclopedia CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -91,6 +96,12 @@ def main(argv=None):
 
     audit = subparsers.add_parser("audit", help="validate and repair storage")
     audit.set_defaults(func=_cmd_audit)
+
+    autovote = subparsers.add_parser("autovote", help="generate chapters with Gemini and vote")
+    autovote.add_argument("--position", type=int, required=True, help="chapter position")
+    autovote.add_argument("--prev", required=True, help="uuid of previous chapter")
+    autovote.add_argument("--voter", required=True, help="uuid of forking path casting the vote")
+    autovote.set_defaults(func=_cmd_auto_vote)
 
     args = parser.parse_args(argv)
     args.func(args)

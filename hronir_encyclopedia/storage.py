@@ -43,6 +43,20 @@ def store_chapter(chapter_file: Path, previous_uuid: str | None = None, base: Pa
     return chapter_uuid
 
 
+def store_chapter_text(text: str, previous_uuid: str | None = None, base: Path | str = "hronirs") -> str:
+    """Store raw chapter text and return its UUID."""
+    base = Path(base)
+    chapter_uuid = compute_uuid(text)
+    chapter_dir = uuid_to_path(chapter_uuid, base)
+    chapter_dir.mkdir(parents=True, exist_ok=True)
+    (chapter_dir / "index.md").write_text(text)
+    meta = {"uuid": chapter_uuid}
+    if previous_uuid:
+        meta["previous_uuid"] = previous_uuid
+    (chapter_dir / "metadata.json").write_text(json.dumps(meta, indent=2))
+    return chapter_uuid
+
+
 def is_valid_uuid_v5(value: str) -> bool:
     """Return True if value is a valid UUIDv5."""
     try:
