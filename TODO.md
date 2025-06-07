@@ -4,23 +4,23 @@ This document outlines the tasks required to implement the **Hrönir Encyclopedi
 
 ## ✅ Phase 0 — Repository Setup
 
-- [ ] Initialize git repository structure:
-  - [ ] `hronir_encyclopedia/` (Python package)
-  - [ ] `book/` (storage for chapters)
-  - [ ] `ratings/` (Elo rankings)
-  - [ ] `.github/workflows/` (for CI/CD)
-- [ ] Create essential files:
-  - [ ] `.gitignore`
-  - [ ] `LICENSE` (MIT)
-  - [ ] `requirements.txt`
-  - [ ] `book_index.json` (initial narrative tree)
+- [x] Initialize git repository structure:
+  - [x] `hronir_encyclopedia/` (Python package)
+  - [x] `book/` (storage for chapters)
+  - [x] `ratings/` (Elo rankings)
+  - [x] `.github/workflows/` (for CI/CD)
+- [x] Create essential files:
+  - [x] `.gitignore`
+  - [x] `LICENSE` (MIT)
+  - [x] `requirements.txt`
+  - [x] `book_index.json` (initial narrative tree)
 
 ---
 
 ## 🚧 Phase 1 — Seed Chapter & Basic CLI
 
-- [ ] Write Chapter 0 seed (`00_tlon_uqbar.md`)  
-- [ ] Implement minimal CLI (`cli.py`):
+- [x] Write Chapter 0 seed (`00_tlon_uqbar.md`)
+- [x] Implement minimal CLI (`cli.py`):
   - [ ] Generate initial branches (`continue` command)
   - [ ] Update `book_index.json`
 
@@ -41,6 +41,7 @@ This document outlines the tasks required to implement the **Hrönir Encyclopedi
 
 - [ ] Define clear file structure and naming conventions:
   - `book/<position>/<variant>.md`
+- [x] Implement UUID-based chapter storage under `hronirs/`
 - [ ] Update `book_index.json` dynamically with new chapters
 - [ ] Automate commit/version control of chapters
 
@@ -52,7 +53,7 @@ This document outlines the tasks required to implement the **Hrönir Encyclopedi
   - [ ] Endpoint `/vote` (JSON payload)
 - [ ] Set up Elo ranking logic:
   - [ ] Calculate Elo ratings per chapter position
-  - [ ] Persist rankings in `ratings/position_<n>.csv`
+  - [x] Persist rankings in `ratings/position_<n>.csv`
 - [ ] Create reader voting interface (CLI/web)
 
 ---
@@ -60,7 +61,10 @@ This document outlines the tasks required to implement the **Hrönir Encyclopedi
 ## 🚧 Phase 5 — CLI & API Completeness
 
 - [ ] Expand CLI functionality:
-  - [ ] `generate`, `vote`, `ranking`, and `tree` commands
+  - [ ] `generate`
+  - [x] `vote`
+  - [ ] `ranking`
+  - [x] `tree`
 - [ ] Implement comprehensive logging and error handling
 - [ ] Document CLI usage extensively
 
@@ -101,9 +105,9 @@ This document outlines the tasks required to implement the **Hrönir Encyclopedi
 
 ## 🗓️ Current Status
 
-- **README**: ✅ completed  
-- **Repository structure**: 🔲 pending (Phase 0)  
-- **Seed chapter (Tlön)**: 🔲 pending (Phase 1)
+- **README**: ✅ completed
+- **Repository structure**: ✅ completed (Phase 0)
+- **Seed chapter (Tlön)**: ✅ completed (Phase 1)
 
 This document will be updated as development progresses.
 
