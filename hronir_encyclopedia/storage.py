@@ -74,6 +74,21 @@ def chapter_exists(uuid_str: str, base: Path | str = "hronirs") -> bool:
     return any(chapter_dir.glob("index.*"))
 
 
+def forking_path_exists(fork_uuid: str, fork_dir: Path | str = "forking_path") -> bool:
+    """Return True if fork_uuid appears in any forking_path CSV."""
+    import pandas as pd
+
+    fork_dir = Path(fork_dir)
+    for csv in fork_dir.glob("*.csv"):
+        try:
+            df = pd.read_csv(csv)
+        except Exception:
+            continue
+        if "fork_uuid" in df.columns and fork_uuid in df["fork_uuid"].astype(str).values:
+            return True
+    return False
+
+
 def validate_or_move(chapter_file: Path, base: Path | str = "hronirs") -> str:
     """Ensure chapter_file resides under its UUID path. Move if necessary."""
     base = Path(base)
@@ -97,7 +112,14 @@ def audit_forking_csv(csv_path: Path, base: Path | str = "hronirs") -> None:
     import pandas as pd
 
     base = Path(base)
-    df = pd.read_csv(csv_path)
+    if csv_path.stat().st_size == 0:
+        csv_path.write_text("")
+        return 0
+    try:
+        df = pd.read_csv(csv_path)
+    except pd.errors.EmptyDataError:
+        csv_path.write_text("")
+        return 0
 
     # Normalise column names
     cols = list(df.columns)
@@ -169,7 +191,14 @@ def purge_fake_forking_csv(csv_path: Path, base: Path | str = "hronirs") -> int:
     if not csv_path.exists():
         return 0
 
-    df = pd.read_csv(csv_path)
+    if csv_path.stat().st_size == 0:
+        csv_path.write_text("")
+        return 0
+    try:
+        df = pd.read_csv(csv_path)
+    except pd.errors.EmptyDataError:
+        csv_path.write_text("")
+        return 0
     keep = []
     removed = 0
     for _, row in df.iterrows():
@@ -194,7 +223,11 @@ def purge_fake_forking_csv(csv_path: Path, base: Path | str = "hronirs") -> int:
     return removed
 
 
-def purge_fake_votes_csv(csv_path: Path, base: Path | str = "hronirs") -> int:
+def purge_fake_votes_csv(
+    csv_path: Path,
+    base: Path | str = "hronirs",
+    fork_dir: Path | str = "forking_path",
+) -> int:
     """Remove votes referencing missing chapters or duplicate voters."""
     import pandas as pd
 
@@ -202,7 +235,14 @@ def purge_fake_votes_csv(csv_path: Path, base: Path | str = "hronirs") -> int:
     if not csv_path.exists():
         return 0
 
-    df = pd.read_csv(csv_path)
+    if csv_path.stat().st_size == 0:
+        csv_path.write_text("")
+        return 0
+    try:
+        df = pd.read_csv(csv_path)
+    except pd.errors.EmptyDataError:
+        csv_path.write_text("")
+        return 0
     keep = []
     seen = set()
     removed = 0
@@ -211,6 +251,9 @@ def purge_fake_votes_csv(csv_path: Path, base: Path | str = "hronirs") -> int:
         winner = str(row.get("winner", ""))
         loser = str(row.get("loser", ""))
         if voter in seen:
+            removed += 1
+            continue
+        if not forking_path_exists(voter, fork_dir):
             removed += 1
             continue
         if not (is_valid_uuid_v5(winner) and chapter_exists(winner, base)):
