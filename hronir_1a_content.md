@@ -1,0 +1,1 @@
+The scholar, intrigued by the obsidian mirror mentioned in the Uqbar manuscript, found it led not to a reflection, but a passage into a library of shifting sands. Each grain was a world, each gust of wind a new history.
