@@ -219,6 +219,15 @@ python -m hronir_encyclopedia.cli vote \
   --winner 3_a --loser 3_b
 ```
 
+## Development Setup
+
+Install and enable the pre-commit hook to automatically clean invalid hrönirs and votes:
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
 ---
 
 ## 🚧 Project Roadmap

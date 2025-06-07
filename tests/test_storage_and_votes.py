@@ -84,17 +84,30 @@ def test_clean_functions(tmp_path):
     df = pd.read_csv(fork_csv)
     assert len(df) == 1
 
+    fork_uuid_valid = "fork1"
+    fork_dir = tmp_path / "forking_path"
+    fork_dir.mkdir()
+    fork_csv2 = fork_dir / "paths.csv"
+    pd.DataFrame([
+        {
+            "position": 1,
+            "prev_uuid": uid1,
+            "uuid": uid2,
+            "fork_uuid": fork_uuid_valid,
+        }
+    ]).to_csv(fork_csv2, index=False)
+
     rating_csv = tmp_path / "rating.csv"
     rows = [
         {
             "uuid": str(uuid.uuid4()),
-            "voter": "fork1",
+            "voter": fork_uuid_valid,
             "winner": uid1,
             "loser": uid2,
         },
         {
             "uuid": str(uuid.uuid4()),
-            "voter": "fork1",
+            "voter": fork_uuid_valid,
             "winner": uid1,
             "loser": uid2,
         },
@@ -106,7 +119,7 @@ def test_clean_functions(tmp_path):
         },
     ]
     pd.DataFrame(rows).to_csv(rating_csv, index=False)
-    removed = storage.purge_fake_votes_csv(rating_csv, base=base)
+    removed = storage.purge_fake_votes_csv(rating_csv, base=base, fork_dir=fork_dir)
     assert removed == 2
     df = pd.read_csv(rating_csv)
     assert len(df) == 1
