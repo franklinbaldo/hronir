@@ -1,5 +1,6 @@
 import json
 import uuid
+import shutil
 from pathlib import Path
 
 UUID_NAMESPACE = uuid.NAMESPACE_URL
@@ -130,3 +131,97 @@ def audit_forking_csv(csv_path: Path, base: Path | str = "hronirs") -> None:
 
     if changed:
         df.to_csv(csv_path, index=False)
+
+
+def purge_fake_hronirs(base: Path | str = "hronirs") -> int:
+    """Remove chapters whose metadata or path UUID doesn't match their text."""
+    base = Path(base)
+    removed = 0
+    for meta in base.rglob("metadata.json"):
+        chapter_dir = meta.parent
+        try:
+            data = json.loads(meta.read_text())
+        except Exception:
+            shutil.rmtree(chapter_dir, ignore_errors=True)
+            removed += 1
+            continue
+
+        uuid_str = data.get("uuid")
+        index_file = chapter_dir / "index.md"
+        if not index_file.exists() or not is_valid_uuid_v5(uuid_str):
+            shutil.rmtree(chapter_dir, ignore_errors=True)
+            removed += 1
+            continue
+
+        computed = compute_uuid(index_file.read_text())
+        expected_dir = uuid_to_path(uuid_str, base)
+        if computed != uuid_str or chapter_dir.resolve() != expected_dir.resolve():
+            shutil.rmtree(chapter_dir, ignore_errors=True)
+            removed += 1
+    return removed
+
+
+def purge_fake_forking_csv(csv_path: Path, base: Path | str = "hronirs") -> int:
+    """Remove invalid rows from a forking path CSV."""
+    import pandas as pd
+
+    base = Path(base)
+    if not csv_path.exists():
+        return 0
+
+    df = pd.read_csv(csv_path)
+    keep = []
+    removed = 0
+    for _, row in df.iterrows():
+        pos = int(row.get("position", 0))
+        prev_uuid = str(row.get("prev_uuid", ""))
+        cur_uuid = str(row.get("uuid", ""))
+        fork_uuid = str(row.get("fork_uuid", ""))
+        expected = compute_forking_uuid(pos, prev_uuid, cur_uuid)
+        if fork_uuid != expected:
+            removed += 1
+            continue
+        if not (is_valid_uuid_v5(prev_uuid) and chapter_exists(prev_uuid, base)):
+            removed += 1
+            continue
+        if not (is_valid_uuid_v5(cur_uuid) and chapter_exists(cur_uuid, base)):
+            removed += 1
+            continue
+        keep.append(row)
+
+    if removed:
+        pd.DataFrame(keep).to_csv(csv_path, index=False)
+    return removed
+
+
+def purge_fake_votes_csv(csv_path: Path, base: Path | str = "hronirs") -> int:
+    """Remove votes referencing missing chapters or duplicate voters."""
+    import pandas as pd
+
+    base = Path(base)
+    if not csv_path.exists():
+        return 0
+
+    df = pd.read_csv(csv_path)
+    keep = []
+    seen = set()
+    removed = 0
+    for _, row in df.iterrows():
+        voter = str(row.get("voter", ""))
+        winner = str(row.get("winner", ""))
+        loser = str(row.get("loser", ""))
+        if voter in seen:
+            removed += 1
+            continue
+        if not (is_valid_uuid_v5(winner) and chapter_exists(winner, base)):
+            removed += 1
+            continue
+        if not (is_valid_uuid_v5(loser) and chapter_exists(loser, base)):
+            removed += 1
+            continue
+        seen.add(voter)
+        keep.append(row)
+
+    if removed:
+        pd.DataFrame(keep).to_csv(csv_path, index=False)
+    return removed

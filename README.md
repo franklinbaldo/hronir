@@ -184,6 +184,9 @@ python -m hronir_encyclopedia.cli store book/03/03_human.md --prev 123e4567-e89b
 python -m hronir_encyclopedia.cli audit
 # Each forking entry receives a deterministic UUID
 
+# Remove invalid hrönirs, forking paths or votes
+python -m hronir_encyclopedia.cli clean --git
+
 # Automatically generate two chapters with Gemini and cast a vote
 python -m hronir_encyclopedia.cli autovote \
   --position 1 \
