@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from hronir_encyclopedia import storage, ratings, gemini_util
+from hronir_encyclopedia import storage, ratings, gemini_util, database
 
 
 def test_store_chapter_text(tmp_path):
@@ -20,8 +20,10 @@ def test_store_chapter_text(tmp_path):
 
 def test_record_vote_multiple_entries(tmp_path):
     base = tmp_path / "ratings"
-    for i in range(10):
-        ratings.record_vote(1, f"voter{i}", f"winner{i}", f"loser{i}", base=base)
+    fork_dir = tmp_path / "forking_path"
+    with database.open_database(ratings_dir=base, fork_dir=fork_dir) as conn:
+        for i in range(10):
+            ratings.record_vote(1, f"voter{i}", f"winner{i}", f"loser{i}", conn=conn)
     df = pd.read_csv(base / "position_001.csv")
     assert len(df) == 10
     assert set(df["voter"]) == {f"voter{i}" for i in range(10)}
@@ -39,12 +41,14 @@ def test_auto_vote_records_votes(monkeypatch, tmp_path):
 
     monkeypatch.setattr(gemini_util, "_gemini_request", fake_request)
 
-    for _ in range(10):
-        gemini_util.auto_vote(
-            position=1,
-            prev_uuid="00000000-0000-0000-0000-000000000000",
-            voter=str(uuid.uuid4()),
-        )
+    with database.open_database() as conn:
+        for _ in range(10):
+            gemini_util.auto_vote(
+                position=1,
+                prev_uuid="00000000-0000-0000-0000-000000000000",
+                voter=str(uuid.uuid4()),
+                conn=conn,
+            )
 
     df = pd.read_csv(Path("ratings/position_001.csv"))
     assert len(df) == 10

@@ -2,7 +2,7 @@ import argparse
 import json
 import subprocess
 from pathlib import Path
-from . import storage, ratings, gemini_util
+from . import storage, ratings, gemini_util, database
 
 
 def _placeholder_handler(name):
@@ -39,7 +39,10 @@ def _cmd_store(args):
 
 
 def _cmd_vote(args):
-    ratings.record_vote(args.position, args.voter, args.winner, args.loser)
+    with database.open_database() as conn:
+        ratings.record_vote(
+            args.position, args.voter, args.winner, args.loser, conn=conn
+        )
     print("vote recorded")
 
 
@@ -55,7 +58,8 @@ def _cmd_audit(args):
 
 
 def _cmd_auto_vote(args):
-    gemini_util.auto_vote(args.position, args.prev, args.voter)
+    with database.open_database() as conn:
+        gemini_util.auto_vote(args.position, args.prev, args.voter, conn=conn)
     print("auto vote recorded")
 
 
