@@ -6,7 +6,7 @@ This document outlines the tasks required to implement the **Hrönir Encyclopedi
 
 - [x] Initialize git repository structure:
   - [x] `hronir_encyclopedia/` (Python package)
-  - [x] `book/` (storage for chapters)
+  - [x] `book/` (canonical encyclopedia)
   - [x] `ratings/` (Elo rankings)
   - [x] `.github/workflows/` (for CI/CD)
 - [x] Create essential files:
@@ -40,8 +40,9 @@ This document outlines the tasks required to implement the **Hrönir Encyclopedi
 ## 🚧 Phase 3 — Chapter Management
 
 - [ ] Define clear file structure and naming conventions:
-  - `book/<position>/<variant>.md`
-- [x] Implement UUID-based chapter storage under `hronirs/`
+  - canonical chapters: `book/<position>.md`
+  - new variants stored under `the_library/<uuid>/index.md`
+- [x] Implement UUID-based chapter storage under `the_library/`
 - [ ] Update `book_index.json` dynamically with new chapters
 - [ ] Automate commit/version control of chapters
 

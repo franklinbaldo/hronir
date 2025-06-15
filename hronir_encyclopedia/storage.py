@@ -27,7 +27,7 @@ def uuid_to_path(uuid_str: str, base: Path) -> Path:
     return path
 
 
-def store_chapter(chapter_file: Path, previous_uuid: str | None = None, base: Path | str = "hronirs") -> str:
+def store_chapter(chapter_file: Path, previous_uuid: str | None = None, base: Path | str = "the_library") -> str:
     """Store chapter_file content under UUID-based path and return UUID."""
     base = Path(base)
     text = chapter_file.read_text()
@@ -45,7 +45,7 @@ def store_chapter(chapter_file: Path, previous_uuid: str | None = None, base: Pa
     return chapter_uuid
 
 
-def store_chapter_text(text: str, previous_uuid: str | None = None, base: Path | str = "hronirs") -> str:
+def store_chapter_text(text: str, previous_uuid: str | None = None, base: Path | str = "the_library") -> str:
     """Store raw chapter text and return its UUID."""
     base = Path(base)
     chapter_uuid = compute_uuid(text)
@@ -68,7 +68,7 @@ def is_valid_uuid_v5(value: str) -> bool:
         return False
 
 
-def chapter_exists(uuid_str: str, base: Path | str = "hronirs") -> bool:
+def chapter_exists(uuid_str: str, base: Path | str = "the_library") -> bool:
     """Return True if a chapter directory exists for uuid_str."""
     base = Path(base)
     chapter_dir = uuid_to_path(uuid_str, base)
@@ -109,7 +109,7 @@ def forking_path_exists(
     return False
 
 
-def validate_or_move(chapter_file: Path, base: Path | str = "hronirs") -> str:
+def validate_or_move(chapter_file: Path, base: Path | str = "the_library") -> str:
     """Ensure chapter_file resides under its UUID path. Move if necessary."""
     base = Path(base)
     text = chapter_file.read_text()
@@ -127,7 +127,7 @@ def validate_or_move(chapter_file: Path, base: Path | str = "hronirs") -> str:
     return chapter_uuid
 
 
-def audit_forking_csv(csv_path: Path, base: Path | str = "hronirs") -> None:
+def audit_forking_csv(csv_path: Path, base: Path | str = "the_library") -> None:
     """Validate chapters referenced in a forking path CSV."""
     import pandas as pd
 
@@ -175,7 +175,7 @@ def audit_forking_csv(csv_path: Path, base: Path | str = "hronirs") -> None:
         df.to_csv(csv_path, index=False)
 
 
-def purge_fake_hronirs(base: Path | str = "hronirs") -> int:
+def purge_fake_hronirs(base: Path | str = "the_library") -> int:
     """Remove chapters whose metadata or path UUID doesn't match their text."""
     base = Path(base)
     removed = 0
@@ -203,7 +203,7 @@ def purge_fake_hronirs(base: Path | str = "hronirs") -> int:
     return removed
 
 
-def purge_fake_forking_csv(csv_path: Path, base: Path | str = "hronirs") -> int:
+def purge_fake_forking_csv(csv_path: Path, base: Path | str = "the_library") -> int:
     """Remove invalid rows from a forking path CSV."""
     import pandas as pd
 
@@ -245,7 +245,7 @@ def purge_fake_forking_csv(csv_path: Path, base: Path | str = "hronirs") -> int:
 
 def purge_fake_votes_csv(
     csv_path: Path,
-    base: Path | str = "hronirs",
+    base: Path | str = "the_library",
     fork_dir: Path | str = "forking_path",
     conn: Engine | None = None,
 ) -> int:

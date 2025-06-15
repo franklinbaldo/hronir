@@ -4,6 +4,8 @@
 
 The **Hrönir Encyclopedia** is a computational literary project creating an infinitely branching, self-reflective narrative inspired by Jorge Luis Borges' **Tlön, Uqbar, Orbis Tertius**.
 
+See `GLOSSARY.md` for how various Borgesian concepts map onto project structures.
+
 In this encyclopedia, each new chapter (**Chapter n**) is not simply a continuation of the immediately preceding chapter but is generated from the entire narrative space formed by all previously written chapters (0 to n-1). Each new branch is a probabilistic synthesis of previous narrative paths, preserving thematic coherence, stylistic unity, and Borgesian philosophical concepts.
 
 Among infinite possibilities, one version will ultimately prove itself authentic—not by external authority, but because it resonates most powerfully within the minds of its readers.
@@ -62,9 +64,13 @@ Human contributors can participate in the encyclopedia's evolution by submitting
 ### Contributing a Chapter Variant
 
 1. **Fork the repository** and create a branch for your contribution
-2. **Add your chapter** following the naming convention: `book/[position]/[position]_[variant].md`
-3. **Follow Borgesian style guidelines** (see `CONTRIBUTING.md`)
-4. **Submit a pull request** with your variant
+2. **Write your chapter** as a Markdown file anywhere (e.g., `drafts/03_my_variant.md`)
+3. **Store it** under `the_library/` using the CLI:
+   ```bash
+   python -m hronir_encyclopedia.cli store drafts/03_my_variant.md --prev <previous_uuid>
+   ```
+4. **Follow Borgesian style guidelines** (see `CONTRIBUTING.md`)
+5. **Submit a pull request** with your stored hrön
 
 ### Review Process
 
@@ -78,8 +84,8 @@ Human-authored and AI-generated variants compete on equal terms in the literary 
 
 ```bash
 # Contributing via CLI
-python -m hronir_encyclopedia.cli validate --chapter book/03/03_human.md
-python -m hronir_encyclopedia.cli submit --chapter book/03/03_human.md --author "human"
+python -m hronir_encyclopedia.cli validate --chapter drafts/03_my_variant.md
+python -m hronir_encyclopedia.cli store drafts/03_my_variant.md --prev <previous_uuid>
 ```
 
 ---
@@ -125,6 +131,7 @@ This process ensures each new chapter reflects not only isolated events but also
 - Variants within the same chapter position compete through **paired reader evaluations** (literary duels).
 - Results of these duels are recorded using an **Elo-based literary ranking system**, establishing a probabilistic hierarchy among competing versions.
 - Over time, a dominant version emerges for each chapter position—the "canonical Hrönir"—acknowledged by readers as the authentic narrative branch through their collective experience.
+- Winning chapters are copied into the `book/` folder, and each selection constrains the possibilities for subsequent chapters via updated forking paths.
 
 Example Elo ranking for Chapter 2 variants:
 
@@ -138,16 +145,16 @@ Example Elo ranking for Chapter 2 variants:
 
 ## 🗂️ Repository Structure
 
+Forking paths are stored in `forking_path/yu-tsun.csv`, named after the protagonist of *The Garden of Forking Paths*.
+
+
 ```
-book/
+the_library/                       # Chapters stored by UUID
+book/                              # Current canonical version
 ├── 00_tlon_uqbar.md             # Seed chapter (position 0)
-├── 01/
-│   ├── 01_a.md
-│   └── 01_b.md
-├── 02/
-│   ├── 02_a.md
-│   └── 02_b.md
-├── book_index.json              # Detailed narrative tree
+├── book_index.json              # Canonical path index
+forking_path/
+└── yu-tsun.csv                  # Narrative branches
 ratings/
 └── position_002.csv             # Recorded votes per chapter position
 ```
@@ -171,14 +178,11 @@ python -m hronir_encyclopedia.cli tree
 # Check Elo rankings for a specific position
 python -m hronir_encyclopedia.cli ranking --position 2
 
-# Validate a human-contributed chapter (checks file location only)
-python -m hronir_encyclopedia.cli validate --chapter book/03/03_human.md
-
-# Submit human contribution to ranking system
-python -m hronir_encyclopedia.cli submit --chapter book/03/03_human.md --author "human"
+# Validate a human-contributed chapter
+python -m hronir_encyclopedia.cli validate --chapter drafts/03_my_variant.md
 
 # Store chapter using UUID layout
-python -m hronir_encyclopedia.cli store book/03/03_human.md --prev 123e4567-e89b-12d3-a456-426614174000
+python -m hronir_encyclopedia.cli store drafts/03_my_variant.md --prev 123e4567-e89b-12d3-a456-426614174000
 
 # Validate and repair stored chapters
 python -m hronir_encyclopedia.cli audit
@@ -251,7 +255,10 @@ pre-commit install
 
 The Hrönir Encyclopedia exists at the intersection of imagination and reality, possibility and inevitability, continually expanding within the reader's consciousness. Each generated variant—whether born from artificial intelligence or human creativity—exists in a state of potential authenticity until collective recognition determines which version was always meant to be.
 
+Just as the **Library of Babel** contains every possible book, the `the_library/` directory holds innumerable variants. Each branch's summary hash functions as an **Aleph**, a point that contains all other points. Some branches become a **Zahir**, monopolising attention, while a Funes-like audit log recalls every change. Our Git history unfolds like the **Book of Sand**, without a first or last page, and any author may himself be dreamed by another, echoing **The Circular Ruins**.
+
 The project explores fundamental questions about literary truth: Is authenticity inherent in a text, or does it emerge through recognition? Can computational generation achieve the same inevitability as human inspiration? When human and artificial minds collaborate unknowingly, which produces the more "true" version? In the end, the readers themselves become the final arbiters of what feels most inevitable, regardless of its origin.
+[^menard]: This approach echoes Borges' 'Pierre Menard, Author of the Quixote' (1939), in which identical text gains new meaning through context.
 
 ---
 
