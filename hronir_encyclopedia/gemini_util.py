@@ -1,5 +1,5 @@
 import os
-import sqlite3
+from sqlalchemy.engine import Engine
 from pathlib import Path
 
 import pandas as pd
@@ -48,26 +48,27 @@ def append_fork(
     position: int,
     prev_uuid: str,
     uuid: str,
-    conn: sqlite3.Connection | None = None,
+    conn: Engine | None = None,
 ) -> str:
     csv_file.parent.mkdir(parents=True, exist_ok=True)
     fork_uuid = storage.compute_forking_uuid(position, prev_uuid, uuid)
     if conn is not None:
         table = csv_file.stem
-        conn.execute(
-            f"""
-            CREATE TABLE IF NOT EXISTS `{table}` (
-                position INTEGER,
-                prev_uuid TEXT,
-                uuid TEXT,
-                fork_uuid TEXT
+        with conn.begin() as con:
+            con.exec_driver_sql(
+                f"""
+                CREATE TABLE IF NOT EXISTS `{table}` (
+                    position INTEGER,
+                    prev_uuid TEXT,
+                    uuid TEXT,
+                    fork_uuid TEXT
+                )
+                """
             )
-            """
-        )
-        conn.execute(
-            f"INSERT INTO `{table}` (position, prev_uuid, uuid, fork_uuid) VALUES (?, ?, ?, ?)",
-            (position, prev_uuid, uuid, fork_uuid),
-        )
+            con.exec_driver_sql(
+                f"INSERT INTO `{table}` (position, prev_uuid, uuid, fork_uuid) VALUES (?, ?, ?, ?)",
+                (position, prev_uuid, uuid, fork_uuid),
+            )
         return fork_uuid
 
     if csv_file.exists():
@@ -82,7 +83,7 @@ def append_fork(
     return fork_uuid
 
 
-def auto_vote(position: int, prev_uuid: str, voter: str, conn: sqlite3.Connection | None = None) -> str:
+def auto_vote(position: int, prev_uuid: str, voter: str, conn: Engine | None = None) -> str:
     """Generate winner and loser chapters and record a vote."""
     winner_uuid = generate_chapter(f"Winner for position {position}", prev_uuid)
     loser_uuid = generate_chapter(f"Loser for position {position}", prev_uuid)
