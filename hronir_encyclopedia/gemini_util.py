@@ -1,4 +1,5 @@
 import os
+import sqlite3
 from pathlib import Path
 
 import pandas as pd
@@ -42,27 +43,51 @@ def generate_chapter(prompt: str, prev_uuid: str | None = None) -> str:
     return storage.store_chapter_text(text, previous_uuid=prev_uuid)
 
 
-def append_fork(csv_file: Path, position: int, prev_uuid: str, uuid: str) -> str:
+def append_fork(
+    csv_file: Path,
+    position: int,
+    prev_uuid: str,
+    uuid: str,
+    conn: sqlite3.Connection | None = None,
+) -> str:
     csv_file.parent.mkdir(parents=True, exist_ok=True)
     fork_uuid = storage.compute_forking_uuid(position, prev_uuid, uuid)
+    if conn is not None:
+        table = csv_file.stem
+        conn.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS `{table}` (
+                position INTEGER,
+                prev_uuid TEXT,
+                uuid TEXT,
+                fork_uuid TEXT
+            )
+            """
+        )
+        conn.execute(
+            f"INSERT INTO `{table}` (position, prev_uuid, uuid, fork_uuid) VALUES (?, ?, ?, ?)",
+            (position, prev_uuid, uuid, fork_uuid),
+        )
+        return fork_uuid
+
     if csv_file.exists():
         df = pd.read_csv(csv_file)
     else:
         df = pd.DataFrame(columns=["position", "prev_uuid", "uuid", "fork_uuid"])
-    df = pd.concat([
-        df,
-        pd.DataFrame([{"position": position, "prev_uuid": prev_uuid, "uuid": uuid, "fork_uuid": fork_uuid}])
-    ], ignore_index=True)
+    df = pd.concat(
+        [df, pd.DataFrame([{"position": position, "prev_uuid": prev_uuid, "uuid": uuid, "fork_uuid": fork_uuid}])],
+        ignore_index=True,
+    )
     df.to_csv(csv_file, index=False)
     return fork_uuid
 
 
-def auto_vote(position: int, prev_uuid: str, voter: str) -> str:
+def auto_vote(position: int, prev_uuid: str, voter: str, conn: sqlite3.Connection | None = None) -> str:
     """Generate winner and loser chapters and record a vote."""
     winner_uuid = generate_chapter(f"Winner for position {position}", prev_uuid)
     loser_uuid = generate_chapter(f"Loser for position {position}", prev_uuid)
     fork_csv = Path("forking_path/auto.csv")
-    append_fork(fork_csv, position, prev_uuid, winner_uuid)
-    append_fork(fork_csv, position, prev_uuid, loser_uuid)
-    ratings.record_vote(position, voter, winner_uuid, loser_uuid)
+    append_fork(fork_csv, position, prev_uuid, winner_uuid, conn=conn)
+    append_fork(fork_csv, position, prev_uuid, loser_uuid, conn=conn)
+    ratings.record_vote(position, voter, winner_uuid, loser_uuid, conn=conn)
     return winner_uuid

@@ -1,6 +1,7 @@
 import json
 import uuid
 import shutil
+import sqlite3
 from pathlib import Path
 
 UUID_NAMESPACE = uuid.NAMESPACE_URL
@@ -74,9 +75,25 @@ def chapter_exists(uuid_str: str, base: Path | str = "hronirs") -> bool:
     return any(chapter_dir.glob("index.*"))
 
 
-def forking_path_exists(fork_uuid: str, fork_dir: Path | str = "forking_path") -> bool:
-    """Return True if fork_uuid appears in any forking_path CSV."""
+def forking_path_exists(
+    fork_uuid: str,
+    fork_dir: Path | str = "forking_path",
+    conn: sqlite3.Connection | None = None,
+) -> bool:
+    """Return True if fork_uuid appears in any forking path table or CSV."""
     import pandas as pd
+
+    if conn is not None:
+        cur = conn.cursor()
+        tables = [row[0] for row in cur.execute("SELECT name FROM sqlite_master WHERE type='table'")]
+        for table in tables:
+            try:
+                row = cur.execute(f"SELECT 1 FROM `{table}` WHERE fork_uuid=? LIMIT 1", (fork_uuid,)).fetchone()
+            except sqlite3.OperationalError:
+                continue
+            if row:
+                return True
+        return False
 
     fork_dir = Path(fork_dir)
     for csv in fork_dir.glob("*.csv"):
@@ -227,6 +244,7 @@ def purge_fake_votes_csv(
     csv_path: Path,
     base: Path | str = "hronirs",
     fork_dir: Path | str = "forking_path",
+    conn: sqlite3.Connection | None = None,
 ) -> int:
     """Remove votes referencing missing chapters or duplicate voters."""
     import pandas as pd
@@ -253,7 +271,7 @@ def purge_fake_votes_csv(
         if voter in seen:
             removed += 1
             continue
-        if not forking_path_exists(voter, fork_dir):
+        if not forking_path_exists(voter, fork_dir, conn=conn):
             removed += 1
             continue
         if not (is_valid_uuid_v5(winner) and chapter_exists(winner, base)):
