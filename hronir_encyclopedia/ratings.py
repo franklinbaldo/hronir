@@ -2,7 +2,7 @@ import uuid
 from pathlib import Path
 from typing import Optional
 import pandas as pd
-import sqlite3
+from sqlalchemy.engine import Engine
 
 
 def record_vote(
@@ -11,25 +11,26 @@ def record_vote(
     winner: str,
     loser: str,
     base: Path | str = "ratings",
-    conn: Optional[sqlite3.Connection] = None,
+    conn: Optional[Engine] = None,
 ) -> None:
     """Append a vote to the ratings table."""
     if conn is not None:
         table = f"position_{position:03d}"
-        conn.execute(
-            f"""
-            CREATE TABLE IF NOT EXISTS `{table}` (
-                uuid TEXT,
-                voter TEXT,
-                winner TEXT,
-                loser TEXT
+        with conn.begin() as con:
+            con.exec_driver_sql(
+                f"""
+                CREATE TABLE IF NOT EXISTS `{table}` (
+                    uuid TEXT,
+                    voter TEXT,
+                    winner TEXT,
+                    loser TEXT
+                )
+                """
             )
-            """
-        )
-        conn.execute(
-            f"INSERT INTO `{table}` (uuid, voter, winner, loser) VALUES (?, ?, ?, ?)",
-            (str(uuid.uuid4()), voter, winner, loser),
-        )
+            con.exec_driver_sql(
+                f"INSERT INTO `{table}` (uuid, voter, winner, loser) VALUES (?, ?, ?, ?)",
+                (str(uuid.uuid4()), voter, winner, loser),
+            )
         return
 
     base = Path(base)

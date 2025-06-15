@@ -1,3 +1,4 @@
 click
 pandas
 google-generativeai
+sqlalchemy>=2.0
