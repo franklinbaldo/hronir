@@ -195,7 +195,8 @@ python -m hronir_encyclopedia.cli autovote \
 # GEMINI_API_KEY must be set in your environment
 
 # These commands load ratings and forking_path CSV files into a temporary
-# SQLite database. Changes are written back to CSV when the command finishes.
+# SQLite database via SQLAlchemy. Changes are written back to CSV when the
+# command finishes.
 
 # Export the highest-ranked path as EPUB
 python -m hronir_encyclopedia.cli export --format epub --path canonical

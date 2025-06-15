@@ -1,7 +1,7 @@
 import json
 import uuid
 import shutil
-import sqlite3
+from sqlalchemy.engine import Engine
 from pathlib import Path
 
 UUID_NAMESPACE = uuid.NAMESPACE_URL
@@ -78,22 +78,25 @@ def chapter_exists(uuid_str: str, base: Path | str = "hronirs") -> bool:
 def forking_path_exists(
     fork_uuid: str,
     fork_dir: Path | str = "forking_path",
-    conn: sqlite3.Connection | None = None,
+    conn: Engine | None = None,
 ) -> bool:
     """Return True if fork_uuid appears in any forking path table or CSV."""
     import pandas as pd
 
     if conn is not None:
-        cur = conn.cursor()
-        tables = [row[0] for row in cur.execute("SELECT name FROM sqlite_master WHERE type='table'")]
-        for table in tables:
-            try:
-                row = cur.execute(f"SELECT 1 FROM `{table}` WHERE fork_uuid=? LIMIT 1", (fork_uuid,)).fetchone()
-            except sqlite3.OperationalError:
-                continue
-            if row:
-                return True
-        return False
+        with conn.connect() as con:
+            tables = [row[0] for row in con.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'")]
+            for table in tables:
+                try:
+                    row = con.exec_driver_sql(
+                        f"SELECT 1 FROM `{table}` WHERE fork_uuid=? LIMIT 1",
+                        (fork_uuid,),
+                    ).fetchone()
+                except Exception:
+                    continue
+                if row:
+                    return True
+            return False
 
     fork_dir = Path(fork_dir)
     for csv in fork_dir.glob("*.csv"):
@@ -244,7 +247,7 @@ def purge_fake_votes_csv(
     csv_path: Path,
     base: Path | str = "hronirs",
     fork_dir: Path | str = "forking_path",
-    conn: sqlite3.Connection | None = None,
+    conn: Engine | None = None,
 ) -> int:
     """Remove votes referencing missing chapters or duplicate voters."""
     import pandas as pd
