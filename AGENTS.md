@@ -40,8 +40,8 @@ Committing these hrönirs offers several benefits:
 
 ### How to Commit Content
 
-1.  **Use the `store` command:** Ensure all generated hrönirs are correctly processed using the `python -m hronir_encyclopedia.cli store <markdown_file> --prev <previous_hrönir_uuid>` command. This will place the hrönir into the `hronirs/` directory structure and (usually) update the relevant `forking_path/*.csv` file.
-2.  **Identify changed files:** The `store` command will create new files under `hronirs/` (specifically an `index.md` and `metadata.json` within a UUID-derived path) and may modify files in `forking_path/`.
+1.  **Use the `store` command:** Ensure all generated hrönirs are correctly processed using the `python -m hronir_encyclopedia.cli store <markdown_file> --prev <previous_hrönir_uuid>` command. This will place the hrönir into the `the_library/` directory structure and (usually) update the relevant `forking_path/*.csv` file.
+2.  **Identify changed files:** The `store` command will create new files under `the_library/` (specifically an `index.md` and `metadata.json` within a UUID-derived path) and may modify files in `forking_path/`.
 3.  **Stage and Commit:** Add these new/modified files to your Git commit. Use a descriptive commit message explaining the purpose of the generated hrönirs (e.g., Test: Add hrönirs for testing vote command PoW).
 
 ## Section 2: Active Participation in Canon Evolution

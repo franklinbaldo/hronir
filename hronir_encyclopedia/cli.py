@@ -25,9 +25,6 @@ def _cmd_validate(args):
     if not chapter.exists() or not chapter.is_file():
         print("chapter file not found")
         return
-    if "book" not in chapter.parts:
-        print("chapter must reside in the book/ directory")
-        return
     print("chapter looks valid")
 
 

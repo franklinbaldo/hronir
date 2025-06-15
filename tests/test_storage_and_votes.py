@@ -9,7 +9,7 @@ from hronir_encyclopedia import storage, ratings, gemini_util, database
 
 
 def test_store_chapter_text(tmp_path):
-    base = tmp_path / "hronirs"
+    base = tmp_path / "the_library"
     text = "hello world"
     uid = storage.store_chapter_text(text, base=base)
     chapter_dir = storage.uuid_to_path(uid, base)
@@ -55,7 +55,7 @@ def test_auto_vote_records_votes(monkeypatch, tmp_path):
 
 
 def test_clean_functions(tmp_path):
-    base = tmp_path / "hronirs"
+    base = tmp_path / "the_library"
     uid1 = storage.store_chapter_text("good", base=base)
     uid2 = storage.store_chapter_text("better", base=base)
 
@@ -133,7 +133,7 @@ def test_clean_git_prunes_from_branch(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     subprocess.run(["git", "init"], check=True)
 
-    base = Path("hronirs")
+    base = Path("the_library")
     uid = storage.store_chapter_text("data", base=base)
     bad = storage.store_chapter_text("bad", base=base)
     bad_dir = storage.uuid_to_path(bad, base)

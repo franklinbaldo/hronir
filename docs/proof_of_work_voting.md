@@ -8,7 +8,7 @@ In a system with limitless branching paths, it would be trivial to submit endles
 
 ## How It Works
 
-1. **Discover** two new hr\u00f6nirs that do not yet appear in `hronirs/index.txt`.
+1. **Discover** two new hr\u00f6nirs that do not yet appear in `the_library/index.txt`.
 2. **Forge** a new forking path that has not been used before.
 3. **Submit** the vote along with the two hr\u00f6nirs via the CLI:
 

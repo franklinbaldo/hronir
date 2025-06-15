@@ -6,11 +6,11 @@ This table defines the fundamental rules, principles, and constraints that gover
 
 | ID    | Rule Name                  | Description                                                                                                                                                                                             |
 | :---- | :------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| CS.1  | Hrönir Immutability & UUID | The canonical identifier for a hrönir is a version 5 UUID, deterministically generated from the full, exact text content of its `index.md` file. Hrönirs are immutable.                                 |
-| CS.2  | Canonical File Path        | Each hrönir is stored in a unique directory path derived from its UUID. The path is constructed by using each character of the UUID as a subdirectory name (e.g., `hronirs/d/9/4/4/...`).                  |
-| CS.3  | Required Folder Contents   | Each hrönir directory **must** contain an `index.md` file with the chapter's text and a `metadata.json` file.                                                                                             |
+| CS.1  | Hrönir Immutability & UUID | The canonical identifier for a hrön is a version 5 UUID, deterministically generated from the full, exact text content of its `index.md` file. Hrönirs are immutable.                                 |
+| CS.2  | Canonical File Path        | Each hrön is stored in a unique directory path derived from its UUID. The path is constructed by using each character of the UUID as a subdirectory name (e.g., `the_library/d/9/4/4/...`).                  |
+| CS.3  | Required Folder Contents   | Each hrön directory **must** contain an `index.md` file with the chapter's text and a `metadata.json` file.                                                                                             |
 | CS.4  | Metadata Integrity         | The `metadata.json` file **must** contain a `uuid` field that exactly matches the content-derived UUID of the `index.md` file. It may also contain a `previous_uuid`.                                     |
-| CS.5  | Hrönir Validity Conditions | A hrönir is only valid if it exists at its correct UUID-derived path and its `metadata.json` `uuid` matches its content-derived UUID. Invalid hrönirs are subject to automated purging.                   |
+| CS.5  | Hrönir Validity Conditions | A hrön is only valid if it exists at its correct UUID-derived path and its `metadata.json` `uuid` matches its content-derived UUID. Invalid hrönir are subject to automated purging.                   |
 
 ### Narrative Structure (The Forking Paths)
 
