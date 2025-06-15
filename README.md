@@ -198,10 +198,10 @@ python -m hronir_encyclopedia.cli autovote \
 python -m hronir_encyclopedia.cli export --format epub --path canonical
 
 # Submit a vote with proof of work
-python -m hronir_encyclopedia.cli vote 
-  --position 1 
-  --voter 01234567-89ab-cdef-0123-456789abcdef 
-  --path "0->1" --hronirs keystone
+python -m hronir_encyclopedia.cli vote
+  --position 1
+  --voter 01234567-89ab-cdef-0123-456789abcdef
+  --winner 123e4567-e89b-12d3-a456-426614174000 --loser 765e4321-b98e-21d3-a654-024617417000
 ```
 
 ## 🔏 Proof-of-Work Voting
