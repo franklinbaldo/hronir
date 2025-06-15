@@ -14,7 +14,7 @@ Among infinite possibilities, one version will ultimately prove itself authentic
 
 ```bash
 git clone https://github.com/franklinbaldo/hronir
-cd hronir_encyclopedia
+cd hronir
 pip install -r requirements.txt
 ```
 
