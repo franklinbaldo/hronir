@@ -18,6 +18,7 @@ Among infinite possibilities, one version will ultimately prove itself authentic
 git clone https://github.com/franklinbaldo/hronir
 cd hronir
 pip install -r requirements.txt
+cp .env.example .env  # and add your GEMINI_API_KEY
 ```
 
 The `requirements.txt` file lists the core Python libraries used in the project,
@@ -196,7 +197,7 @@ python -m hronir_encyclopedia.cli autovote \
   --position 1 \
   --prev 123e4567-e89b-12d3-a456-426614174000 \
   --voter 01234567-89ab-cdef-0123-456789abcdef
-# GEMINI_API_KEY must be set in your environment
+# Requires GEMINI_API_KEY in your .env file
 
 # These commands load ratings and forking_path CSV files into a temporary
 # SQLite database via SQLAlchemy. Changes are written back to CSV when the

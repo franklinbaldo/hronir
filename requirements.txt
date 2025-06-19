@@ -1,4 +1,5 @@
 click
 pandas
 google-generativeai
+python-dotenv
 sqlalchemy>=2.0
