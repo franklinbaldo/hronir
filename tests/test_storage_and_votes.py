@@ -134,7 +134,7 @@ def test_clean_git_prunes_from_branch(tmp_path, monkeypatch):
     subprocess.run(["git", "init"], check=True)
 
     base = Path("the_library")
-    uid = storage.store_chapter_text("data", base=base)
+    storage.store_chapter_text("data", base=base)
     bad = storage.store_chapter_text("bad", base=base)
     bad_dir = storage.uuid_to_path(bad, base)
     (bad_dir / "index.md").write_text("tampered")

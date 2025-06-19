@@ -17,13 +17,17 @@ Among infinite possibilities, one version will ultimately prove itself authentic
 ```bash
 git clone https://github.com/franklinbaldo/hronir
 cd hronir
-pip install -r requirements.txt
+pip install -e .
 ```
 
-The `requirements.txt` file lists the core Python libraries used in the project,
-such as [**click**](https://palletsprojects.com/p/click/) for the command-line
-interface and [**pandas**](https://pandas.pydata.org/) for Elo ranking data
-manipulation.
+The dependencies are defined in `pyproject.toml`. For development tools like
+[**pytest**](https://docs.pytest.org/),
+[**ruff**](https://github.com/astral-sh/ruff), and
+[**black**](https://github.com/psf/black), install with:
+
+```bash
+pip install -e .[dev]
+```
 
 ---
 
