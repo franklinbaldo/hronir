@@ -14,19 +14,20 @@ Thank you for your interest in helping expand this labyrinthine narrative. This 
 ## Pull Requests and Review
 
 1. **Fork** this repository and create a branch for your chapter.
-2. **Add your file** following the naming conventions above.
-3. **Validate** locally (optional) using:
+2. Run `pre-commit install` to set up the git hooks.
+3. **Add your file** following the naming conventions above.
+4. **Validate** locally (optional) using:
    ```bash
    python -m hronir_encyclopedia.cli validate --chapter drafts/<position>_<variant>.md
    ```
-4. **Store** the chapter under `the_library/`:
+5. **Store** the chapter under `the_library/`:
    ```bash
    python -m hronir_encyclopedia.cli store drafts/<position>_<variant>.md --prev <previous_uuid>
    ```
-5. **Commit** your change with a clear message, e.g. `Add 02_a chapter variant`.
-6. **Open a pull request** on GitHub. Briefly describe your chapter and its relation to the narrative.
-7. **Automated checks** will run to confirm basic formatting.
-8. **Review** happens publicly; maintainers may request adjustments to tone or structure.
-9. Once approved, your chapter is merged and enters the Elo ranking system.
+6. **Commit** your change with a clear message, e.g. `Add 02_a chapter variant`.
+7. **Open a pull request** on GitHub. Briefly describe your chapter and its relation to the narrative.
+8. **Automated checks** will run to confirm basic formatting.
+9. **Review** happens publicly; maintainers may request adjustments to tone or structure.
+10. Once approved, your chapter is merged and enters the Elo ranking system.
 
 Happy writing—may your version prove itself the inevitable one.
