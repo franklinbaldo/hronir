@@ -29,4 +29,21 @@ Thank you for your interest in helping expand this labyrinthine narrative. This 
 8. **Review** happens publicly; maintainers may request adjustments to tone or structure.
 9. Once approved, your chapter is merged and enters the Elo ranking system.
 
+### Helpful CLI commands
+
+Check the current standings for a chapter:
+
+```bash
+python -m hronir_encyclopedia.cli ranking --position 1
+```
+
+Generate two variants and cast a vote automatically:
+
+```bash
+python -m hronir_encyclopedia.cli synthesize \
+  --position 1 \
+  --prev <previous_uuid> \
+  --voter <fork_uuid>
+```
+
 Happy writing—may your version prove itself the inevitable one.

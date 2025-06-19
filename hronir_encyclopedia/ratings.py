@@ -49,3 +49,24 @@ def record_vote(
     else:
         df = pd.DataFrame([row])
     df.to_csv(csv_path, index=False)
+
+
+def get_ranking(position: int, base: Path | str = "ratings") -> pd.DataFrame:
+    """Return aggregated wins/losses for the given position."""
+    csv_path = Path(base) / f"position_{position:03d}.csv"
+    if not csv_path.exists() or csv_path.stat().st_size == 0:
+        return pd.DataFrame(columns=["chapter", "wins", "losses", "score"])
+
+    df = pd.read_csv(csv_path)
+    wins = df["winner"].value_counts()
+    losses = df["loser"].value_counts()
+    chapters = sorted(set(wins.index) | set(losses.index))
+    data = []
+    for chapter in chapters:
+        w = int(wins.get(chapter, 0))
+        l = int(losses.get(chapter, 0))
+        data.append({"chapter": chapter, "wins": w, "losses": l, "score": w - l})
+    result = pd.DataFrame(data)
+    if not result.empty:
+        result = result.sort_values(["score", "wins"], ascending=[False, False]).reset_index(drop=True)
+    return result

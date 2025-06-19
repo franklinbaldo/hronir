@@ -60,6 +60,20 @@ def _cmd_auto_vote(args):
     print("auto vote recorded")
 
 
+def _cmd_synthesize(args):
+    with database.open_database() as conn:
+        winner = gemini_util.auto_vote(args.position, args.prev, args.voter, conn=conn)
+    print(winner)
+
+
+def _cmd_ranking(args):
+    df = ratings.get_ranking(args.position)
+    if df.empty:
+        print("no votes recorded")
+        return
+    print(df.to_string(index=False))
+
+
 def _git_remove_deleted():
     """Stage deleted files in git if available."""
     try:
@@ -90,8 +104,14 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Hr\u00f6nir Encyclopedia CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    synth = subparsers.add_parser("synthesize", help="in development")
-    synth.set_defaults(func=_placeholder_handler("synthesize"))
+    synth = subparsers.add_parser(
+        "synthesize",
+        help="generate two chapters with Gemini and cast a vote",
+    )
+    synth.add_argument("--position", type=int, required=True, help="chapter position")
+    synth.add_argument("--prev", required=True, help="uuid of previous chapter")
+    synth.add_argument("--voter", required=True, help="uuid of forking path casting the vote")
+    synth.set_defaults(func=_cmd_synthesize)
 
     validate = subparsers.add_parser("validate", help="validate a chapter file")
     validate.add_argument("chapter", help="path to chapter markdown file")
@@ -104,8 +124,9 @@ def main(argv=None):
     tree.add_argument("--index", default="book/book_index.json", help="index file")
     tree.set_defaults(func=_cmd_tree)
 
-    ranking = subparsers.add_parser("ranking", help="in development")
-    ranking.set_defaults(func=_placeholder_handler("ranking"))
+    ranking = subparsers.add_parser("ranking", help="print current ranking")
+    ranking.add_argument("--position", type=int, required=True, help="chapter position")
+    ranking.set_defaults(func=_cmd_ranking)
 
     vote = subparsers.add_parser("vote", help="record a duel result")
     vote.add_argument("--position", type=int, required=True, help="chapter position")

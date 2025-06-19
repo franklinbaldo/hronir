@@ -163,14 +163,13 @@ ratings/
 
 ## ⚙️ Quickstart CLI Usage
 
-### Generate a new chapter from the accumulated narrative space:
+### Generate new chapters and cast a vote automatically:
 
 ```bash
-# Generate a single variant for Chapter 3
-python -m hronir_encyclopedia.cli synthesize --position 3 --variant_id 3_a
-
-# Generate multiple variants at once
-python -m hronir_encyclopedia.cli synthesize --position 3 --variants 3
+python -m hronir_encyclopedia.cli synthesize \
+  --position 3 \
+  --prev 123e4567-e89b-12d3-a456-426614174000 \
+  --voter 01234567-89ab-cdef-0123-456789abcdef
 
 # View the current narrative tree (prints a simple list for now)
 python -m hronir_encyclopedia.cli tree
