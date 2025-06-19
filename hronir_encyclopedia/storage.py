@@ -179,7 +179,8 @@ def purge_fake_hronirs(base: Path | str = "the_library") -> int:
     """Remove chapters whose metadata or path UUID doesn't match their text."""
     base = Path(base)
     removed = 0
-    for meta in base.rglob("metadata.json"):
+    metas = list(base.rglob("metadata.json"))
+    for meta in metas:
         chapter_dir = meta.parent
         try:
             data = json.loads(meta.read_text())
