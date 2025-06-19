@@ -9,10 +9,9 @@ content-derived UUIDs rather than the current numeric structure.
 - `forking_path/` – sequence of chapters that form narrative branches.
 - Each chapter will be referenced by a UUID v5 computed from its Markdown
   contents.
-- To avoid large folder listings, each character of the UUID becomes a
-  directory level. Example for UUID
-  `01234567-89ab-cdef-0123-456789abcdef`:
-  `the_library/0/1/2/3/4/5/6/7/-/8/9/a/b/-/c/d/e/f/-/0/1/2/3/-/4/5/6/7/8/9/a/b/c/d/e/f/index.md`.
+- To avoid large folder listings, each character of the UUID (with dashes removed)
+  becomes a directory level. Example for UUID `01234567-89ab-cdef-0123-456789abcdef`:
+  `the_library/0/1/2/3/4/5/6/7/8/9/a/b/c/d/e/f/0/1/2/3/4/5/6/7/8/9/a/b/c/d/e/f/index.md`.
 
 ## Chapter folder contents
 
