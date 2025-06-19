@@ -19,10 +19,10 @@ def compute_uuid(text: str) -> str:
 
 
 def uuid_to_path(uuid_str: str, base: Path) -> Path:
-    """Split UUID characters into a directory tree under base."""
-    parts = list(uuid_str)
+    """Return nested path for uuid_str under base using a hyphenless UUID."""
+    uuid_clean = uuid_str.replace("-", "")
     path = base
-    for c in parts:
+    for c in uuid_clean:
         path /= c
     return path
 
