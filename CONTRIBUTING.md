@@ -44,7 +44,6 @@ Generate two variants and cast a vote automatically:
 python -m hronir_encyclopedia.cli synthesize \
   --position 1 \
   --prev <previous_uuid> \
-  --voter <fork_uuid>
 ```
 
 Happy writing—may your version prove itself the inevitable one.

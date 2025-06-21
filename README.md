@@ -186,7 +186,6 @@ ratings/
 uv run python -m hronir_encyclopedia.cli synthesize \
   --position 3 \
   --prev 123e4567-e89b-12d3-a456-426614174000 \
-  --voter 01234567-89ab-cdef-0123-456789abcdef
 
 # View the current narrative tree (prints a simple list for now)
 uv run python -m hronir_encyclopedia.cli tree
@@ -207,13 +206,6 @@ uv run python -m hronir_encyclopedia.cli audit
 # Remove invalid hrönirs, forking paths or votes
 uv run python -m hronir_encyclopedia.cli clean --git
 
-# Automatically generate two chapters with Gemini and cast a vote
-uv run python -m hronir_encyclopedia.cli autovote \
-  --position 1 \
-  --prev 123e4567-e89b-12d3-a456-426614174000 \
-  --voter 01234567-89ab-cdef-0123-456789abcdef
-# Requires GEMINI_API_KEY in your .env file
-
 # These commands load ratings and forking_path CSV files into a temporary
 # SQLite database via SQLAlchemy. Changes are written back to CSV when the
 # command finishes.
@@ -230,9 +222,7 @@ uv run python -m hronir_encyclopedia.cli vote \
 
 ## 🔏 Proof-of-Work Voting
 
-Each vote must present a new forking path accompanied by two undiscovered hrönirs. This ingenious proof-of-work not only protects the ranking system from frivolous votes, it actively expands the encyclopedia's universe. Votes are tallied immediately unless their forking path has the greatest **distance** in the graph. Distance equals the difference in path length from the current leader plus the path's ranking position. Paths with the maximum distance remain recorded but their votes do not affect the rankings.
-
-For a deeper look at the rationale behind this system, see [docs/proof_of_work_voting.md](docs/proof_of_work_voting.md).
+Voting requires proof that you expanded the narrative. First create hrönirs with `store` and connect them via a new row in `forking_path/`. The resulting `fork_uuid` from that row is your voting identity. Use it with `vote` to choose a winner and loser. See [docs/proof_of_work_voting.md](docs/proof_of_work_voting.md) for details.
 
 ### Vote on a literary duel:
 
