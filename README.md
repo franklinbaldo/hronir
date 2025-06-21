@@ -14,17 +14,33 @@ Among infinite possibilities, one version will ultimately prove itself authentic
 
 ## 📦 Installation
 
-```bash
-git clone https://github.com/franklinbaldo/hronir
-cd hronir
-pip install -r requirements.txt
-cp .env.example .env  # and add your GEMINI_API_KEY
-```
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/franklinbaldo/hronir
+   cd hronir
+   ```
 
-The `requirements.txt` file lists the core Python libraries used in the project,
-such as [**click**](https://palletsprojects.com/p/click/) for the command-line
-interface and [**pandas**](https://pandas.pydata.org/) for Elo ranking data
-manipulation.
+2. **Install `uv` (Python package manager):**
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+   (On Windows, you might need to download the binary from [astral.sh/uv](https://astral.sh/uv) or use WSL.)
+
+3. **Set up Python version (optional but recommended):**
+   If you don't have Python 3.12 (or the version specified in `.python-version`), `uv` can install it for you.
+   Ensure `.python-version` exists with your desired Python version (e.g., `3.12`).
+
+4. **Create virtual environment and install dependencies:**
+   ```bash
+   uv sync --all-extras # Installs main and development dependencies
+   ```
+
+5. **Set up environment variables:**
+   ```bash
+   cp .env.example .env  # and add your GEMINI_API_KEY to .env
+   ```
+
+Dependencies are managed with `uv` using `pyproject.toml` and `uv.lock`. Core libraries include [**click**](https://palletsprojects.com/p/click/) for the CLI and [**pandas**](https://pandas.pydata.org/) for data manipulation.
 
 ---
 
@@ -68,7 +84,7 @@ Human contributors can participate in the encyclopedia's evolution by submitting
 2. **Write your chapter** as a Markdown file anywhere (e.g., `drafts/03_my_variant.md`)
 3. **Store it** under `the_library/` using the CLI:
    ```bash
-   python -m hronir_encyclopedia.cli store drafts/03_my_variant.md --prev <previous_uuid>
+   uv run python -m hronir_encyclopedia.cli store drafts/03_my_variant.md --prev <previous_uuid>
    ```
 4. **Follow Borgesian style guidelines** (see `CONTRIBUTING.md`)
 5. **Submit a pull request** with your stored hrön
@@ -85,8 +101,8 @@ Human-authored and AI-generated variants compete on equal terms in the literary 
 
 ```bash
 # Contributing via CLI
-python -m hronir_encyclopedia.cli validate --chapter drafts/03_my_variant.md
-python -m hronir_encyclopedia.cli store drafts/03_my_variant.md --prev <previous_uuid>
+uv run python -m hronir_encyclopedia.cli validate --chapter drafts/03_my_variant.md
+uv run python -m hronir_encyclopedia.cli store drafts/03_my_variant.md --prev <previous_uuid>
 ```
 
 ---
@@ -167,32 +183,32 @@ ratings/
 ### Generate new chapters and cast a vote automatically:
 
 ```bash
-python -m hronir_encyclopedia.cli synthesize \
+uv run python -m hronir_encyclopedia.cli synthesize \
   --position 3 \
   --prev 123e4567-e89b-12d3-a456-426614174000 \
   --voter 01234567-89ab-cdef-0123-456789abcdef
 
 # View the current narrative tree (prints a simple list for now)
-python -m hronir_encyclopedia.cli tree
+uv run python -m hronir_encyclopedia.cli tree
 
 # Check Elo rankings for a specific position
-python -m hronir_encyclopedia.cli ranking --position 2
+uv run python -m hronir_encyclopedia.cli ranking --position 2
 
 # Validate a human-contributed chapter
-python -m hronir_encyclopedia.cli validate --chapter drafts/03_my_variant.md
+uv run python -m hronir_encyclopedia.cli validate --chapter drafts/03_my_variant.md
 
 # Store chapter using UUID layout
-python -m hronir_encyclopedia.cli store drafts/03_my_variant.md --prev 123e4567-e89b-12d3-a456-426614174000
+uv run python -m hronir_encyclopedia.cli store drafts/03_my_variant.md --prev 123e4567-e89b-12d3-a456-426614174000
 
 # Validate and repair stored chapters
-python -m hronir_encyclopedia.cli audit
+uv run python -m hronir_encyclopedia.cli audit
 # Each forking entry receives a deterministic UUID
 
 # Remove invalid hrönirs, forking paths or votes
-python -m hronir_encyclopedia.cli clean --git
+uv run python -m hronir_encyclopedia.cli clean --git
 
 # Automatically generate two chapters with Gemini and cast a vote
-python -m hronir_encyclopedia.cli autovote \
+uv run python -m hronir_encyclopedia.cli autovote \
   --position 1 \
   --prev 123e4567-e89b-12d3-a456-426614174000 \
   --voter 01234567-89ab-cdef-0123-456789abcdef
@@ -203,12 +219,12 @@ python -m hronir_encyclopedia.cli autovote \
 # command finishes.
 
 # Export the highest-ranked path as EPUB
-python -m hronir_encyclopedia.cli export --format epub --path canonical
+uv run python -m hronir_encyclopedia.cli export --format epub --path canonical
 
 # Submit a vote with proof of work
-python -m hronir_encyclopedia.cli vote
-  --position 1
-  --voter 01234567-89ab-cdef-0123-456789abcdef
+uv run python -m hronir_encyclopedia.cli vote \
+  --position 1 \
+  --voter 01234567-89ab-cdef-0123-456789abcdef \
   --winner 123e4567-e89b-12d3-a456-426614174000 --loser 765e4321-b98e-21d3-a654-024617417000
 ```
 
@@ -221,7 +237,7 @@ For a deeper look at the rationale behind this system, see [docs/proof_of_work_v
 ### Vote on a literary duel:
 
 ```bash
-python -m hronir_encyclopedia.cli vote \
+uv run python -m hronir_encyclopedia.cli vote \
   --position 3 \
   --voter 89abcdef-0123-4567-89ab-cdef01234567 \
   --winner 3_a --loser 3_b
@@ -229,11 +245,14 @@ python -m hronir_encyclopedia.cli vote \
 
 ## Development Setup
 
-Install and enable the pre-commit hook to automatically clean invalid hrönirs and votes:
-
+Ensure you have development dependencies installed:
 ```bash
-pip install pre-commit
-pre-commit install
+uv sync --all-extras
+```
+
+Then, install and enable the pre-commit hook to automatically clean invalid hrönirs and votes:
+```bash
+uv run pre-commit install
 ```
 
 ---
