@@ -41,6 +41,8 @@ def test_consolidate_book_workflow(tmp_path, capsys):
     book_dir = tmp_path / "book"
     book_dir.mkdir()
     index_file = book_dir / "book_index.json"
+    forking_path_dir = tmp_path / "forking_path" # Adicionado
+    forking_path_dir.mkdir() # Adicionado
 
     # --- Setup Chapters in Library ---
     chap_A_uuid = storage.compute_uuid("Chapter A: The True Winner for Pos 1")
@@ -96,6 +98,7 @@ def test_consolidate_book_workflow(tmp_path, capsys):
                 f"--library-dir={library_dir}",
                 f"--book-dir={book_dir}",
                 f"--index-file={index_file}",
+                f"--forking-path-dir={forking_path_dir}", # Adicionado
             ]
         )
     assert e_info.type == SystemExit
@@ -135,6 +138,7 @@ def test_consolidate_book_workflow(tmp_path, capsys):
                 f"--library-dir={library_dir}",
                 f"--book-dir={book_dir}",
                 f"--index-file={index_file}",
+                f"--forking-path-dir={forking_path_dir}", # Adicionado
             ]
         )
     assert e_info_run2.type == SystemExit
@@ -169,6 +173,7 @@ def test_consolidate_book_workflow(tmp_path, capsys):
                 f"--library-dir={library_dir}",
                 f"--book-dir={book_dir}",
                 f"--index-file={index_file}",
+                f"--forking-path-dir={forking_path_dir}", # Adicionado
             ]
         )
     assert e_info_run3.type == SystemExit

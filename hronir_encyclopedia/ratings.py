@@ -68,108 +68,239 @@ def record_vote(
     df.to_csv(csv_path, index=False)
 
 
-def get_ranking(position: int, base: Path | str = "ratings") -> pd.DataFrame:
-    csv_path = Path(base) / f"position_{position:03d}.csv"
-    if not csv_path.exists():
-        return pd.DataFrame(columns=["uuid", "elo", "wins", "losses"])  # Elo a ser implementado
+def get_ranking(
+    position: int,
+    canonical_predecessor_uuid: str | None, # None para Posição 0
+    forking_path_dir: Path,
+    ratings_base_dir: Path
+) -> pd.DataFrame:
+    """
+    Calcula o ranking Elo para hrönirs de uma dada 'position', considerando
+    apenas os herdeiros diretos do 'canonical_predecessor_uuid'.
+    Para a Posição 0, 'canonical_predecessor_uuid' pode ser None,
+    e todos os hrönirs da Posição 0 são considerados.
+    """
+    # 1. Identificar os Herdeiros
+    heir_uuids = set()
+    all_forking_files = list(forking_path_dir.glob("*.csv"))
 
-    df = pd.read_csv(csv_path)
-    # Ensure DataFrame is not empty to prevent errors with value_counts
-    if df.empty:
+    if not all_forking_files and canonical_predecessor_uuid is not None:
+        # Se não há arquivos de forking path, não pode haver herdeiros de um predecessor específico.
+        # No entanto, se canonical_predecessor_uuid é None (caso da Posição 0),
+        # continuaremos para tentar encontrar hrönirs da Posição 0 diretamente dos votos.
         return pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])
 
-    wins = df["winner"].value_counts().reset_index()
-    wins.columns = ["uuid", "wins"]
+    for csv_file in all_forking_files:
+        if csv_file.stat().st_size == 0:
+            continue
+        try:
+            df_forks = pd.read_csv(csv_file)
+            if df_forks.empty:
+                continue
 
-    losses = df["loser"].value_counts().reset_index()
-    losses.columns = ["uuid", "losses"]
+            # Filtrar por posição e predecessor canônico
+            # Certificar que as colunas de posição são comparadas como o mesmo tipo
+            df_forks["position"] = df_forks["position"].astype(int)
 
-    ranking_df = pd.merge(wins, losses, on="uuid", how="outer").fillna(0)
-    ranking_df["wins"] = ranking_df["wins"].astype(int)
-    ranking_df["losses"] = ranking_df["losses"].astype(int)
-    ranking_df["total_duels"] = ranking_df["wins"] + ranking_df["losses"]
+            if canonical_predecessor_uuid is None: # Caso especial para Posição 0
+                 # Considera todos os hrönirs na Posição 0 como "herdeiros"
+                # desde que não tenham um prev_uuid (ou um prev_uuid específico para raiz, se definido)
+                # Por simplicidade, se canonical_predecessor_uuid é None, pegamos todos da Posição 0.
+                # O `prev_uuid` para a Posição 0 pode ser variado ou NaN.
+                # A lógica aqui é que se estamos pedindo ranking para Posição 0 sem predecessor,
+                # então todos os hrönirs na Posição 0 são candidatos.
+                # No entanto, a especificação da tarefa é que `get_ranking` é chamado com N e N-1.
+                # Se N=0, N-1 é -1. `get_canonical_uuid(-1)` falharia.
+                # A "Consideração Adicional" do plano sugere que Posição 0 pode ter `None` como predecessor.
+                # Se `canonical_predecessor_uuid` é `None`, isso implica que estamos buscando
+                # os hrönirs da `position` que *não têm* um `prev_uuid` ou cujo `prev_uuid` é um
+                # valor especial indicando a raiz (ex: "ROOT_UUID" ou pd.NA).
+                # Para a Posição 0, geralmente não há `prev_uuid`.
+                # Se o `forking_path` para a Posição 0 tiver `prev_uuid` como NaN/None/vazio,
+                # eles seriam selecionados aqui.
+                # O plano diz: "Para a Posição 0, canonical_predecessor_uuid será um valor fixo especial (ex: None)"
+                # "que get_ranking interpretará como "sem predecessor, considere todos os hrönirs da posição 0".
+                # Isso significa que o filtro em `prev_uuid` deve ser diferente.
+                # Se `canonical_predecessor_uuid` é None, queremos hrönirs da `position` (que deve ser 0)
+                # cujo `prev_uuid` é efetivamente nulo ou não especificado.
+                # Assumindo que para Posição 0, `prev_uuid` nos CSVs é NaN ou uma string vazia.
+                if position == 0:
+                    # Para a posição 0, `prev_uuid` deve ser nulo ou ausente.
+                    # Pandas lê colunas vazias como NaN por padrão.
+                    potential_heirs = df_forks[
+                        (df_forks["position"] == position) &
+                        (df_forks["prev_uuid"].isnull() | (df_forks["prev_uuid"] == ""))
+                    ]["uuid"].tolist()
+                    heir_uuids.update(potential_heirs)
+                else:
+                    # Se canonical_predecessor_uuid é None, mas a posição não é 0,
+                    # isso é um estado inesperado baseado no plano. Retornar vazio.
+                    return pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])
 
-    # Implementação do cálculo de Elo mínimo
-    ELO_BASE = 1000
-    POINTS_PER_WIN = 15
-    POINTS_PER_LOSS = 10  # Poderia ser igual a POINTS_PER_WIN se quisermos um impacto simétrico
+            else: # canonical_predecessor_uuid is not None
+                potential_heirs = df_forks[
+                    (df_forks["position"] == position) &
+                    (df_forks["prev_uuid"] == canonical_predecessor_uuid)
+                ]["uuid"].tolist()
+                heir_uuids.update(potential_heirs)
 
-    # Implementação do cálculo de Elo tradicional
-    ELO_BASE = 1500  # Rating inicial comum para novos jogadores
-    K_FACTOR = 32    # Fator K comum, determina a sensibilidade do rating
+        except pd.errors.EmptyDataError:
+            continue # Arquivo CSV vazio
+        except Exception:
+            # Ignorar arquivos CSV malformados ou com colunas ausentes por enquanto,
+            # ou adicionar logging se necessário.
+            # Idealmente, o sistema deve ser robusto a isso.
+            continue
 
-    # Inicializar Elo para todos os UUIDs únicos presentes nos duelos
-    all_uuids = pd.unique(df[["winner", "loser"]].values.ravel("K"))
-    elo_ratings = {uuid: ELO_BASE for uuid in all_uuids}
+    # Se nenhum herdeiro for encontrado E não estamos no caso especial da Posição 0
+    # (onde herdeiros podem vir diretamente dos votos se não houver forking_path),
+    # então não há ninguém para classificar.
+    # if not heir_uuids and (canonical_predecessor_uuid is not None or position != 0):
+    # Modificação: Se não houver herdeiros do forking_path, não há como rankear.
+    if not heir_uuids:
+        return pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])
 
-    wins_map = {uuid: 0 for uuid in all_uuids}
-    losses_map = {uuid: 0 for uuid in all_uuids}
+    # 2. Filtrar os Anais dos Duelos
+    ratings_csv_path = ratings_base_dir / f"position_{position:03d}.csv"
+    if not ratings_csv_path.exists() or ratings_csv_path.stat().st_size == 0:
+        # Se não há votos, mas existem herdeiros, eles terão Elo base, 0 vitórias/derrotas.
+        # Ou retornar DataFrame vazio se nenhum duelo significa nenhum ranking.
+        # O comportamento atual do Elo é inicializar apenas UUIDs presentes nos duelos.
+        # Para consistência, se não há duelos, não há Elo calculado.
+        # No entanto, queremos mostrar os herdeiros.
+        # Vamos criar um ranking com Elo base para os herdeiros sem duelos.
+        ELO_BASE = 1500 # Consistente com o cálculo abaixo
+        ranking_data = [{"uuid": hid, "elo": ELO_BASE, "wins": 0, "losses": 0, "total_duels": 0} for hid in heir_uuids]
+        if not ranking_data: # Segurança extra
+             return pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])
+        final_df = pd.DataFrame(ranking_data)
+        final_df = final_df.sort_values(by=["elo", "wins", "total_duels"], ascending=[False, False, False])
+        return final_df
 
-    # Iterar sobre cada duelo para atualizar os ratings Elo
-    for _, row in df.iterrows():
+    try:
+        df_votes = pd.read_csv(ratings_csv_path)
+        if df_votes.empty: # Similar ao caso de arquivo não existente
+            ELO_BASE = 1500
+            ranking_data = [{"uuid": hid, "elo": ELO_BASE, "wins": 0, "losses": 0, "total_duels": 0} for hid in heir_uuids]
+            if not ranking_data:
+                return pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])
+            final_df = pd.DataFrame(ranking_data)
+            final_df = final_df.sort_values(by=["elo", "wins", "total_duels"], ascending=[False, False, False])
+            return final_df
+
+    except pd.errors.EmptyDataError:
+        # Tratar como se não houvesse votos
+        ELO_BASE = 1500
+        ranking_data = [{"uuid": hid, "elo": ELO_BASE, "wins": 0, "losses": 0, "total_duels": 0} for hid in heir_uuids]
+        if not ranking_data:
+            return pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])
+        final_df = pd.DataFrame(ranking_data)
+        final_df = final_df.sort_values(by=["elo", "wins", "total_duels"], ascending=[False, False, False])
+        return final_df
+    except Exception: # Outro erro de leitura, incluindo falha ao encontrar colunas
+        # Se houver qualquer erro na leitura ou o arquivo for inválido (e.g. colunas faltando),
+        # trata como se não houvesse votos válidos para os herdeiros.
+        ELO_BASE = 1500
+        ranking_data = [{"uuid": hid, "elo": ELO_BASE, "wins": 0, "losses": 0, "total_duels": 0} for hid in heir_uuids]
+        if not ranking_data: # Segurança
+             return pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])
+        final_df = pd.DataFrame(ranking_data)
+        final_df = final_df.sort_values(by=["elo", "wins", "total_duels"], ascending=[False, False, False])
+        return final_df
+
+    # Verificar se as colunas 'winner' e 'loser' existem
+    if 'winner' not in df_votes.columns or 'loser' not in df_votes.columns:
+        # Colunas essenciais ausentes, tratar como sem votos válidos.
+        ELO_BASE = 1500
+        ranking_data = [{"uuid": hid, "elo": ELO_BASE, "wins": 0, "losses": 0, "total_duels": 0} for hid in heir_uuids]
+        if not ranking_data:
+             return pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])
+        final_df = pd.DataFrame(ranking_data)
+        final_df = final_df.sort_values(by=["elo", "wins", "total_duels"], ascending=[False, False, False])
+        return final_df
+
+    # Manter apenas duelos onde ambos os participantes são herdeiros
+    # Nota: df_votes['winner'] e df_votes['loser'] devem ser strings para a comparação com heir_uuids (que são strings)
+    df_votes['winner'] = df_votes['winner'].astype(str)
+    df_votes['loser'] = df_votes['loser'].astype(str)
+
+    filtered_votes = df_votes[
+        df_votes["winner"].isin(heir_uuids) & df_votes["loser"].isin(heir_uuids)
+    ]
+
+    if filtered_votes.empty:
+        # Não há duelos entre os herdeiros. Retornar herdeiros com Elo base.
+        ELO_BASE = 1500
+        ranking_data = [{"uuid": hid, "elo": ELO_BASE, "wins": 0, "losses": 0, "total_duels": 0} for hid in heir_uuids]
+        if not ranking_data: # Segurança
+             return pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])
+        final_df = pd.DataFrame(ranking_data)
+        final_df = final_df.sort_values(by=["elo", "wins", "total_duels"], ascending=[False, False, False])
+        return final_df
+
+    # 3. Calcular a Hierarquia (Elo)
+    ELO_BASE = 1500
+    K_FACTOR = 32
+
+    # Inicializar Elo para todos os herdeiros
+    elo_ratings = {uuid_str: ELO_BASE for uuid_str in heir_uuids}
+    wins_map = {uuid_str: 0 for uuid_str in heir_uuids}
+    losses_map = {uuid_str: 0 for uuid_str in heir_uuids}
+
+    # Iterar sobre cada duelo FILTRADO para atualizar os ratings Elo
+    for _, row in filtered_votes.iterrows():
         winner_uuid = row["winner"]
         loser_uuid = row["loser"]
 
-        # Adicionar aos contadores de vitórias/derrotas
-        wins_map[winner_uuid] = wins_map.get(winner_uuid, 0) + 1
-        losses_map[loser_uuid] = losses_map.get(loser_uuid, 0) + 1
+        # Adicionar aos contadores de vitórias/derrotas (apenas para herdeiros)
+        if winner_uuid in wins_map: wins_map[winner_uuid] += 1
+        if loser_uuid in losses_map: losses_map[loser_uuid] += 1
 
         # Ratings atuais
         r_winner = elo_ratings[winner_uuid]
         r_loser = elo_ratings[loser_uuid]
 
-        # Calcular probabilidades esperadas
-        # E_winner = 1 / (1 + 10^((r_loser - r_winner) / 400))
-        # E_loser  = 1 / (1 + 10^((r_winner - r_loser) / 400))
+        expected_winner = _calculate_elo_probability(r_winner, r_loser)
+        expected_loser = 1 - expected_winner # _calculate_elo_probability(r_loser, r_winner)
 
-        # q_winner = 10^(r_winner / 400) # Esta não é a fórmula correta para E_winner
-        # q_loser = 10^(r_loser / 400)   # Esta não é a fórmula correta para E_loser
-        # expected_winner = q_winner / (q_winner + q_loser)
-        # expected_loser = q_loser / (q_winner + q_loser)
-
-        # Usando a fórmula correta para a expectativa (E_A = 1 / (1 + 10^((R_B - R_A) / 400)))
-        expected_winner = 1 / (1 + 10**((r_loser - r_winner) / 400))
-        expected_loser = 1 / (1 + 10**((r_winner - r_loser) / 400))
-
-
-        # Atualizar ratings
-        # R'_winner = R_winner + K * (S_winner - E_winner)
-        # S_winner = 1 para vitória, 0 para derrota
         new_r_winner = r_winner + K_FACTOR * (1 - expected_winner)
-        new_r_loser = r_loser + K_FACTOR * (0 - expected_loser) # S_loser = 0
+        new_r_loser = r_loser + K_FACTOR * (0 - expected_loser)
 
         elo_ratings[winner_uuid] = new_r_winner
         elo_ratings[loser_uuid] = new_r_loser
 
-    # Criar DataFrame a partir dos ratings Elo calculados e contagens de vitórias/derrotas
+    # Criar DataFrame a partir dos ratings Elo calculados e contagens de vitórias/derrotas para os herdeiros
     ranking_data = []
-    for uuid_val in all_uuids:
+    for uuid_val in heir_uuids: # Iterar sobre os herdeiros, não sobre todos os que participaram
         ranking_data.append({
             "uuid": uuid_val,
-            "elo": int(round(elo_ratings[uuid_val])), # Elo geralmente é inteiro
-            "wins": wins_map.get(uuid_val, 0),
-            "losses": losses_map.get(uuid_val, 0)
+            "elo": int(round(elo_ratings[uuid_val])),
+            "wins": wins_map[uuid_val],
+            "losses": losses_map[uuid_val],
+            "total_duels": wins_map[uuid_val] + losses_map[uuid_val]
         })
 
-    ranking_df = pd.DataFrame(ranking_data)
-
-    if ranking_df.empty: # Caso não haja duelos, retorna df vazio com colunas corretas
+    if not ranking_data: # Caso extremo, se heir_uuids estivesse vazio após tudo.
         return pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])
 
-    ranking_df["total_duels"] = ranking_df["wins"] + ranking_df["losses"]
-
-    # Ordenar pelo Elo calculado, depois por vitórias para desempate
+    ranking_df = pd.DataFrame(ranking_data)
     ranking_df = ranking_df.sort_values(by=["elo", "wins", "total_duels"], ascending=[False, False, False])
 
     return ranking_df[["uuid", "elo", "wins", "losses", "total_duels"]]
 
 
-def determine_next_duel(position: int, base: Path | str = "ratings") -> dict | None:
+def determine_next_duel(
+    position: int,
+    canonical_predecessor_uuid: str | None,
+    forking_path_dir: Path,
+    ratings_base_dir: Path
+) -> dict | None:
     """
-    Determina o próximo duelo para uma posição selecionando o par de hrönirs
-    com a maior entropia, ou seja, o resultado mais incerto.
+    Determina o próximo duelo para uma posição, considerando apenas os herdeiros
+    do canonical_predecessor_uuid, selecionando o par de hrönirs (herdeiros)
+    com a maior entropia.
     """
-    ranking_df = get_ranking(position, base=base)
+    ranking_df = get_ranking(position, canonical_predecessor_uuid, forking_path_dir, ratings_base_dir)
     if len(ranking_df) < 2:
         return None
 

@@ -39,7 +39,14 @@ def mock_ratings_get_ranking(monkeypatch):
     """
     df_to_return_holder = [pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])]
 
-    def _mock_get_ranking(position: int, base: Path | str = "ratings"):
+    # O mock agora precisa aceitar a nova assinatura de get_ranking
+    def _mock_get_ranking(
+        position: int,
+        canonical_predecessor_uuid: str | None,
+        forking_path_dir: Path,
+        ratings_base_dir: Path
+    ):
+        # Os parâmetros extras não são usados pelo mock, pois os dados são definidos diretamente.
         return df_to_return_holder[0].copy()
 
     monkeypatch.setattr(ratings, "get_ranking", _mock_get_ranking)
@@ -70,7 +77,17 @@ class TestDetermineNextDuelPurelyEntropic:
             {"uuid": h4, "elo": 1450, "wins": 2, "losses": 8, "total_duels": 10},
         ])
 
-        duel_info = ratings.determine_next_duel(position=1, base=tmp_path / "ratings")
+        forking_dir = tmp_path / "forking_path"
+        forking_dir.mkdir()
+        ratings_dir = tmp_path / "ratings" # Adicionado para consistência
+        ratings_dir.mkdir()
+
+        duel_info = ratings.determine_next_duel(
+            position=1,
+            canonical_predecessor_uuid="any-pred-uuid",
+            forking_path_dir=forking_dir,
+            ratings_base_dir=ratings_dir
+        )
 
         assert duel_info is not None
         assert duel_info["strategy"] == "max_entropy_duel"
@@ -97,7 +114,16 @@ class TestDetermineNextDuelPurelyEntropic:
         # Entropy for (1600,1590) should be equal to (1500,1490).
         # The code iterates from top, so (h1,h2) should be picked.
 
-        duel_info = ratings.determine_next_duel(position=1, base=tmp_path / "ratings")
+        forking_dir = tmp_path / "forking_path"
+        forking_dir.mkdir()
+        ratings_dir = tmp_path / "ratings"
+        ratings_dir.mkdir()
+        duel_info = ratings.determine_next_duel(
+            position=1,
+            canonical_predecessor_uuid="any-pred-uuid",
+            forking_path_dir=forking_dir,
+            ratings_base_dir=ratings_dir
+        )
 
         assert duel_info is not None
         assert duel_info["strategy"] == "max_entropy_duel"
@@ -106,7 +132,16 @@ class TestDetermineNextDuelPurelyEntropic:
     def test_edge_case_no_hronirs(self, tmp_path, mock_ratings_get_ranking):
         set_df_data = mock_ratings_get_ranking
         set_df_data([])
-        duel_info = ratings.determine_next_duel(position=1, base=tmp_path / "ratings")
+        forking_dir = tmp_path / "forking_path"
+        forking_dir.mkdir()
+        ratings_dir = tmp_path / "ratings"
+        ratings_dir.mkdir()
+        duel_info = ratings.determine_next_duel(
+            position=1,
+            canonical_predecessor_uuid="any-pred-uuid",
+            forking_path_dir=forking_dir,
+            ratings_base_dir=ratings_dir
+        )
         assert duel_info is None
 
     def test_edge_case_one_hronir(self, tmp_path, mock_ratings_get_ranking):
@@ -114,7 +149,16 @@ class TestDetermineNextDuelPurelyEntropic:
         set_df_data([
             {"uuid": str(uuid.uuid4()), "elo": 1500, "total_duels": 0}
         ])
-        duel_info = ratings.determine_next_duel(position=1, base=tmp_path / "ratings")
+        forking_dir = tmp_path / "forking_path"
+        forking_dir.mkdir()
+        ratings_dir = tmp_path / "ratings"
+        ratings_dir.mkdir()
+        duel_info = ratings.determine_next_duel(
+            position=1,
+            canonical_predecessor_uuid="any-pred-uuid",
+            forking_path_dir=forking_dir,
+            ratings_base_dir=ratings_dir
+        )
         assert duel_info is None
 
     def test_edge_case_two_hronirs_both_new_is_max_entropy(self, tmp_path, mock_ratings_get_ranking):
@@ -125,7 +169,16 @@ class TestDetermineNextDuelPurelyEntropic:
             {"uuid": h2_new, "elo": 1500, "total_duels": 0},
         ])
         # This is the only pair, so it must be max entropy.
-        duel_info = ratings.determine_next_duel(position=1, base=tmp_path / "ratings")
+        forking_dir = tmp_path / "forking_path"
+        forking_dir.mkdir()
+        ratings_dir = tmp_path / "ratings"
+        ratings_dir.mkdir()
+        duel_info = ratings.determine_next_duel(
+            position=1,
+            canonical_predecessor_uuid="any-pred-uuid",
+            forking_path_dir=forking_dir,
+            ratings_base_dir=ratings_dir
+        )
 
         assert duel_info is not None
         assert duel_info["strategy"] == "max_entropy_duel"
@@ -156,7 +209,16 @@ class TestDetermineNextDuelPurelyEntropic:
         set_df_data(malformed_df_without_total_duels.copy())
 
         # The new determine_next_duel does not use 'total_duels'. It should still work.
-        duel_info = ratings.determine_next_duel(position=1, base=tmp_path / "ratings")
+        forking_dir = tmp_path / "forking_path"
+        forking_dir.mkdir()
+        ratings_dir = tmp_path / "ratings"
+        ratings_dir.mkdir()
+        duel_info = ratings.determine_next_duel(
+            position=1,
+            canonical_predecessor_uuid="any-pred-uuid",
+            forking_path_dir=forking_dir,
+            ratings_base_dir=ratings_dir
+        )
         assert duel_info is not None
         assert duel_info["strategy"] == "max_entropy_duel"
         assert set([duel_info["hronir_A"], duel_info["hronir_B"]]) == set([h1_uuid, h2_uuid])
@@ -170,7 +232,16 @@ class TestDetermineNextDuelPurelyEntropic:
             {"uuid": h2, "elo": 1500, "total_duels": 1},
         ])
 
-        duel_info = ratings.determine_next_duel(position=1, base=tmp_path / "ratings")
+        forking_dir = tmp_path / "forking_path"
+        forking_dir.mkdir()
+        ratings_dir = tmp_path / "ratings"
+        ratings_dir.mkdir()
+        duel_info = ratings.determine_next_duel(
+            position=1,
+            canonical_predecessor_uuid="any-pred-uuid",
+            forking_path_dir=forking_dir,
+            ratings_base_dir=ratings_dir
+        )
         assert duel_info is not None
         assert duel_info["strategy"] == "max_entropy_duel"
         assert set([duel_info["hronir_A"], duel_info["hronir_B"]]) == set([h1, h2])
@@ -184,7 +255,16 @@ class TestDetermineNextDuelPurelyEntropic:
             {"uuid": h2, "elo": 1200, "total_duels": 100},
         ])
 
-        duel_info = ratings.determine_next_duel(position=1, base=tmp_path / "ratings")
+        forking_dir = tmp_path / "forking_path"
+        forking_dir.mkdir()
+        ratings_dir = tmp_path / "ratings"
+        ratings_dir.mkdir()
+        duel_info = ratings.determine_next_duel(
+            position=1,
+            canonical_predecessor_uuid="any-pred-uuid",
+            forking_path_dir=forking_dir,
+            ratings_base_dir=ratings_dir
+        )
         assert duel_info is not None
         assert duel_info["strategy"] == "max_entropy_duel"
         assert duel_info["entropy"] == pytest.approx(0.0114, abs=1e-4) # Same as before

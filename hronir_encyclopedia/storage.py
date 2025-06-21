@@ -212,6 +212,61 @@ def purge_fake_hronirs(base: Path | str = "the_library") -> int:
     return removed
 
 
+def get_canonical_uuid(position: int, book_index_path: Path) -> str:
+    """
+    Consulta o book_index.json para revelar a identidade (UUID) do hrönir
+    canônico para a posição especificada.
+    Espera que o book_index.json armazene uma estrutura como:
+    {
+        "chapters": {
+            "0": {"uuid": "actual-uuid-for-pos-0", "filename": "0_file.md"},
+            "1": {"uuid": "actual-uuid-for-pos-1", "filename": "1_file.md"}
+        }
+    }
+    """
+    if not book_index_path.exists():
+        raise FileNotFoundError(f"Arquivo de índice do livro não encontrado: {book_index_path}")
+
+    try:
+        with open(book_index_path, "r") as f:
+            book_index_data = json.load(f)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Erro ao decodificar JSON do arquivo de índice do livro {book_index_path}: {e}")
+    except Exception as e:
+        raise IOError(f"Erro ao ler o arquivo de índice do livro {book_index_path}: {e}")
+
+    chapters = book_index_data.get("chapters")
+    if not isinstance(chapters, dict):
+        raise ValueError(
+            f"Estrutura inválida no arquivo de índice do livro: "
+            f"a chave 'chapters' não é um dicionário ou está ausente em {book_index_path}."
+        )
+
+    position_str = str(position)
+    canonical_entry = chapters.get(position_str)
+
+    if not isinstance(canonical_entry, dict):
+        raise KeyError(
+            f"Nenhuma entrada de dicionário encontrada para a posição '{position_str}' "
+            f"em 'chapters' no arquivo {book_index_path}."
+        )
+
+    canonical_hr_uuid = canonical_entry.get("uuid")
+    if not canonical_hr_uuid:
+        raise ValueError(
+            f"Nenhum 'uuid' encontrado para a posição '{position_str}' "
+            f"em 'chapters' no arquivo {book_index_path}."
+        )
+
+    if not is_valid_uuid_v5(canonical_hr_uuid): # Reutilizando a validação de UUID existente
+        raise ValueError(
+            f"UUID inválido '{canonical_hr_uuid}' encontrado para a posição '{position_str}' "
+            f"em 'chapters' no arquivo {book_index_path}."
+        )
+
+    return canonical_hr_uuid
+
+
 def append_fork(
     csv_file: Path,
     position: int,

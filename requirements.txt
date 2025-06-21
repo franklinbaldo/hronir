@@ -1,0 +1,5 @@
+pandas
+pytest
+sqlalchemy
+typer
+typing_extensions
