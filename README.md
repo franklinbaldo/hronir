@@ -46,14 +46,14 @@ Dependencies are managed with `uv` using `pyproject.toml` and `uv.lock`. Core li
 
 ## 🔮 How It Works
 
-The encyclopedia grows through four parallel processes:
+The encyclopedia grows through interconnected processes:
 
-- **Generation**: AI creates new chapter variants from the accumulated narrative space
-- **Collaboration**: Human contributors submit chapter variants via GitHub pull requests
-- **Selection**: Readers participate in literary duels between competing variants (AI and human)
-- **Evolution**: Elo rankings determine the emerging canonical path through collective recognition
+- **Generation**: AI creates new chapter variants (`hrönirs`) from the accumulated narrative space.
+- **Collaboration**: Human contributors submit chapter variants via GitHub pull requests.
+- **Selection (Votação Guiada Puramente por Entropia)**: O sistema de votação é governado por um único princípio: maximizar a informação. A cada momento, o sistema identifica o **"Duelo de Máxima Entropia"** — o confronto entre os dois `hrönirs` (para uma dada posição) cujo resultado é mais incerto (ou seja, seus Elos são mais próximos) e que, portanto, mais beneficiará o ranking com um novo voto. Não há duelos de calibração especiais; hrönirs novos entram no pool e são selecionados quando sua participação em um duelo maximiza a entropia.
+- **Evolution**: Elo rankings, atualizados por estes duelos de máxima entropia, determinam o emergente caminho canônico através do reconhecimento coletivo.
 
-Unlike branching narratives where readers choose paths, here the paths choose themselves through collective literary recognition—the most inevitable version naturally emerges from the infinite possibilities, whether born from artificial intelligence or human imagination.
+Este sistema puramente entrópico garante que cada voto seja o mais impactante possível, focando a atenção do leitor no ponto de maior ambiguidade atual do sistema.
 
 ## 🤖 Daily Automated Generation
 
@@ -211,27 +211,36 @@ uv run python -m hronir_encyclopedia.cli clean --git
 # command finishes.
 
 # Export the highest-ranked path as EPUB
-uv run python -m hronir_encyclopedia.cli export --format epub --path canonical
+# uv run python -m hronir_encyclopedia.cli export --format epub --path canonical # Temporariamente comentado se o comando export não estiver pronto
 
-# Submit a vote with proof of work
+# Obtenha o Duelo de Máxima Entropia para uma posição:
+uv run python -m hronir_encyclopedia.cli get-duel --position 1
+
+# Exemplo de saída:
+# {
+#   "position": 1,
+#   "strategy": "max_entropy_duel",
+#   "entropy": 0.998, # Valor de entropia do duelo
+#   "duel_pair": { "hronir_A": "uuid_A...", "hronir_B": "uuid_B..." }
+# }
+
+# Submeta seu voto para o duelo apresentado por get-duel:
 uv run python -m hronir_encyclopedia.cli vote \
   --position 1 \
-  --voter 01234567-89ab-cdef-0123-456789abcdef \
-  --winner 123e4567-e89b-12d3-a456-426614174000 --loser 765e4321-b98e-21d3-a654-024617417000
+  --voter <seu_fork_uuid> \
+  --winner <uuid_A_do_get_duel> --loser <uuid_B_do_get_duel>
+# (Substitua os placeholders <> pelos valores reais)
 ```
 
-## 🔏 Proof-of-Work Voting
+## 🔏 Proof-of-Work e Votação Entrópica
 
-Voting requires proof that you expanded the narrative. First create hrönirs with `store` and connect them via a new row in `forking_path/`. The resulting `fork_uuid` from that row is your voting identity. Use it with `vote` to choose a winner and loser. See [docs/proof_of_work_voting.md](docs/proof_of_work_voting.md) for details.
+O direito de votar é conquistado contribuindo para a expansão da narrativa (Proof-of-Work). Ao usar `store` para novos `hrönirs` e conectá-los em `forking_path/`, o `fork_uuid` gerado atua como sua identidade de votante.
 
-### Vote on a literary duel:
+Com seu `fork_uuid`, você participa do processo de votação guiado por entropia:
+1. Use `hronir_encyclopedia.cli get-duel --position <num>` para descobrir o "Duelo de Máxima Entropia" que o sistema identificou como o mais crítico para resolver a incerteza no ranking daquela posição.
+2. Use `hronir_encyclopedia.cli vote --position <num> --voter <seu_fork_uuid> --winner <uuid_A> --loser <uuid_B>` para registrar seu voto **apenas para o par exato apresentado por `get-duel`**.
 
-```bash
-uv run python -m hronir_encyclopedia.cli vote \
-  --position 3 \
-  --voter 89abcdef-0123-4567-89ab-cdef01234567 \
-  --winner 3_a --loser 3_b
-```
+Este processo de dois passos garante que seu esforço intelectual seja direcionado ao ponto de maior necessidade informacional na estrutura evolutiva da enciclopédia. Consulte [docs/proof_of_work_voting.md](docs/proof_of_work_voting.md) para uma explicação mais profunda.
 
 ## Development Setup
 

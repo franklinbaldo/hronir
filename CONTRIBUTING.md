@@ -32,18 +32,41 @@ Thank you for your interest in helping expand this labyrinthine narrative. This 
 
 ### Helpful CLI commands
 
-Check the current standings for a chapter:
+Remember to use `uv run` before `python -m hronir_encyclopedia.cli` if you are using the `uv` environment, as shown in the examples below.
 
+Check the current Elo rankings for a chapter position:
 ```bash
-python -m hronir_encyclopedia.cli ranking --position 1
+uv run python -m hronir_encyclopedia.cli ranking --position 1
 ```
 
-Generate two variants and cast a vote automatically:
+To participate in voting (after obtaining a `fork_uuid` as described in `docs/proof_of_work_voting.md`):
 
+1.  Discover the Duelo de Máxima Entropia for a position:
+    ```bash
+    uv run python -m hronir_encyclopedia.cli get-duel --position 1
+    ```
+    This will output JSON indicating the `hronir_A` and `hronir_B` for the duel, which the system has identified as the most informative one to vote on.
+
+2.  Cast your vote for the presented duel:
+    ```bash
+    uv run python -m hronir_encyclopedia.cli vote \
+      --position 1 \
+      --voter <your_fork_uuid> \
+      --winner <uuid_A_from_get_duel> \
+      --loser <uuid_B_from_get_duel>
+    ```
+
+Generate two new hrönir variants from a predecessor and record an initial assessment (this is mainly for automated agents but can be used manually; it does not bypass the `get-duel` requirement for general voting):
 ```bash
-python -m hronir_encyclopedia.cli synthesize \
+uv run python -m hronir_encyclopedia.cli synthesize \
   --position 1 \
-  --prev <previous_uuid> \
+  --prev <previous_uuid>
+```
+
+Validate and store your own new chapter variant:
+```bash
+uv run python -m hronir_encyclopedia.cli validate --chapter drafts/01_my_variant.md
+uv run python -m hronir_encyclopedia.cli store drafts/01_my_variant.md --prev <previous_uuid>
 ```
 
 Happy writing—may your version prove itself the inevitable one.

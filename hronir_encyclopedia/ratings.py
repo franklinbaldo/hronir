@@ -4,6 +4,23 @@ from pathlib import Path
 import pandas as pd
 from sqlalchemy.engine import Engine
 
+import math # Adicionado para math.log2
+# from itertools import combinations # Não é mais explicitamente necessário para a estratégia de vizinhos
+
+
+def _calculate_elo_probability(elo_a: float, elo_b: float) -> float:
+    """Calcula a probabilidade de A vencer B."""
+    return 1 / (1 + 10**((elo_b - elo_a) / 400))
+
+def _calculate_duel_entropy(elo_a: float, elo_b: float) -> float:
+    """Calcula a entropia de Shannon para um duelo Elo."""
+    p_a = _calculate_elo_probability(elo_a, elo_b)
+    if p_a == 0 or p_a == 1: # Evita math.log2(0)
+        return 0.0 # Retorna 0.0 para consistência de tipo float
+    p_b = 1 - p_a
+    # A verificação de p_b == 0 é implicitamente coberta por p_a == 1.
+    return - (p_a * math.log2(p_a) + p_b * math.log2(p_b))
+
 
 def record_vote(
     position: int,
@@ -145,3 +162,66 @@ def get_ranking(position: int, base: Path | str = "ratings") -> pd.DataFrame:
     ranking_df = ranking_df.sort_values(by=["elo", "wins", "total_duels"], ascending=[False, False, False])
 
     return ranking_df[["uuid", "elo", "wins", "losses", "total_duels"]]
+
+
+def determine_next_duel(position: int, base: Path | str = "ratings") -> dict | None:
+    """
+    Determina o próximo duelo para uma posição selecionando o par de hrönirs
+    com a maior entropia, ou seja, o resultado mais incerto.
+    """
+    ranking_df = get_ranking(position, base=base)
+    if len(ranking_df) < 2:
+        return None
+
+    # Utiliza a heurística otimizada: a maior entropia geralmente ocorre
+    # entre vizinhos no ranking ordenado por Elo.
+    # get_ranking já retorna ordenado, mas re-ordenar aqui garante.
+    ranking_df = ranking_df.sort_values(by="elo", ascending=False).reset_index(drop=True)
+
+    # Calcula a entropia para cada par de vizinhos
+    # Inicializa a coluna com um valor que indica que a entropia não foi calculada (e.g. < 0)
+    ranking_df["entropy_with_next"] = -1.0
+
+    entropies_calculated = []
+    for i in range(len(ranking_df) - 1):
+        elo_a = ranking_df.loc[i, "elo"]
+        elo_b = ranking_df.loc[i + 1, "elo"]
+        entropy = _calculate_duel_entropy(elo_a, elo_b)
+        ranking_df.loc[i, "entropy_with_next"] = entropy
+        entropies_calculated.append(entropy) # Guardar para verificar se alguma entropia foi calculada
+
+    if not entropies_calculated: # Se nenhum par de vizinhos existia (len(ranking_df) < 2, já tratado) ou algo deu errado
+        return None
+
+    # Encontra o índice da maior entropia. idxmax() ignora NaNs e valores não numéricos se existirem,
+    # mas nossa coluna deve ser float. Se todas as entropias forem -1.0 (caso de 2 hrönirs onde o apply não é ideal),
+    # idxmax() pegaria o primeiro.
+    # Se houver apenas um par (2 hrönirs), a entropia será calculada para ranking_df.loc[0, "entropy_with_next"]
+    # e idxmax() o encontrará.
+
+    # Se todas as entropias calculadas forem 0 (e.g. Elos muito distantes), idxmax() ainda pega o primeiro.
+    # Isso é aceitável; um duelo de baixa entropia é melhor que nenhum, se for o máximo disponível.
+    max_entropy_idx = ranking_df["entropy_with_next"].idxmax()
+
+    # Verifica se max_entropy_idx é válido e se o valor de entropia é de fato > -1.0 (ou seja, foi calculado)
+    # Isso é uma segurança extra, pois se len(ranking_df) == 2, o loop roda uma vez para i=0.
+    # ranking_df.loc[0, "entropy_with_next"] será atualizado.
+    # ranking_df.loc[1, "entropy_with_next"] permanecerá -1.0. idxmax() pegaria o índice 0.
+    if ranking_df.loc[max_entropy_idx, "entropy_with_next"] < 0:
+         # Isso não deveria acontecer se len(ranking_df) >= 2, pois pelo menos uma entropia seria calculada.
+         # A menos que todas as entropias sejam 0 e, de alguma forma, o valor inicial -1.0 fosse o máximo.
+         # Mas _calculate_duel_entropy retorna >= 0.
+        return None # Segurança: nenhuma entropia válida foi encontrada.
+
+    hronir_A_uuid = ranking_df.iloc[max_entropy_idx]["uuid"]
+    # O par de max_entropy_idx é com max_entropy_idx + 1
+    hronir_B_uuid = ranking_df.iloc[max_entropy_idx + 1]["uuid"]
+    max_entropy_value = ranking_df.loc[max_entropy_idx, "entropy_with_next"]
+
+    return {
+        "strategy": "max_entropy_duel", # Estratégia é sempre esta agora
+        "hronir_A": hronir_A_uuid,
+        "hronir_B": hronir_B_uuid,
+        "entropy": max_entropy_value,
+        "position": position, # Adicionando position para consistência com output anterior
+    }
