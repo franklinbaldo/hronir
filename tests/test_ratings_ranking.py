@@ -10,10 +10,19 @@ def test_get_ranking(tmp_path):
         ratings.record_vote(1, "v3", "b", "a", conn=conn)
 
     df = ratings.get_ranking(1, base=base)
-    assert list(df["chapter"]) == ["a", "b", "c"]
-    row_a = df[df["chapter"] == "a"].iloc[0]
-    row_b = df[df["chapter"] == "b"].iloc[0]
-    row_c = df[df["chapter"] == "c"].iloc[0]
+    # Ranking should be sorted by Elo (desc), then wins (desc)
+    # Expected order: a (Elo 1020), b (Elo 1005), c (Elo 990)
+    assert list(df["uuid"]) == ["a", "b", "c"]
+
+    row_a = df[df["uuid"] == "a"].iloc[0]
+    row_b = df[df["uuid"] == "b"].iloc[0]
+    row_c = df[df["uuid"] == "c"].iloc[0]
+
     assert row_a["wins"] == 2 and row_a["losses"] == 1
+    assert row_a["elo"] == 1020
+
     assert row_b["wins"] == 1 and row_b["losses"] == 1
+    assert row_b["elo"] == 1005
+
     assert row_c["wins"] == 0 and row_c["losses"] == 1
+    assert row_c["elo"] == 990

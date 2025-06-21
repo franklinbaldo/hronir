@@ -1,6 +1,5 @@
 import uuid
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 from sqlalchemy.engine import Engine
@@ -12,7 +11,7 @@ def record_vote(
     winner: str,
     loser: str,
     base: Path | str = "ratings",
-    conn: Optional[Engine] = None,
+    conn: Engine | None = None,
 ) -> None:
     """Append a vote to the ratings table."""
     if conn is not None:
@@ -72,8 +71,18 @@ def get_ranking(position: int, base: Path | str = "ratings") -> pd.DataFrame:
     ranking_df["wins"] = ranking_df["wins"].astype(int)
     ranking_df["losses"] = ranking_df["losses"].astype(int)
     ranking_df["total_duels"] = ranking_df["wins"] + ranking_df["losses"]
-    # Placeholder for Elo calculation if it were to be implemented
-    ranking_df["elo"] = 0
-    ranking_df = ranking_df.sort_values(by="wins", ascending=False)
-    # Ensure all specified columns are present, even if Elo is just a placeholder
+
+    # Implementação do cálculo de Elo mínimo
+    ELO_BASE = 1000
+    POINTS_PER_WIN = 15
+    POINTS_PER_LOSS = 10  # Poderia ser igual a POINTS_PER_WIN se quisermos um impacto simétrico
+
+    ranking_df["elo"] = (
+        ELO_BASE + (ranking_df["wins"] * POINTS_PER_WIN) - (ranking_df["losses"] * POINTS_PER_LOSS)
+    )
+    ranking_df["elo"] = ranking_df["elo"].astype(int)  # Elo geralmente é inteiro
+
+    # Ordenar pelo Elo calculado, depois por vitórias para desempate
+    ranking_df = ranking_df.sort_values(by=["elo", "wins"], ascending=[False, False])
+
     return ranking_df[["uuid", "elo", "wins", "losses", "total_duels"]]

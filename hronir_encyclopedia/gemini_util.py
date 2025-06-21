@@ -1,16 +1,17 @@
 import os
 from pathlib import Path
 
-from dotenv import load_dotenv
-from sqlalchemy.engine import Engine
-
-load_dotenv()
-
 import google.generativeai as genai
 import pandas as pd
+from dotenv import load_dotenv
 from google.generativeai import types
+from sqlalchemy.engine import Engine
 
 from . import ratings, storage
+
+# load_dotenv() must be called after all imports for E402,
+# but before any code that relies on the .env variables.
+load_dotenv()
 
 MODEL_NAME = "gemini-2.5-flash-preview-05-20"
 

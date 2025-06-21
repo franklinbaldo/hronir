@@ -332,6 +332,7 @@ source = { editable = "." }
 dependencies = [
     { name = "click" },
     { name = "google-generativeai" },
+    { name = "numpy" },
     { name = "pandas" },
     { name = "python-dotenv" },
     { name = "sqlalchemy" },
@@ -350,6 +351,7 @@ requires-dist = [
     { name = "black", marker = "extra == 'dev'" },
     { name = "click" },
     { name = "google-generativeai" },
+    { name = "numpy" },
     { name = "pandas" },
     { name = "pre-commit", marker = "extra == 'dev'" },
     { name = "pytest", marker = "extra == 'dev'" },
