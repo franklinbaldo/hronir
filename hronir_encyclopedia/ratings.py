@@ -1,6 +1,7 @@
 import uuid
 from pathlib import Path
 from typing import Optional
+
 import pandas as pd
 from sqlalchemy.engine import Engine
 
@@ -52,21 +53,27 @@ def record_vote(
 
 
 def get_ranking(position: int, base: Path | str = "ratings") -> pd.DataFrame:
-    """Return aggregated wins/losses for the given position."""
     csv_path = Path(base) / f"position_{position:03d}.csv"
-    if not csv_path.exists() or csv_path.stat().st_size == 0:
-        return pd.DataFrame(columns=["chapter", "wins", "losses", "score"])
+    if not csv_path.exists():
+        return pd.DataFrame(columns=["uuid", "elo", "wins", "losses"])  # Elo a ser implementado
 
     df = pd.read_csv(csv_path)
-    wins = df["winner"].value_counts()
-    losses = df["loser"].value_counts()
-    chapters = sorted(set(wins.index) | set(losses.index))
-    data = []
-    for chapter in chapters:
-        w = int(wins.get(chapter, 0))
-        l = int(losses.get(chapter, 0))
-        data.append({"chapter": chapter, "wins": w, "losses": l, "score": w - l})
-    result = pd.DataFrame(data)
-    if not result.empty:
-        result = result.sort_values(["score", "wins"], ascending=[False, False]).reset_index(drop=True)
-    return result
+    # Ensure DataFrame is not empty to prevent errors with value_counts
+    if df.empty:
+        return pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])
+
+    wins = df["winner"].value_counts().reset_index()
+    wins.columns = ["uuid", "wins"]
+
+    losses = df["loser"].value_counts().reset_index()
+    losses.columns = ["uuid", "losses"]
+
+    ranking_df = pd.merge(wins, losses, on="uuid", how="outer").fillna(0)
+    ranking_df["wins"] = ranking_df["wins"].astype(int)
+    ranking_df["losses"] = ranking_df["losses"].astype(int)
+    ranking_df["total_duels"] = ranking_df["wins"] + ranking_df["losses"]
+    # Placeholder for Elo calculation if it were to be implemented
+    ranking_df["elo"] = 0
+    ranking_df = ranking_df.sort_values(by="wins", ascending=False)
+    # Ensure all specified columns are present, even if Elo is just a placeholder
+    return ranking_df[["uuid", "elo", "wins", "losses", "total_duels"]]

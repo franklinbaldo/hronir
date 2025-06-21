@@ -1,11 +1,11 @@
 import json
-import uuid
 import subprocess
+import uuid
 from pathlib import Path
 
 import pandas as pd
 
-from hronir_encyclopedia import storage, ratings, gemini_util, database
+from hronir_encyclopedia import database, gemini_util, ratings, storage
 
 
 def test_store_chapter_text(tmp_path):
@@ -92,14 +92,16 @@ def test_clean_functions(tmp_path):
     fork_dir = tmp_path / "forking_path"
     fork_dir.mkdir()
     fork_csv2 = fork_dir / "paths.csv"
-    pd.DataFrame([
-        {
-            "position": 1,
-            "prev_uuid": uid1,
-            "uuid": uid2,
-            "fork_uuid": fork_uuid_valid,
-        }
-    ]).to_csv(fork_csv2, index=False)
+    pd.DataFrame(
+        [
+            {
+                "position": 1,
+                "prev_uuid": uid1,
+                "uuid": uid2,
+                "fork_uuid": fork_uuid_valid,
+            }
+        ]
+    ).to_csv(fork_csv2, index=False)
 
     rating_csv = tmp_path / "rating.csv"
     rows = [
@@ -143,8 +145,8 @@ def test_clean_git_prunes_from_branch(tmp_path, monkeypatch):
     subprocess.run(["git", "commit", "-m", "init"], check=True)
 
     from hronir_encyclopedia import cli
+
     cli.main(["clean", "--git"])
 
     ls_files = subprocess.check_output(["git", "ls-files"], text=True)
     assert str(bad_dir / "index.md") not in ls_files
-

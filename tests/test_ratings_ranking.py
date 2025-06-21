@@ -1,4 +1,4 @@
-from hronir_encyclopedia import ratings, database
+from hronir_encyclopedia import database, ratings
 
 
 def test_get_ranking(tmp_path):

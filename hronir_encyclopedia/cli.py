@@ -2,7 +2,8 @@ import argparse
 import json
 import subprocess
 from pathlib import Path
-from . import storage, ratings, gemini_util, database
+
+from . import database, gemini_util, ratings, storage
 
 
 def _placeholder_handler(name):
@@ -37,9 +38,7 @@ def _cmd_store(args):
 
 def _cmd_vote(args):
     with database.open_database() as conn:
-        ratings.record_vote(
-            args.position, args.voter, args.winner, args.loser, conn=conn
-        )
+        ratings.record_vote(args.position, args.voter, args.winner, args.loser, conn=conn)
     print("vote recorded")
 
 
@@ -54,24 +53,27 @@ def _cmd_audit(args):
             storage.audit_forking_csv(csv)
 
 
-def _cmd_auto_vote(args):
-    with database.open_database() as conn:
-        gemini_util.auto_vote(args.position, args.prev, args.voter, conn=conn)
-    print("auto vote recorded")
-
-
 def _cmd_synthesize(args):
+    # A lógica de 'auto_vote' é, na verdade, a síntese de dois ramos
+    # e o registro de uma "opinião" inicial sobre eles.
+    # Poderíamos renomear auto_vote para synthesize_and_vote
+    print(
+        f"Synthesizing two new hrönirs from predecessor '{args.prev}' at position {args.position}..."
+    )
     with database.open_database() as conn:
-        winner = gemini_util.auto_vote(args.position, args.prev, args.voter, conn=conn)
-    print(winner)
+        # O 'voter' aqui é o próprio agente gerador, identificado por um UUID fixo ou dinâmico
+        voter_uuid = "00000000-agent-0000-0000-000000000000"  # Exemplo de UUID do agente
+        winner_uuid = gemini_util.auto_vote(args.position, args.prev, voter_uuid, conn=conn)
+    print(f"Synthesis complete. New canonical candidate: {winner_uuid}")
 
 
 def _cmd_ranking(args):
-    df = ratings.get_ranking(args.position)
-    if df.empty:
-        print("no votes recorded")
-        return
-    print(df.to_string(index=False))
+    ranking_data = ratings.get_ranking(args.position)
+    if ranking_data.empty:
+        print(f"No ranking data found for position {args.position}.")
+    else:
+        print(f"Ranking for Position {args.position}:")
+        print(ranking_data.to_string(index=False))
 
 
 def _git_remove_deleted():
@@ -105,12 +107,10 @@ def main(argv=None):
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     synth = subparsers.add_parser(
-        "synthesize",
-        help="generate two chapters with Gemini and cast a vote",
+        "synthesize", help="Generate competing chapters from a predecessor"
     )
-    synth.add_argument("--position", type=int, required=True, help="chapter position")
-    synth.add_argument("--prev", required=True, help="uuid of previous chapter")
-    synth.add_argument("--voter", required=True, help="uuid of forking path casting the vote")
+    synth.add_argument("--position", type=int, required=True, help="Chapter position")
+    synth.add_argument("--prev", required=True, help="UUID of the previous chapter")
     synth.set_defaults(func=_cmd_synthesize)
 
     validate = subparsers.add_parser("validate", help="validate a chapter file")
@@ -124,8 +124,10 @@ def main(argv=None):
     tree.add_argument("--index", default="book/book_index.json", help="index file")
     tree.set_defaults(func=_cmd_tree)
 
-    ranking = subparsers.add_parser("ranking", help="print current ranking")
-    ranking.add_argument("--position", type=int, required=True, help="chapter position")
+    ranking = subparsers.add_parser("ranking", help="Show Elo rankings for a chapter position")
+    ranking.add_argument(
+        "--position", type=int, required=True, help="The chapter position to rank."
+    )
     ranking.set_defaults(func=_cmd_ranking)
 
     vote = subparsers.add_parser("vote", help="record a duel result")
@@ -146,12 +148,6 @@ def main(argv=None):
     audit = subparsers.add_parser("audit", help="validate and repair storage")
     audit.set_defaults(func=_cmd_audit)
 
-    autovote = subparsers.add_parser("autovote", help="generate chapters with Gemini and vote")
-    autovote.add_argument("--position", type=int, required=True, help="chapter position")
-    autovote.add_argument("--prev", required=True, help="uuid of previous chapter")
-    autovote.add_argument("--voter", required=True, help="uuid of forking path casting the vote")
-    autovote.set_defaults(func=_cmd_auto_vote)
-
     clean = subparsers.add_parser("clean", help="remove invalid entries")
     clean.add_argument(
         "--git",
@@ -166,4 +162,3 @@ def main(argv=None):
 
 if __name__ == "__main__":
     main()
-

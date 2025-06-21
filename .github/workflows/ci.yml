@@ -1,0 +1,28 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  test-and-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements.txt && pip install pytest ruff
+      - name: Lint with Ruff
+        run: ruff check .
+      - name: Run tests with Pytest
+        run: pytest
+      - name: Validate data integrity
+        run: |
+          # Toca nos arquivos de votação/fork para criá-los se não existirem
+          mkdir -p ratings forking_path
+          # Roda a limpeza. Falhará se algo for removido.
+          python -m hronir_encyclopedia.cli clean
+          # Checa se a limpeza modificou o repo. Se sim, o estado estava sujo.
+          if [[ -n $(git status -s) ]]; then
+            echo "Repository is not clean. Invalid files were found."
+            git status -s
+            exit 1
+          fi

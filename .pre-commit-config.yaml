@@ -1,18 +1,21 @@
 repos:
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.12.0
-  hooks:
-  - id: ruff
-    args: [--fix]
-  - id: ruff-format
-- repo: https://github.com/psf/black
-  rev: 25.1.0
-  hooks:
-  - id: black
-- repo: local
-  hooks:
-  - id: hronir-clean
-    name: Clean invalid hrönirs and votes
-    entry: python -m hronir_encyclopedia.cli clean --git
-    language: system
-    pass_filenames: false
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.4 # As specified in the issue
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+  # Remove the old black hook if it exists, as ruff-format handles formatting.
+  # The original .pre-commit-config.yaml had a black hook:
+  # - repo: https://github.com/psf/black
+  #   rev: 25.1.0 # This was the old version
+  #   hooks:
+  #   - id: black
+  # This should be removed.
+  - repo: local
+    hooks:
+      - id: hronir-clean
+        name: Clean invalid hrönirs and votes
+        entry: python -m hronir_encyclopedia.cli clean --git
+        language: system
+        pass_filenames: false
