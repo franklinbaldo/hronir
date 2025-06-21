@@ -1,6 +1,7 @@
 [project]
 name = "hronir-encyclopedia"
 version = "0.1.0"
+requires-python = ">=3.12"
 dependencies = [
     "click",
     "pandas",
@@ -23,3 +24,9 @@ select = ["E", "F", "W", "I", "UP"] # Standard lints + isort + pyupgrade
 
 [tool.black]
 line-length = 100
+
+[tool.setuptools]
+packages = ["hronir_encyclopedia"]
+
+[tool.uv]
+package = true

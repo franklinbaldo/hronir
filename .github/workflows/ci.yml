@@ -4,22 +4,27 @@ jobs:
   test-and-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v1
         with:
-          python-version: '3.11'
+          uv-version: "latest" # ou uma versão específica como "0.1.15"
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('uv.lock') }}
       - name: Install dependencies
-        run: pip install -r requirements.txt && pip install pytest ruff
+        run: uv sync --frozen --all-extras # Instala dependências de prod e dev (pytest, ruff)
       - name: Lint with Ruff
-        run: ruff check .
+        run: uv run ruff check .
       - name: Run tests with Pytest
-        run: pytest
+        run: uv run pytest
       - name: Validate data integrity
         run: |
           # Toca nos arquivos de votação/fork para criá-los se não existirem
           mkdir -p ratings forking_path
           # Roda a limpeza. Falhará se algo for removido.
-          python -m hronir_encyclopedia.cli clean
+          uv run python -m hronir_encyclopedia.cli clean
           # Checa se a limpeza modificou o repo. Se sim, o estado estava sujo.
           if [[ -n $(git status -s) ]]; then
             echo "Repository is not clean. Invalid files were found."
