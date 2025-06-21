@@ -1,0 +1,52 @@
+name: Weekly Book Consolidation
+
+on:
+  schedule:
+    - cron: "0 0 * * 0" # Runs every Sunday at midnight UTC
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  consolidate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required to push changes to the repository
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch all history for all branches and tags
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11" # Specify your project's Python version
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install dependencies
+        run: uv pip install -r requirements.txt --system
+
+      - name: Install project in editable mode
+        run: uv pip install -e . --system
+
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+
+      - name: Consolidate book
+        run: uv run hronir_encyclopedia.cli consolidate_book
+
+      - name: Commit and push changes
+        run: |
+          # Check if there are changes in book/ or book_index.json
+          if ! git diff --quiet book/ book_index.json; then
+            git add book/ book_index.json
+            git commit -m "Automated weekly book consolidation"
+            git push
+          else
+            echo "No changes to commit."
+          fi

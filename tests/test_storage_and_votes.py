@@ -4,6 +4,7 @@ import uuid
 from pathlib import Path
 
 import pandas as pd
+import pytest # Added for pytest.raises
 
 from hronir_encyclopedia import database, gemini_util, ratings, storage
 
@@ -146,7 +147,38 @@ def test_clean_git_prunes_from_branch(tmp_path, monkeypatch):
 
     from hronir_encyclopedia import cli
 
-    cli.main(["clean", "--git"])
+    with pytest.raises(SystemExit) as e:
+        cli.main(["clean", "--git"])
+    assert e.type == SystemExit
+    assert e.value.code == 0
 
-    ls_files = subprocess.check_output(["git", "ls-files"], text=True)
-    assert str(bad_dir / "index.md") not in ls_files
+    # After 'clean --git', the 'git rm' should have run.
+    # 'git ls-files' will no longer show the file.
+    ls_files_after_rm = subprocess.check_output(["git", "ls-files"], text=True)
+    assert str(bad_dir / "index.md") not in ls_files_after_rm
+    assert str(bad_dir / "metadata.json") not in ls_files_after_rm
+
+    # Also check git status --porcelain to see the 'D' (deleted) status
+    # This confirms they are staged for deletion.
+    status_result = subprocess.run(
+        ["git", "status", "--porcelain"], capture_output=True, text=True, check=True
+    )
+    # bad_dir is already relative to tmp_path (e.g. "the_library/c/8/0/...")
+    # So, no need for .relative_to(tmp_path)
+    deleted_file_path_str = str(bad_dir / "index.md")
+    deleted_metadata_path_str = str(bad_dir / "metadata.json")
+
+    expected_deleted_lines = {
+        f"D  {deleted_file_path_str}",
+        f"D  {deleted_metadata_path_str}"
+    }
+    actual_lines = {line.strip() for line in status_result.stdout.strip().split('\n') if line.strip().startswith("D ")}
+
+    # Check that only the two "bad" files are staged for deletion
+    # and no other files are unexpectedly staged.
+    assert actual_lines == expected_deleted_lines
+
+    # Verify that the "good" chapter is still tracked by git
+    good_uuid = storage.compute_uuid("data")
+    good_dir = storage.uuid_to_path(good_uuid, base)
+    assert str(good_dir / "index.md") in ls_files_after_rm

@@ -2,7 +2,7 @@ import json
 import shutil
 import uuid
 from pathlib import Path
-
+import pandas as pd # Moved to top
 from sqlalchemy.engine import Engine
 
 UUID_NAMESPACE = uuid.NAMESPACE_URL
@@ -210,6 +210,77 @@ def purge_fake_hronirs(base: Path | str = "the_library") -> int:
             shutil.rmtree(chapter_dir, ignore_errors=True)
             removed += 1
     return removed
+
+
+def append_fork(
+    csv_file: Path,
+    position: int,
+    prev_uuid: str,
+    uuid_str: str, # Renamed 'uuid' to 'uuid_str' to avoid conflict with uuid module
+    conn: Engine | None = None,
+) -> str:
+    """
+    Appends a new fork entry to a CSV file or a database table.
+    Calculates a deterministic fork_uuid for the entry.
+    """
+    csv_file.parent.mkdir(parents=True, exist_ok=True)
+    # compute_forking_uuid is already in storage.py
+    fork_uuid = compute_forking_uuid(position, prev_uuid, uuid_str)
+
+    if conn is not None:
+        table_name = csv_file.stem # Use stem for table name consistency
+        with conn.begin() as con:
+            # Ensure table exists
+            con.exec_driver_sql(
+                f"""
+                CREATE TABLE IF NOT EXISTS `{table_name}` (
+                    position INTEGER,
+                    prev_uuid TEXT,
+                    uuid TEXT,
+                    fork_uuid TEXT PRIMARY KEY  -- Added PRIMARY KEY for fork_uuid
+                )
+                """
+            )
+            # Insert data, handle potential conflicts if fork_uuid is primary key
+            # For SQLite, ON CONFLICT REPLACE or IGNORE can be used.
+            # Using ON CONFLICT IGNORE to avoid error if the exact same fork is appended again.
+            con.exec_driver_sql(
+                f"""
+                INSERT INTO `{table_name}` (position, prev_uuid, uuid, fork_uuid)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(fork_uuid) DO NOTHING
+                """,
+                (position, prev_uuid, uuid_str, fork_uuid),
+            )
+        return fork_uuid
+
+    # CSV handling
+    new_row_df = pd.DataFrame(
+        [
+            {
+                "position": position,
+                "prev_uuid": prev_uuid,
+                "uuid": uuid_str,
+                "fork_uuid": fork_uuid,
+            }
+        ]
+    )
+    if csv_file.exists() and csv_file.stat().st_size > 0:
+        try:
+            df = pd.read_csv(csv_file)
+            # Check if fork_uuid already exists to prevent duplicates
+            if not df[df["fork_uuid"] == fork_uuid].empty:
+                # print(f"Fork {fork_uuid} already exists in {csv_file}. Skipping append.")
+                return fork_uuid
+            df = pd.concat([df, new_row_df], ignore_index=True)
+        except pd.errors.EmptyDataError:
+            # File exists but is empty, treat as new file
+            df = new_row_df
+    else:
+        df = new_row_df
+
+    df.to_csv(csv_file, index=False)
+    return fork_uuid
 
 
 def purge_fake_forking_csv(csv_path: Path, base: Path | str = "the_library") -> int:
