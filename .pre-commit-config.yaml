@@ -17,5 +17,6 @@ repos:
       - id: hronir-clean
         name: Clean invalid hrönirs and votes
         entry: python -m hronir_encyclopedia.cli clean --git
-        language: system
+        language: python
         pass_filenames: false
+        additional_dependencies: [pandas, sqlalchemy, google-generativeai, python-dotenv]

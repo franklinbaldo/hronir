@@ -255,6 +255,26 @@ Then, install and enable the pre-commit hook to automatically clean invalid hrö
 uv run pre-commit install
 ```
 
+### Troubleshooting Pre-commit Hooks
+
+If you encounter issues when running `uv run pre-commit install`, such as errors related to `core.hooksPath`, or if the hooks don't seem to run automatically when you commit, you can use the `scripts/fix_hooks.sh` script to help diagnose and potentially resolve common problems.
+
+To run it:
+```bash
+bash scripts/fix_hooks.sh
+```
+This script will:
+- Check your local and global Git `core.hooksPath` configurations.
+- Inform you of potential conflicts with `pre-commit`.
+- Offer to unset a conflicting local `core.hooksPath` if found.
+- Attempt to run `pre-commit install` again.
+- Provide guidance if issues persist.
+
+Make sure the script is executable:
+```bash
+chmod +x scripts/fix_hooks.sh
+```
+
 ---
 
 ## 🚧 Project Roadmap
