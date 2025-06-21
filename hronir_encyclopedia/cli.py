@@ -1,31 +1,46 @@
-import argparse
 import json
-import shutil  # Added
+import shutil
 import subprocess
 from pathlib import Path
+from typing_extensions import Annotated # Use typing_extensions for compatibility
+
+import typer
 
 from . import database, gemini_util, ratings, storage
 
+app = typer.Typer(
+    help="Hrönir Encyclopedia CLI: A tool for managing and generating content for the encyclopedia.",
+    add_completion=True, # Typer will handle shell completion
+    no_args_is_help=True # Show help if no command is given
+)
 
-def _cmd_consolidate_book(args):
-    ratings_dir = Path(args.ratings_dir)
-    library_dir = Path(args.library_dir)
-    book_dir = Path(args.book_dir)
-    index_file_path = Path(args.index_file)
+# Re-map old _cmd functions to new Typer command functions
+# Original functions are kept with minimal changes to their core logic,
+# only adapting their signatures to Typer's way of handling arguments.
 
+@app.command(help="Consolidate chapter rankings and update the canonical book view.")
+def consolidate_book(
+    ratings_dir: Annotated[Path, typer.Option(help="Directory containing rating CSV files.", exists=True, file_okay=False, dir_okay=True, readable=True)] = Path("ratings"),
+    library_dir: Annotated[Path, typer.Option(help="Directory containing all hrönirs.", exists=True, file_okay=False, dir_okay=True, readable=True)] = Path("the_library"),
+    book_dir: Annotated[Path, typer.Option(help="Directory for the canonical book.", file_okay=False, dir_okay=True, writable=True)] = Path("book"),
+    index_file: Annotated[Path, typer.Option(help="Path to the book index JSON file.", dir_okay=False, writable=True)] = Path("book/book_index.json"),
+):
+    """
+    Analyzes chapter rankings and updates the canonical version of the book.
+    """
     if not ratings_dir.is_dir():
-        print(f"Ratings directory not found: {ratings_dir}")
-        return
+        typer.echo(f"Ratings directory not found: {ratings_dir}", err=True)
+        raise typer.Exit(code=1)
 
     try:
         book_index = (
-            json.loads(index_file_path.read_text())
-            if index_file_path.exists()
+            json.loads(index_file.read_text())
+            if index_file.exists()
             else {"title": "The Hrönir Encyclopedia", "chapters": {}}
         )
     except json.JSONDecodeError:
-        print(f"Error reading or parsing book index file: {index_file_path}")
-        book_index = {"title": "The Hrönir Encyclopedia", "chapters": {}}  # Start fresh if corrupt
+        typer.echo(f"Error reading or parsing book index file: {index_file}", err=True)
+        book_index = {"title": "The Hrönir Encyclopedia", "chapters": {}}
 
     updated_positions = 0
     for rating_file in ratings_dir.glob("position_*.csv"):
@@ -33,228 +48,302 @@ def _cmd_consolidate_book(args):
             position_str = rating_file.stem.split("_")[1]
             position = int(position_str)
         except (IndexError, ValueError):
-            print(f"Could not parse position from rating file: {rating_file.name}")
+            typer.echo(f"Could not parse position from rating file: {rating_file.name}", err=True)
             continue
 
         ranking_df = ratings.get_ranking(position, base=ratings_dir)
         if ranking_df.empty:
-            print(f"No ranking data for position {position}.")
+            typer.echo(f"No ranking data for position {position}.")
             continue
 
         winner_uuid = ranking_df.iloc[0]["uuid"]
-        winner_elo = ranking_df.iloc[0]["elo"]  # For logging
+        winner_elo = ranking_df.iloc[0]["elo"]
 
         if not storage.chapter_exists(winner_uuid, base=library_dir):
-            print(f"Winner chapter {winner_uuid} for position {position} not found in library.")
+            typer.echo(f"Winner chapter {winner_uuid} for position {position} not found in library.", err=True)
             continue
 
-        # Remove old chapter file for this position from book dir
+        book_dir.mkdir(parents=True, exist_ok=True) # Ensure book_dir exists
         for old_file in book_dir.glob(f"{position}_*.md"):
             old_file.unlink()
 
-        # Define new canonical filename
-        # Using first 8 chars of UUID for brevity, similar to git short SHAs
         new_filename = f"{position}_{winner_uuid[:8]}.md"
         destination_path = book_dir / new_filename
         source_path = storage.uuid_to_path(winner_uuid, library_dir) / "index.md"
 
         try:
-            book_dir.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source_path, destination_path)
             book_index["chapters"][str(position)] = new_filename
-            print(
+            typer.echo(
                 f"Position {position}: Set chapter {winner_uuid[:8]} (Elo: {winner_elo}) "
                 f"as canonical. Copied to {destination_path}"
             )
             updated_positions += 1
         except Exception as e:
-            print(f"Error copying chapter {winner_uuid} for position {position}: {e}")
+            typer.echo(f"Error copying chapter {winner_uuid} for position {position}: {e}", err=True)
             continue
 
     if updated_positions > 0:
         try:
-            index_file_path.write_text(json.dumps(book_index, indent=2))
-            print(f"Book index updated: {index_file_path}")
+            index_file.parent.mkdir(parents=True, exist_ok=True) # Ensure parent dir for index exists
+            index_file.write_text(json.dumps(book_index, indent=2))
+            typer.echo(f"Book index updated: {index_file}")
         except Exception as e:
-            print(f"Error writing book index file: {e}")
+            typer.echo(f"Error writing book index file: {e}", err=True)
     else:
-        print("No positions were updated in the book index.")
+        typer.echo("No positions were updated in the book index.")
 
-    print("Book consolidation complete.")
-
-
-def _placeholder_handler(name):
-    def handler(args):
-        print(f"{name} command is in development.")
-
-    return handler
+    typer.echo("Book consolidation complete.")
 
 
-def _cmd_tree(args):
-    index_path = Path(args.index)
-    data = json.loads(index_path.read_text())
-    print(data.get("title", "Hr\u00f6nir Encyclopedia"))
+# @app.command(help="Export the canonical book to a file.") # Command removed
+# def export(
+#     output_file: Annotated[Path, typer.Argument(help="Path to the output file (e.g., book.epub, book.pdf).", writable=True, dir_okay=False)],
+#     format_str: Annotated[str, typer.Option("--format", "-f", help="Output format (e.g., epub, pdf, markdown). Requires Pandoc.")] = "epub",
+#     index_file: Annotated[Path, typer.Option(help="Path to the book index JSON file.", exists=True, dir_okay=False, readable=True)] = Path("book/book_index.json"),
+#     book_dir: Annotated[Path, typer.Option(help="Directory for the canonical book files.", exists=True, file_okay=False, dir_okay=True, readable=True)] = Path("book"),
+# ):
+#     """
+#     Exports the canonical book from book_index.json and chapter files into a single output file.
+#     """
+#     try:
+#         book_index = json.loads(index_file.read_text())
+#     except json.JSONDecodeError:
+#         typer.echo(f"Error reading or parsing book index file: {index_file}", err=True)
+#         raise typer.Exit(code=1)
+
+#     chapter_files = []
+#     sorted_chapters = sorted(book_index.get("chapters", {}).items(), key=lambda x: int(x[0]))
+
+#     if not sorted_chapters:
+#         typer.echo("No chapters found in the book index.")
+#         raise typer.Exit(code=1)
+
+#     for position, filename in sorted_chapters:
+#         chapter_path = book_dir / filename
+#         if chapter_path.exists():
+#             chapter_files.append(str(chapter_path))
+#         else:
+#             typer.echo(f"Warning: Chapter file {filename} for position {position} not found in {book_dir}.", err=True)
+
+#     if not chapter_files:
+#         typer.echo("No valid chapter files found to export.")
+#         raise typer.Exit(code=1)
+
+#     try:
+#         # import pypandoc # This import would now be problematic
+#         typer.echo(f"Exporting book to {output_file} in {format_str} format...")
+#         output_file.parent.mkdir(parents=True, exist_ok=True)
+
+#         # pypandoc.convert_files( # This call would now be problematic
+#         #     chapter_files,
+#         #     outputfile=str(output_file),
+#         #     format=format_str,
+#         #     extra_args=['--metadata', f'title="{book_index.get("title", "Hrönir Encyclopedia")}"']
+#         # )
+#         typer.echo(f"Book successfully exported to {output_file}")
+#     except ImportError:
+#         typer.echo("pypandoc is not installed. Please install it (and Pandoc itself) to use the export command.", err=True)
+#         typer.echo("Pandoc installation: https://pandoc.org/installing.html", err=True)
+#         raise typer.Exit(code=1)
+#     except OSError as e:
+#         if "No such file or directory: 'pandoc'" in str(e):
+#             typer.echo("Pandoc executable not found. Please ensure Pandoc is installed and in your PATH.", err=True)
+#             typer.echo("Installation instructions: https://pandoc.org/installing.html", err=True)
+#         else:
+#             typer.echo(f"An error occurred during export (OSError): {e}", err=True)
+#         raise typer.Exit(code=1)
+#     except Exception as e:
+#         typer.echo(f"An unexpected error occurred during export: {e}", err=True)
+#         raise typer.Exit(code=1)
+
+
+@app.command(help="Print the chapter tree from the book index.")
+def tree(
+    index: Annotated[Path, typer.Option(help="Path to the book index JSON file.", exists=True, dir_okay=False, readable=True)] = Path("book/book_index.json"),
+):
+    """
+    Displays the title and sorted chapter list from the book_index.json.
+    """
+    data = json.loads(index.read_text())
+    typer.echo(data.get("title", "Hrönir Encyclopedia"))
     for pos, fname in sorted(data.get("chapters", {}).items(), key=lambda x: int(x[0])):
-        print(f"{pos}: {fname}")
+        typer.echo(f"{pos}: {fname}")
 
 
-def _cmd_validate(args):
-    chapter = Path(args.chapter)
-    if not chapter.exists() or not chapter.is_file():
-        print("chapter file not found")
-        return
-    print("chapter looks valid")
+@app.command(help="Validate a chapter file (basic check).")
+def validate(
+    chapter: Annotated[Path, typer.Argument(help="Path to chapter markdown file.", exists=True, dir_okay=False, readable=True)],
+):
+    """
+    Performs a basic validation check on a chapter file.
+    Currently, just checks for existence.
+    """
+    # The original logic was just a print, keeping it simple.
+    # More complex validation would go into storage.validate_or_move
+    typer.echo(f"Chapter file {chapter} exists and is readable. Basic validation passed.")
+    # For a more meaningful validation, one might call storage.validate_or_move or parts of it.
 
 
-def _cmd_store(args):
-    chapter = Path(args.chapter)
-    prev_uuid = args.prev
-    uuid_str = storage.store_chapter(chapter, prev_uuid)
-    print(uuid_str)
+@app.command(help="Store a chapter by UUID in the library.")
+def store(
+    chapter: Annotated[Path, typer.Argument(help="Path to chapter markdown file.", exists=True, dir_okay=False, readable=True)],
+    prev: Annotated[str, typer.Option(help="UUID of the previous chapter.")] = None, # Made optional as in original
+):
+    """
+    Stores a given chapter file into the hrönir library, associating it with a predecessor UUID if provided.
+    """
+    uuid_str = storage.store_chapter(chapter, prev_uuid=prev)
+    typer.echo(uuid_str)
 
 
-def _cmd_vote(args):
-    with database.open_database() as conn:
-        ratings.record_vote(args.position, args.voter, args.winner, args.loser, conn=conn)
-    print("vote recorded")
+@app.command(help="Record a duel result (vote).")
+def vote(
+    position: Annotated[int, typer.Option(help="Chapter position being voted on.")],
+    voter: Annotated[str, typer.Option(help="UUID of the forking path or entity casting the vote.")],
+    winner: Annotated[str, typer.Option(help="Winning chapter UUID.")],
+    loser: Annotated[str, typer.Option(help="Losing chapter UUID.")],
+):
+    """
+    Records a vote for a winner against a loser for a given chapter position.
+    """
+    with database.open_database() as conn: # Assuming database.py handles the DB connection details
+        ratings.record_vote(position, voter, winner, loser, conn=conn)
+    typer.echo("Vote recorded.")
 
 
-def _cmd_audit(args):
+@app.command(help="Validate and repair storage, audit forking CSVs.")
+def audit():
+    """
+    Performs audit operations: validates chapters in the book directory,
+    moves invalid ones, and audits forking path CSV files.
+    """
     book_dir = Path("book")
-    for chapter in book_dir.glob("**/*.md"):
-        storage.validate_or_move(chapter)
+    typer.echo(f"Auditing book directory: {book_dir}...")
+    for chapter_file in book_dir.glob("**/*.md"): # Corrected from 'chapter' to 'chapter_file'
+        storage.validate_or_move(chapter_file) # Assuming this function prints its own status
 
     fork_dir = Path("forking_path")
     if fork_dir.exists():
-        for csv in fork_dir.glob("*.csv"):
-            storage.audit_forking_csv(csv)
+        typer.echo(f"Auditing forking path directory: {fork_dir}...")
+        for csv_file in fork_dir.glob("*.csv"): # Corrected from 'csv' to 'csv_file'
+            storage.audit_forking_csv(csv_file) # Assuming this function prints its own status
+    else:
+        typer.echo(f"Forking path directory {fork_dir} not found. Skipping audit.")
+    typer.echo("Audit complete.")
 
 
-def _cmd_synthesize(args):
-    # A lógica de 'auto_vote' é, na verdade, a síntese de dois ramos
-    # e o registro de uma "opinião" inicial sobre eles.
-    # Poderíamos renomear auto_vote para synthesize_and_vote
-    print(
-        f"Synthesizing two new hrönirs from predecessor '{args.prev}' "
-        f"at position {args.position}..."
+@app.command(help="Generate competing chapters from a predecessor and record an initial vote.")
+def synthesize(
+    position: Annotated[int, typer.Option(help="Chapter position for the new hrönirs.")],
+    prev: Annotated[str, typer.Option(help="UUID of the predecessor chapter to fork from.")],
+):
+    """
+    Synthesizes two new hrönirs from a predecessor for a given position
+    and records an initial 'vote' or assessment by the generating agent.
+    """
+    typer.echo(
+        f"Synthesizing two new hrönirs from predecessor '{prev}' "
+        f"at position {position}..."
     )
     with database.open_database() as conn:
-        # O 'voter' aqui é o próprio agente gerador, identificado por um UUID fixo ou dinâmico
-        voter_uuid = "00000000-agent-0000-0000-000000000000"  # Exemplo de UUID do agente
-        winner_uuid = gemini_util.auto_vote(args.position, args.prev, voter_uuid, conn=conn)
-    print(f"Synthesis complete. New canonical candidate: {winner_uuid}")
+        voter_uuid = "00000000-agent-0000-0000-000000000000" # Example agent UUID
+        winner_uuid = gemini_util.auto_vote(position, prev, voter_uuid, conn=conn)
+    typer.echo(f"Synthesis complete. New canonical candidate: {winner_uuid}")
 
 
-def _cmd_ranking(args):
-    ranking_data = ratings.get_ranking(args.position)
+@app.command(help="Show Elo rankings for a chapter position.")
+def ranking(
+    position: Annotated[int, typer.Argument(help="The chapter position to rank.")],
+    ratings_dir: Annotated[Path, typer.Option(help="Directory containing rating CSV files.")] = Path("ratings"),
+):
+    """
+    Displays the Elo rankings for hrönirs at a specific chapter position.
+    """
+    # The 'base' argument for get_ranking was Path(base), so passing ratings_dir directly.
+    ranking_data = ratings.get_ranking(position, base=ratings_dir)
     if ranking_data.empty:
-        print(f"No ranking data found for position {args.position}.")
+        typer.echo(f"No ranking data found for position {position}.")
     else:
-        print(f"Ranking for Position {args.position}:")
-        print(ranking_data.to_string(index=False))
+        typer.echo(f"Ranking for Position {position}:")
+        # Typer automatically handles printing DataFrames nicely with rich if available,
+        # otherwise, it falls back to standard print. For explicit control, use to_string().
+        typer.echo(ranking_data.to_string(index=False))
 
 
-def _git_remove_deleted():
-    """Stage deleted files in git if available."""
+def _git_remove_deleted_files(): # Renamed to avoid conflict and be more descriptive
+    """Stage deleted files in git if git is available and files were deleted."""
     try:
-        output = subprocess.check_output(["git", "ls-files", "--deleted"], text=True)
-    except Exception:
-        return
-    for path in output.splitlines():
-        if path:
-            subprocess.run(["git", "rm", "-r", "--ignore-unmatch", path])
+        # Check if we are in a git repository and git is installed
+        subprocess.check_call(["git", "rev-parse", "--is-inside-work-tree"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        output = subprocess.check_output(["git", "ls-files", "--deleted"], text=True, stderr=subprocess.PIPE)
+        if not output.strip():
+            typer.echo("No deleted files to stage in Git.")
+            return
+
+        for path_str in output.splitlines():
+            if path_str:
+                typer.echo(f"Staging deleted file for removal in Git: {path_str}")
+                subprocess.run(["git", "rm", "--ignore-unmatch", path_str], check=True)
+        typer.echo("Staged deleted files in Git.")
+
+    except FileNotFoundError:
+        typer.echo("Git command not found. Skipping Git operations.", err=True)
+    except subprocess.CalledProcessError as e:
+        if "not a git repository" in e.stderr.lower():
+             typer.echo("Not inside a Git repository. Skipping Git operations for deleted files.")
+        else:
+            typer.echo(f"Git ls-files or rm command failed: {e.stderr}", err=True)
+    except Exception as e:
+        typer.echo(f"An unexpected error occurred with Git operations: {e}", err=True)
 
 
-def _cmd_clean(args):
-    storage.purge_fake_hronirs()
+@app.command(help="Remove invalid entries (fake hrönirs, votes, etc.) from storage.")
+def clean(
+    git_stage_deleted: Annotated[bool, typer.Option("--git", help="Also stage deleted files for removal in the Git index.")] = False,
+):
+    """
+    Cleans up storage by removing entries identified as 'fake' or invalid.
+    Optionally, stages these deletions in Git.
+    """
+    typer.echo("Starting cleanup process...")
+    storage.purge_fake_hronirs() # Assumes this function prints its actions
+
     fork_dir = Path("forking_path")
     if fork_dir.exists():
-        for csv in fork_dir.glob("*.csv"):
-            storage.purge_fake_forking_csv(csv)
+        typer.echo(f"Cleaning fake forking CSVs in {fork_dir}...")
+        for csv_file in fork_dir.glob("*.csv"):
+            storage.purge_fake_forking_csv(csv_file) # Assumes this function prints its actions
+    else:
+        typer.echo(f"Forking path directory {fork_dir} not found. Skipping.")
+
     rating_dir = Path("ratings")
     if rating_dir.exists():
-        for csv in rating_dir.glob("*.csv"):
-            storage.purge_fake_votes_csv(csv)
-    if getattr(args, "git", False):
-        _git_remove_deleted()
-    print("cleanup complete")
+        typer.echo(f"Cleaning fake votes CSVs in {rating_dir}...")
+        for csv_file in rating_dir.glob("*.csv"):
+            storage.purge_fake_votes_csv(csv_file) # Assumes this function prints its actions
+    else:
+        typer.echo(f"Ratings directory {rating_dir} not found. Skipping.")
+
+    if git_stage_deleted:
+        typer.echo("Attempting to stage deleted files in Git...")
+        _git_remove_deleted_files()
+
+    typer.echo("Cleanup complete.")
 
 
-def main(argv=None):
-    parser = argparse.ArgumentParser(description="Hr\u00f6nir Encyclopedia CLI")
-    subparsers = parser.add_subparsers(dest="command", required=True)
+# Placeholder for 'submit' command if it was meant to be kept.
+# If not, it can be removed. For now, it's commented out as per original structure.
+# @app.command(help="Submit changes (placeholder).")
+# def submit_cmd():
+#     typer.echo("Submit command is in development.")
 
-    synth = subparsers.add_parser(
-        "synthesize", help="Generate competing chapters from a predecessor"
-    )
-    synth.add_argument("--position", type=int, required=True, help="Chapter position")
-    synth.add_argument("--prev", required=True, help="UUID of the previous chapter")
-    synth.set_defaults(func=_cmd_synthesize)
 
-    validate = subparsers.add_parser("validate", help="validate a chapter file")
-    validate.add_argument("chapter", help="path to chapter markdown file")
-    validate.set_defaults(func=_cmd_validate)
-
-    submit = subparsers.add_parser("submit", help="in development")
-    submit.set_defaults(func=_placeholder_handler("submit"))
-
-    tree = subparsers.add_parser("tree", help="print the chapter tree")
-    tree.add_argument("--index", default="book/book_index.json", help="index file")
-    tree.set_defaults(func=_cmd_tree)
-
-    ranking = subparsers.add_parser("ranking", help="Show Elo rankings for a chapter position")
-    ranking.add_argument(
-        "--position", type=int, required=True, help="The chapter position to rank."
-    )
-    ranking.set_defaults(func=_cmd_ranking)
-
-    vote = subparsers.add_parser("vote", help="record a duel result")
-    vote.add_argument("--position", type=int, required=True, help="chapter position")
-    vote.add_argument("--voter", required=True, help="uuid of forking path casting the vote")
-    vote.add_argument("--winner", required=True, help="winning chapter id")
-    vote.add_argument("--loser", required=True, help="losing chapter id")
-    vote.set_defaults(func=_cmd_vote)
-
-    export = subparsers.add_parser("export", help="in development")
-    export.set_defaults(func=_placeholder_handler("export"))
-
-    store = subparsers.add_parser("store", help="store chapter by UUID")
-    store.add_argument("chapter", help="path to chapter markdown file")
-    store.add_argument("--prev", help="uuid of previous chapter")
-    store.set_defaults(func=_cmd_store)
-
-    audit = subparsers.add_parser("audit", help="validate and repair storage")
-    audit.set_defaults(func=_cmd_audit)
-
-    clean = subparsers.add_parser("clean", help="remove invalid entries")
-    clean.add_argument(
-        "--git",
-        action="store_true",
-        help="also remove deleted files from the git index",
-    )
-    clean.set_defaults(func=_cmd_clean)
-
-    consolidate = subparsers.add_parser(
-        "consolidate_book",
-        help="Consolidate chapter rankings and update the canonical book view.",
-    )
-    consolidate.add_argument(
-        "--ratings_dir", default="ratings", help="Directory containing rating CSV files."
-    )
-    consolidate.add_argument(
-        "--library_dir", default="the_library", help="Directory containing all hrönirs."
-    )
-    consolidate.add_argument("--book_dir", default="book", help="Directory for the canonical book.")
-    consolidate.add_argument(
-        "--index_file",
-        default="book/book_index.json",
-        help="Path to the book index JSON file.",
-    )
-    consolidate.set_defaults(func=_cmd_consolidate_book)  # Placeholder for now
-
-    args = parser.parse_args(argv)
-    args.func(args)
-
+def main(argv: list[str] | None = None):
+    # If argv is None, Typer's app() will use sys.argv by default (which is what we want for CLI execution).
+    # If argv is provided (e.g., from a test), app() will use that specific list of arguments.
+    app(args=argv)
 
 if __name__ == "__main__":
-    main()
+    main() # Called with no arguments, so app() will use sys.argv

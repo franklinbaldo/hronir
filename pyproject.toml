@@ -8,7 +8,9 @@ dependencies = [
     "google-generativeai",
     "sqlalchemy>=2.0",
     "python-dotenv", # Adicionado para gerenciar secrets
-    "numpy" # Adicionado para extração semântica
+    "numpy", # Adicionado para extração semântica
+    # "pypandoc", # Removido pois não será usado
+    "typer[all]" # Adicionado para um CLI moderno
 ]
 
 [project.scripts]
