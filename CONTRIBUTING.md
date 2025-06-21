@@ -32,7 +32,7 @@ Thank you for your interest in helping expand this labyrinthine narrative. This 
 
 ### Helpful CLI commands
 
-Remember to use `uv run` before `python -m hronir_encyclopedia.cli` if you are using the `uv` environment.
+Remember to use `uv run` before `python -m hronir_encyclopedia.cli` if you are using the `uv` environment, as shown in the examples below.
 
 Check the current Elo rankings for a chapter position:
 ```bash
@@ -41,11 +41,11 @@ uv run python -m hronir_encyclopedia.cli ranking --position 1
 
 To participate in voting (after obtaining a `fork_uuid` as described in `docs/proof_of_work_voting.md`):
 
-1.  Discover the most informative duel for a position:
+1.  Discover the Duelo de Máxima Entropia for a position:
     ```bash
     uv run python -m hronir_encyclopedia.cli get-duel --position 1
     ```
-    This will output JSON indicating the `hronir_A` and `hronir_B` for the duel.
+    This will output JSON indicating the `hronir_A` and `hronir_B` for the duel, which the system has identified as the most informative one to vote on.
 
 2.  Cast your vote for the presented duel:
     ```bash
@@ -56,7 +56,7 @@ To participate in voting (after obtaining a `fork_uuid` as described in `docs/pr
       --loser <uuid_B_from_get_duel>
     ```
 
-Generate two new hrönir variants from a predecessor and record an initial assessment (this is mainly for automated agents but can be used manually):
+Generate two new hrönir variants from a predecessor and record an initial assessment (this is mainly for automated agents but can be used manually; it does not bypass the `get-duel` requirement for general voting):
 ```bash
 uv run python -m hronir_encyclopedia.cli synthesize \
   --position 1 \

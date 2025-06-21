@@ -1,65 +1,50 @@
-# Voting as Information: The Entropy-Guided System
+# Voting as Information: The Purely Entropic System
 
-In The Hrönir Encyclopedia, voting is not merely an expression of preference but a crucial act of information contribution. The system is designed to maximize the knowledge gained from each vote, guiding the collective effort towards resolving the greatest uncertainties in the narrative's evolving structure. This is achieved through a **Proof-of-Work** mechanism coupled with an **Entropy-Guided Duel Selection** process.
+In The Hrönir Encyclopedia, voting is a direct contribution to reducing uncertainty within the narrative's ranking. The system is governed by a single, powerful principle: **maximization of information gain (Entropy)**. Each vote is directed by the system to resolve the most ambiguous point in the current literary landscape.
 
-## The Philosophy: Relevância Informativa
+## The Philosophy: Pure Informational Relevance
 
-The core idea is that each vote should be as informative as possible. Instead of allowing votes on any arbitrary pair of `hrönirs`, the system directs your intellectual labor to where it's most needed. This ensures that the collective ranking converges efficiently towards the "true" or most "inevitable" narrative paths.
+The guiding philosophy is that every vote must be as informative as possible. There are no special cases or alternative strategies; the system *always* seeks out the pair of `hrönirs` (chapter variants) for a given position whose relative order is most uncertain. By resolving this "Duelo de Máxima Entropia," the collective ranking converges more efficiently towards the most "inevitable" or "true" narrative paths. A new `hrönir` simply joins the pool and will be selected for a duel if and when its inclusion in a pair results in the highest current entropy.
 
-## Proof-of-Work: Earning Your Say
+## Proof-of-Work: Earning Your Voice
 
-Before you can vote, you must contribute to the encyclopedia's expansion. This is the "Proof-of-Work":
-1.  **Create:** Generate one or more new `hrönirs` (chapter variants).
+Before you can contribute your judgment, you must first expand the narrative space. This is the "Proof-of-Work":
+1.  **Create:** Generate one or more new `hrönirs`.
 2.  **Store:** Use the `store` command to add your `hrönirs` to `the_library/`.
 3.  **Connect:** Record the lineage of your new `hrönirs` by adding entries to `forking_path/yu-tsun.csv`. Each entry links a `prev_uuid` (the UUID of the preceding chapter) to your new `hrönir's` `uuid`. This action generates a unique `fork_uuid`.
 
-This `fork_uuid` is your credential. It proves you have expanded the narrative space and grants you the right to help refine it through voting.
+This `fork_uuid` is your credential. It signifies your active participation in building the encyclopedia and grants you the right to help refine its structure through voting.
 
-## The Entropy-Guided Voting Process: A Two-Step Dance
+## The Purely Entropic Voting Process: A Two-Step Resolution
 
-Once you have your `fork_uuid`, you participate in a curated voting process:
+With your `fork_uuid`, you engage in a precise, system-guided voting process:
 
-**Step 1: Discover the Most Informative Duel (`get-duel`)**
+**Step 1: Discover the Point of Maximum Uncertainty (`get-duel`)**
 
-The system identifies the duel that will provide the most information to refine the rankings. You don't choose the combatants; the system presents them to you.
+The system itself identifies the duel that will yield the most information. You, the voter, are directed to this specific point of ambiguity.
 ```bash
 uv run python -m hronir_encyclopedia.cli get-duel --position <position_number>
 ```
-This command will return a JSON object detailing the duel. The `strategy` field indicates why this duel was chosen:
-
-*   **`calibration_duel` (Duelo de Calibração):**
-    *   **Priority 1.** Occurs when a `hrönir` has no recorded duels (it's "new" to the ranking system for that position).
-    *   The new `hrönir` is pitted against the current **champion** (highest Elo `hrönir`) of that position.
-    *   This quickly establishes a baseline Elo for the new entrant, integrating it into the existing ranking structure.
-    *   *Example Output Snippet:*
-        ```json
-        {
-          "strategy": "calibration_duel",
-          "hronir_A": "champion_uuid",
-          "hronir_B": "new_hronir_uuid",
-          // ...
-        }
-        ```
+This command will return a JSON object detailing the duel. The `strategy` field will **always** be `"max_entropy_duel"`:
 
 *   **`max_entropy_duel` (Duelo de Máxima Entropia):**
-    *   **Priority 2.** Occurs if there are no `hrönirs` needing calibration.
-    *   The system selects two `hrönirs` whose Elo ratings are very close. The outcome of such a duel is highly uncertain (high Shannon entropy).
-    *   Resolving this duel provides the maximum possible information to distinguish between closely ranked contenders, thus refining the ordering most effectively.
-    *   The current implementation uses a heuristic: it compares `hrönirs` that are adjacent in the Elo-sorted ranking, as these are strong candidates for high entropy.
+    *   This is the **only** strategy. The system calculates the Shannon entropy for potential duels, prioritizing those between `hrönirs` with the closest Elo ratings, as their outcome is the most unpredictable.
+    *   The current implementation uses an efficient heuristic: it primarily considers `hrönirs` that are adjacent in the Elo-sorted ranking to find the pair with the highest entropy.
     *   *Example Output Snippet:*
         ```json
         {
+          "position": 1,
           "strategy": "max_entropy_duel",
           "hronir_A": "uuid_of_hronir1",
           "hronir_B": "uuid_of_hronir2",
-          "entropy": 0.999, // Value close to 1.0 indicates high uncertainty
+          "entropy": 0.999123, // Value close to 1.0 indicates high uncertainty
           // ...
         }
         ```
 
-**Step 2: Cast Your Vote (`vote`)**
+**Step 2: Cast Your Decisive Vote (`vote`)**
 
-After `get-duel` has informed you of the system-selected pair, you cast your vote using your `fork_uuid`:
+After `get-duel` has presented the system-selected pair, you cast your vote using your `fork_uuid`:
 ```bash
 uv run python -m hronir_encyclopedia.cli vote \
   --position <position_number> \
@@ -67,14 +52,15 @@ uv run python -m hronir_encyclopedia.cli vote \
   --winner <uuid_A_from_get_duel> \
   --loser <uuid_B_from_get_duel>
 ```
-**Crucially, your vote will only be accepted if `winner` and `loser` match the `hronir_A` and `hronir_B` provided by `get-duel` for that position.**
+**Crucially, your vote will only be accepted if the `winner` and `loser` UUIDs precisely match the `hronir_A` and `hronir_B` provided by `get-duel` for that position.**
 
-This strict validation ensures that your vote directly addresses the system's current point of maximum uncertainty, making your contribution as valuable as possible.
+This strict validation ensures that your intellectual effort is applied directly to the system's current point of greatest informational need.
 
-## Why This Approach?
+## Advantages of the Purely Entropic Model
 
-*   **Efficiency:** Directs limited human attention to where it has the most impact.
-*   **Robust Rankings:** Helps build a more accurate and stable Elo ranking system quickly.
-*   **Philosophical Alignment:** Reinforces the idea of the encyclopedia as a system discovering itself, with human input serving to clarify its inherent structure rather than impose arbitrary choices.
+*   **Philosophical Consistency:** A single, elegant rule governs the selection of all duels. The system is a pure embodiment of the quest for information.
+*   **Fairness and Organic Growth:** New `hrönirs` are not subjected to arbitrary "calibration" duels against potentially much stronger opponents. They integrate into the ranking and are selected for duels based on their potential to resolve uncertainty, allowing for more organic and fair competition.
+*   **Implementation Simplicity:** Removing special-case logic (like calibration duels) results in cleaner, more maintainable code in `ratings.determine_next_duel`.
+*   **Clarity in Communication:** A system driven by one powerful, unifying principle is easier to understand, explain, and trust.
 
-By participating in this entropy-guided voting, you are not just picking winners; you are actively helping to reveal the most "inevitable" narrative threads within the Hrönir Encyclopedia.
+By participating in this purely entropy-guided voting, you are not just picking favorites; you are a critical agent in the encyclopedia's process of self-discovery, helping to illuminate the most "inevitable" narrative pathways from a universe of possibilities.
