@@ -1,0 +1,25 @@
+[project]
+name = "hronir-encyclopedia"
+version = "0.1.0"
+dependencies = [
+    "click",
+    "pandas",
+    "google-generativeai",
+    "sqlalchemy>=2.0",
+    "python-dotenv" # Adicionado para gerenciar secrets
+]
+
+[project.scripts]
+hronir = "hronir_encyclopedia.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest", "pre-commit", "ruff", "black"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP"] # Standard lints + isort + pyupgrade
+
+[tool.black]
+line-length = 100

@@ -1,8 +1,9 @@
 import json
-import uuid
 import shutil
-from sqlalchemy.engine import Engine
+import uuid
 from pathlib import Path
+
+from sqlalchemy.engine import Engine
 
 UUID_NAMESPACE = uuid.NAMESPACE_URL
 
@@ -27,7 +28,9 @@ def uuid_to_path(uuid_str: str, base: Path) -> Path:
     return path
 
 
-def store_chapter(chapter_file: Path, previous_uuid: str | None = None, base: Path | str = "the_library") -> str:
+def store_chapter(
+    chapter_file: Path, previous_uuid: str | None = None, base: Path | str = "the_library"
+) -> str:
     """Store chapter_file content under UUID-based path and return UUID."""
     base = Path(base)
     text = chapter_file.read_text()
@@ -45,7 +48,9 @@ def store_chapter(chapter_file: Path, previous_uuid: str | None = None, base: Pa
     return chapter_uuid
 
 
-def store_chapter_text(text: str, previous_uuid: str | None = None, base: Path | str = "the_library") -> str:
+def store_chapter_text(
+    text: str, previous_uuid: str | None = None, base: Path | str = "the_library"
+) -> str:
     """Store raw chapter text and return its UUID."""
     base = Path(base)
     chapter_uuid = compute_uuid(text)
@@ -85,7 +90,10 @@ def forking_path_exists(
 
     if conn is not None:
         with conn.connect() as con:
-            tables = [row[0] for row in con.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'")]
+            tables = [
+                row[0]
+                for row in con.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'")
+            ]
             for table in tables:
                 try:
                     row = con.exec_driver_sql(

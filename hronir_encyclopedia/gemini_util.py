@@ -1,13 +1,16 @@
 import os
-from sqlalchemy.engine import Engine
 from pathlib import Path
-from dotenv import load_dotenv
 
-import pandas as pd
+from dotenv import load_dotenv
+from sqlalchemy.engine import Engine
+
+load_dotenv()
+
 import google.generativeai as genai
+import pandas as pd
 from google.generativeai import types
 
-from . import storage, ratings
+from . import ratings, storage
 
 MODEL_NAME = "gemini-2.5-flash-preview-05-20"
 
@@ -20,9 +23,7 @@ def _gemini_request(prompt: str) -> str:
         raise RuntimeError("GEMINI_API_KEY not set")
 
     client = genai.Client(api_key=key)
-    contents = [
-        types.Content(role="user", parts=[types.Part.from_text(text=prompt)])
-    ]
+    contents = [types.Content(role="user", parts=[types.Part.from_text(text=prompt)])]
     cfg = types.GenerateContentConfig(
         safety_settings=[
             types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"),
@@ -33,9 +34,7 @@ def _gemini_request(prompt: str) -> str:
         response_mime_type="text/plain",
     )
 
-    chunks = client.models.generate_content_stream(
-        model=MODEL_NAME, contents=contents, config=cfg
-    )
+    chunks = client.models.generate_content_stream(model=MODEL_NAME, contents=contents, config=cfg)
     return "".join(chunk.text for chunk in chunks)
 
 
@@ -78,7 +77,19 @@ def append_fork(
     else:
         df = pd.DataFrame(columns=["position", "prev_uuid", "uuid", "fork_uuid"])
     df = pd.concat(
-        [df, pd.DataFrame([{"position": position, "prev_uuid": prev_uuid, "uuid": uuid, "fork_uuid": fork_uuid}])],
+        [
+            df,
+            pd.DataFrame(
+                [
+                    {
+                        "position": position,
+                        "prev_uuid": prev_uuid,
+                        "uuid": uuid,
+                        "fork_uuid": fork_uuid,
+                    }
+                ]
+            ),
+        ],
         ignore_index=True,
     )
     df.to_csv(csv_file, index=False)

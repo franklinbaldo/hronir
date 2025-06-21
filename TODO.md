@@ -112,3 +112,18 @@ This document outlines the tasks required to implement the **Hrönir Encyclopedi
 
 This document will be updated as development progresses.
 
+---
+
+## 🛠️ Post-Refactor Action Items (Post-PR #1)
+
+These items were identified during or after the initial engineering backlog implementation:
+
+- **Pre-commit Hook Installation:**
+  - The `pre-commit install` command failed during initial environment setup due to a potential conflict with `core.hooksPath`. This needs to be investigated and resolved to ensure hooks are automatically active in local development environments.
+- **Remaining Linting Errors:**
+  - After running `pre-commit run --all-files`, the following Ruff linting errors remained and need manual correction:
+    - `E501 Line too long (> 100 characters)`: Several files may have lines exceeding the configured limit.
+    - `E402 Module level import not at top of file`: Some imports might not be at the very top of their respective files.
+    - `F841 Unused local variable`: There might be variables that are assigned but never used.
+- **`git status` Anomaly during Subtasks:**
+  - During subtask execution (e.g., `pre-commit run --all-files`), file modifications made by tools were reported, but `git status` within the same subtask often showed a clean working tree immediately after. This behavior should be understood, as it might affect how changes are automatically staged or committed in future automated tasks.

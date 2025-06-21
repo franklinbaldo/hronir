@@ -1,7 +1,9 @@
 from __future__ import annotations
-from pathlib import Path
+
 import os
 import tempfile
+from pathlib import Path
+
 import pandas as pd
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
@@ -78,6 +80,7 @@ class CsvDatabase:
 
 # Helper ------------------------------------------------------------
 
+
 def commit_to_csv(engine: Engine) -> None:
     """Write loaded tables back to their original CSV files."""
     info = _CONNECTION_MAP.get(id(engine))
@@ -91,15 +94,14 @@ def commit_to_csv(engine: Engine) -> None:
             df = pd.read_sql_table(tbl_name, con)
             csv = mapping.get(tbl_name)
             if not csv:
-                base = (
-                    info["ratings_dir"] if tbl_name.startswith("position_") else info["fork_dir"]
-                )
+                base = info["ratings_dir"] if tbl_name.startswith("position_") else info["fork_dir"]
                 csv = Path(base) / f"{tbl_name}.csv"
             csv.parent.mkdir(parents=True, exist_ok=True)
             df.to_csv(csv, index=False)
 
 
 # Convenience shortcut ---------------------------------------------
+
 
 def open_database(
     *,
