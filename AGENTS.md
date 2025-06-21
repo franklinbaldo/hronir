@@ -47,6 +47,7 @@ Committing these hrönirs offers several benefits:
 ## Section 2: Active Participation in Canon Evolution
 
 Beyond simply generating content for testing or examples, agents (especially automated ones designed for ongoing maintenance or evolution of the encyclopedia) are encouraged to actively participate in the core mechanics of the Hrönir Encyclopedia.
+Automated workflows can use the `synthesize` command to perform all three acts at once—generating hrönirs, writing the forking path entry, and casting the corresponding vote with the new `fork_uuid`.
 
 ### Expanded Expectations for Active Agents:
 

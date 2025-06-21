@@ -24,11 +24,12 @@ This table defines the fundamental rules, principles, and constraints that gover
 
 | ID    | Rule Name                      | Description                                                                                                                                                                                                                          |
 | :---- | :----------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| SC.1  | Proof-of-Work for Voting       | Voting is not a free action; it is an act of contribution. To vote, a participant must first expand the narrative possibilities, typically by generating new hrönirs and forking paths.                                                 |
+| SC.1  | Proof-of-Work for Voting       | Every vote **must** originate from a new row in `forking_path`. Creating this entry links valid hrönirs and yields a unique `fork_uuid` that acts as the voter identity and proof of work.
 | SC.2  | Vote Record Structure          | Votes are recorded in `.csv` files within the `ratings/` directory. Each record **must** contain a unique `uuid` (for the vote itself), a `voter`, a `winner` (hrönir UUID), and a `loser` (hrönir UUID).                              |
 | SC.3  | Voter Identity (Fork UUID)     | The `voter` field in a vote record **must** be the `fork_uuid` of a valid, existing forking path. A vote is cast "as" a specific narrative branch.                                                                                     |
 | SC.4  | One Vote per Voter per Position| A single `voter` (`fork_uuid`) may only cast **one vote** per position. Subsequent votes from the same `fork_uuid` for the same position are invalid.                                                                                   |
 | SC.5  | Vote Validity Conditions       | A vote is only valid if its `voter` is a valid `fork_uuid`, its `winner` and `loser` point to valid hrönirs, and the voter has not already voted for that position. Invalid votes are subject to automated purging.                      |
+| SC.6  | Canonização por Consenso | A versão canônica do livro é determinada periodicamente através do comando `consolidate_book`. Para cada posição, o hrönir com a maior pontuação Elo é copiado para `book/` e `book/book_index.json`. |
 
 ### Generation & Contribution (Agents)
 
