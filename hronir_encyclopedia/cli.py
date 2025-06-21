@@ -203,13 +203,49 @@ def vote(
     voter: Annotated[str, typer.Option(help="UUID of the forking path or entity casting the vote.")],
     winner: Annotated[str, typer.Option(help="Winning chapter UUID.")],
     loser: Annotated[str, typer.Option(help="Losing chapter UUID.")],
+    ratings_dir: Annotated[Path, typer.Option(help="Directory containing rating CSV files.")] = Path("ratings"), # Adicionado para determinar o duelo oficial
 ):
     """
-    Records a vote for a winner against a loser for a given chapter position.
+    Records a vote for a winner against a loser for a given chapter position,
+    only if the vote corresponds to the officially curated duel.
     """
-    with database.open_database() as conn: # Assuming database.py handles the DB connection details
+    official_duel = ratings.determine_next_duel(position, base=ratings_dir)
+
+    if not official_duel:
+        typer.echo(json.dumps({
+            "error": "Não foi possível determinar um duelo oficial para esta posição. Voto não pode ser validado.",
+            "position": position
+        }, indent=2))
+        raise typer.Exit(code=1)
+
+    official_hronir_A = official_duel.get("hronir_A")
+    official_hronir_B = official_duel.get("hronir_B")
+
+    # Normaliza o par submetido para comparação (ordem não importa)
+    submitted_pair = set([winner, loser])
+    official_pair = set([official_hronir_A, official_hronir_B])
+
+    if submitted_pair != official_pair:
+        typer.echo(json.dumps({
+            "error": "Voto rejeitado. O par submetido não corresponde ao duelo curado oficialmente.",
+            "submitted_duel": {"hronir_A": winner, "hronir_B": loser},
+            "expected_duel": {"hronir_A": official_hronir_A, "hronir_B": official_hronir_B},
+            "strategy": official_duel.get("strategy"),
+            "position": position
+        }, indent=2))
+        raise typer.Exit(code=1)
+
+    # Se a validação passar, registra o voto
+    with database.open_database() as conn:
         ratings.record_vote(position, voter, winner, loser, conn=conn)
-    typer.echo("Vote recorded.")
+    typer.echo(json.dumps({
+        "message": "Voto registrado. A incerteza do sistema foi reduzida.",
+        "position": position,
+        "winner": winner,
+        "loser": loser,
+        "voter": voter,
+        "duel_strategy": official_duel.get("strategy")
+    }, indent=2))
 
 
 @app.command(help="Validate and repair storage, audit forking CSVs.")
@@ -269,6 +305,30 @@ def ranking(
         # Typer automatically handles printing DataFrames nicely with rich if available,
         # otherwise, it falls back to standard print. For explicit control, use to_string().
         typer.echo(ranking_data.to_string(index=False))
+
+@app.command(help="Obtém o duelo mais relevante para uma posição.")
+def get_duel(
+    position: Annotated[int, typer.Option(help="A posição do capítulo para a qual obter o duelo.")],
+    ratings_dir: Annotated[Path, typer.Option(help="Diretório contendo arquivos CSV de classificação.")] = Path("ratings"),
+):
+    """
+    Obtém o duelo mais relevante (calibração ou máxima entropia) para uma determinada posição.
+    """
+    duel_info = ratings.determine_next_duel(position, base=ratings_dir)
+    if duel_info:
+        # Adiciona a estrutura duel_pair para corresponder ao output de exemplo do plano
+        output_data = {
+            "position": duel_info.get("position"), # Pega de duel_info se existir
+            "strategy": duel_info.get("strategy"),
+            "entropy": duel_info.get("entropy"), # Pode ser None para calibração
+            "duel_pair": {
+                "hronir_A": duel_info.get("hronir_A"),
+                "hronir_B": duel_info.get("hronir_B"),
+            }
+        }
+        typer.echo(json.dumps(output_data, indent=2))
+    else:
+        typer.echo(json.dumps({"error": "Não foi possível determinar um duelo. Verifique se há hrönirs suficientes.", "position": position}, indent=2))
 
 
 def _git_remove_deleted_files(): # Renamed to avoid conflict and be more descriptive
