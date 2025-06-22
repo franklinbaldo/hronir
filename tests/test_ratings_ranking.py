@@ -9,8 +9,8 @@ UUID_C = "hr-c"
 PREDECESSOR_POS1 = "pred-pos1"
 
 def test_get_ranking(tmp_path: Path):
-    ratings_base_dir = tmp_path / "ratings"
-    ratings_base_dir.mkdir()
+    ratings_dir_test_var = tmp_path / "ratings" # Renamed local variable
+    ratings_dir_test_var.mkdir()
     forking_path_dir = tmp_path / "forking_path"
     forking_path_dir.mkdir()
 
@@ -30,30 +30,30 @@ def test_get_ranking(tmp_path: Path):
         {"uuid": "vote2", "voter": "v2", "winner": UUID_A, "loser": UUID_C},
         {"uuid": "vote3", "voter": "v3", "winner": UUID_B, "loser": UUID_A},
     ]
-    pd.DataFrame(votes_for_pos1).to_csv(ratings_base_dir / "position_001.csv", index=False)
+    pd.DataFrame(votes_for_pos1).to_csv(ratings_dir_test_var / "position_001.csv", index=False) # Use renamed var
 
     # Chamar ratings.get_ranking com os novos parâmetros
     df = ratings.get_ranking(
         position=1,
-        canonical_predecessor_uuid=PREDECESSOR_POS1,
+        predecessor_hronir_uuid=PREDECESSOR_POS1, # Updated
         forking_path_dir=forking_path_dir,
-        ratings_base_dir=ratings_base_dir
+        ratings_dir=ratings_dir_test_var # Updated and use renamed var
     )
 
     # As asserções originais sobre Elos, vitórias e derrotas devem continuar válidas
     # se a lógica de cálculo de Elo não mudou fundamentalmente, apenas a filtragem de dados.
     # Ordem esperada: A, B, C com base nos Elos calculados no teste original.
-    assert list(df["uuid"]) == [UUID_A, UUID_B, UUID_C]
+    assert list(df["hrönir_uuid"]) == [UUID_A, UUID_B, UUID_C] # Changed "uuid" to "hrönir_uuid"
 
-    row_a = df[df["uuid"] == UUID_A].iloc[0]
-    row_b = df[df["uuid"] == UUID_B].iloc[0]
-    row_c = df[df["uuid"] == UUID_C].iloc[0]
+    row_a = df[df["hrönir_uuid"] == UUID_A].iloc[0] # Changed "uuid" to "hrönir_uuid"
+    row_b = df[df["hrönir_uuid"] == UUID_B].iloc[0] # Changed "uuid" to "hrönir_uuid"
+    row_c = df[df["hrönir_uuid"] == UUID_C].iloc[0] # Changed "uuid" to "hrönir_uuid"
 
     assert row_a["wins"] == 2 and row_a["losses"] == 1
-    assert row_a["elo"] == 1513  # Elo esperado do teste original
+    assert row_a["elo_rating"] == 1513  # Elo esperado do teste original. Changed "elo" to "elo_rating"
 
     assert row_b["wins"] == 1 and row_b["losses"] == 1
-    assert row_b["elo"] == 1502  # Elo esperado do teste original
+    assert row_b["elo_rating"] == 1502  # Elo esperado do teste original. Changed "elo" to "elo_rating"
 
     assert row_c["wins"] == 0 and row_c["losses"] == 1
-    assert row_c["elo"] == 1485  # Elo esperado do teste original
+    assert row_c["elo_rating"] == 1485  # Elo esperado do teste original. Changed "elo" to "elo_rating"

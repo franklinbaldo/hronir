@@ -164,81 +164,134 @@ Example Elo ranking for Chapter 2 variants:
 
 Forking paths are stored in `forking_path/yu-tsun.csv`, named after the protagonist of *The Garden of Forking Paths*.
 
-
 ```
-the_library/                       # Hrönirs (conteúdo textual) armazenados por UUID
+the_library/                       # Hrönirs (textual content) stored by UUID
 data/
-└── canonical_path.json          # O caminho canônico de forks (UUIDs de bifurcações)
+├── canonical_path.json          # The canonical path of forks (fork UUIDs)
+├── sessions/                    # Active judgment session files (e.g., <session_id>.json)
+│   └── consumed_fork_uuids.json # Record of fork_uuids used to start sessions
+└── transactions/                # Chronological ledger of all judgment session commits
+    ├── HEAD                     # Pointer to the latest transaction_uuid
+    └── <transaction_uuid>.json  # Individual transaction records
 forking_path/
-└── *.csv                        # Definições de forks (posição, prev_hrönir_uuid, hrönir_uuid_sucessor, fork_uuid)
+└── *.csv                        # Fork definitions (position, prev_hrönir_uuid, successor_hrönir_uuid, fork_uuid)
 ratings/
-└── position_*.csv               # Votos registrados para duelos de forks em cada posição
+└── position_*.csv               # Recorded votes for fork duels at each position
 ```
 
 ---
 
-## ⚙️ Quickstart CLI Usage
+## ⚖️ The Tribunal of the Future: Judgment Sessions
 
-### Generate new chapters and cast a vote automatically:
-(Nota: `synthesize` pode precisar de atualização para refletir a lógica de `fork_uuid` se for usado para votação direta)
+The core mechanism for evolving the canonical narrative is the "Tribunal of the Future." Creating a new hrönir and its corresponding fork at position `N` grants you a one-time "mandate" (using its `fork_uuid`) to initiate a **Judgment Session**.
+
+1.  **Initiate a Session (`session start`):**
+    Use your new `fork_uuid` (from position `N`) to start a session. The system provides a `session_id` and a "dossier" of duels for all prior positions (`N-1` down to `0`). Each duel in the dossier is the "duel of maximum entropy" for its respective position at that moment.
+    ```bash
+    # Example: Your new fork at position 10 is fork_N_uuid
+    uv run python -m hronir_encyclopedia.cli session start \
+      --position 10 \
+      --fork-uuid <fork_N_uuid>
+    ```
+    This returns a `session_id` and the dossier.
+
+2.  **Deliberate and Form Veredicts (Offline):**
+    Review the static dossier. You have complete freedom to choose which duels to vote on. For each duel you address, select a winner. Abstention is implicit for duels you don't include in your veredict.
+
+3.  **Commit Veredicts (`session commit`):**
+    Submit all your chosen veredicts in a single, atomic commit using the `session_id`.
+    Provide veredicts as a JSON string or a path to a JSON file. The JSON object maps position numbers (as strings) to the `fork_uuid` you chose as the winner for that position's duel.
+    ```bash
+    # Example: Veredicts in a JSON string
+    uv run python -m hronir_encyclopedia.cli session commit \
+      --session-id <your_session_id> \
+      --verdicts '{"9": "winning_fork_for_pos9", "7": "winning_fork_for_pos7", "2": "winning_fork_for_pos2"}'
+
+    # Example: Veredicts from a file (e.g., my_verdicts.json)
+    # Contents of my_verdicts.json:
+    # {
+    #   "9": "winning_fork_for_pos9",
+    #   "7": "winning_fork_for_pos7",
+    #   "2": "winning_fork_for_pos2"
+    # }
+    uv run python -m hronir_encyclopedia.cli session commit \
+      --session-id <your_session_id> \
+      --verdicts my_verdicts.json
+    ```
+
+**Consequences of Committing:**
+*   **Votes Recorded:** Your veredicts are recorded as votes in the respective `ratings/position_*.csv` files.
+*   **Transaction Logged:** The entire session commit (your identity, veredicts, timestamp, previous transaction) is immutably recorded in the `data/transactions/` ledger.
+*   **Temporal Cascade Triggered:** The "Temporal Cascade" recalculates the canonical path (`data/canonical_path.json`) starting from the oldest position you voted on, propagating changes forward. This is the sole mechanism for updating the canon.
+
+This process ensures that every significant contribution (a new fork) has the potential to reshape the entire history that precedes it, governed by transparent, auditable rules.
+
+---
+
+## ⚙️ Other CLI Usage
+
+### Basic Operations
 ```bash
-uv run python -m hronir_encyclopedia.cli synthesize \
-  --position 1 \
-  --prev <uuid_do_hronir_predecessor_canonico_da_posicao_0>
+# Store a new hrönir chapter (and create its forking path entry implicitly or explicitly)
+# This is your Proof-of-Work to get a <fork_uuid> for starting a session.
+uv run python -m hronir_encyclopedia.cli store drafts/my_chapter.md --prev <uuid_of_previous_hronir_in_path>
+# The output will include the new hrönir's UUID. You'll also need to ensure a forking_path entry is made.
+# (The `store` command might need enhancement to also create/output the `fork_uuid` directly)
 
-# Check Elo rankings for a specific position (ranking de forks)
+# Check Elo rankings for forks at a specific position
 uv run python -m hronir_encyclopedia.cli ranking --position 1
-# (O comando ranking pode precisar ser adaptado para mostrar rankings de forks se ainda mostra hrönirs)
 
-# Validate a human-contributed chapter
-uv run python -m hronir_encyclopedia.cli validate --chapter drafts/03_my_variant.md
+# Validate a human-contributed chapter (basic check)
+uv run python -m hronir_encyclopedia.cli validate --chapter drafts/my_chapter.md
 
-# Store chapter using UUID layout
-uv run python -m hronir_encyclopedia.cli store drafts/03_my_variant.md --prev 123e4567-e89b-12d3-a456-426614174000
-
-# Validate and repair stored chapters
+# Audit and repair stored hrönirs, forking paths, and votes
 uv run python -m hronir_encyclopedia.cli audit
-# Each forking entry receives a deterministic UUID
 
-# Remove invalid hrönirs, forking paths or votes
+# Remove invalid hrönirs, forking paths, or votes
 uv run python -m hronir_encyclopedia.cli clean --git
-
-# These commands load ratings and forking_path CSV files into a temporary
-# SQLite database via SQLAlchemy. Changes are written back to CSV when the
-# command finishes.
-
-# Export the highest-ranked path as EPUB
-# uv run python -m hronir_encyclopedia.cli export --format epub --path canonical # Temporariamente comentado se o comando export não estiver pronto
-
-# Obtenha o Duelo de Máxima Entropia entre forks para uma posição:
-uv run python -m hronir_encyclopedia.cli get-duel --position 1
-
-# Exemplo de saída:
-# {
-#   "position": 1,
-#   "strategy": "max_entropy_duel",
-#   "entropy": 0.998,
-#   "duel_pair": { "fork_A": "fork_uuid_A...", "fork_B": "fork_uuid_B..." }
-# }
-
-# Submeta seu voto para o duelo de forks apresentado por get-duel:
-uv run python -m hronir_encyclopedia.cli vote \
-  --position 1 \
-  --voter-fork-uuid <seu_fork_uuid_de_prova_de_trabalho> \
-  --winner-fork-uuid <fork_uuid_A_do_get_duel> \
-  --loser-fork-uuid <fork_uuid_B_do_get_duel>
-# (Substitua os placeholders <> pelos valores reais)
 ```
 
-## 🔏 Proof-of-Work e Votação Entrópica de Bifurcações
+### Legacy/Informational Commands
+The following commands relate to older mechanisms or provide specific information:
 
-O direito de votar é conquistado contribuindo para a expansão da narrativa (Proof-of-Work). Ao usar `store` para novos `hrönirs` e conectá-los em `forking_path/*.csv`, o `fork_uuid` gerado para essa conexão atua como sua identidade de votante (seu PoW).
+```bash
+# Synthesize (generate chapters and cast an initial vote - may be outdated by session model)
+# uv run python -m hronir_encyclopedia.cli synthesize \
+#  --position 1 \
+#  --prev <uuid_do_hronir_predecessor_canonico_da_posicao_0>
 
-Com seu `fork_uuid` de PoW, você participa do processo de votação guiado por entropia:
-1. Use `hronir_encyclopedia.cli get-duel --position <num>` para descobrir o "Duelo de Máxima Entropia" entre dois `forks` que o sistema identificou como o mais crítico para resolver a incerteza no ranking daquela posição e linhagem.
-2. Use `hronir_encyclopedia.cli vote --position <num> --voter-fork-uuid <seu_fork_uuid_pow> --winner-fork-uuid <fork_A_uuid> --loser-fork-uuid <fork_B_uuid>` para registrar seu voto **apenas para o par de `forks` exato apresentado por `get-duel`**.
+# Get the current "Duel of Maximum Entropy" for a position (used internally by `session start`)
+uv run python -m hronir_encyclopedia.cli get-duel --position 1
 
-Este processo de dois passos garante que seu esforço intelectual seja direcionado à escolha da transição narrativa (fork) de maior necessidade informacional na estrutura evolutiva da enciclopédia. Consulte [docs/proof_of_work_voting.md](docs/proof_of_work_voting.md) para uma explicação mais profunda.
+# Submit a direct vote for a specific duel (legacy, prefer session commit)
+# This was part of the older PoW and Entropic Dueling system.
+# The `voter-fork-uuid` here is the PoW from creating a new fork.
+# uv run python -m hronir_encyclopedia.cli vote \
+#  --position 1 \
+#  --voter-fork-uuid <seu_fork_uuid_de_prova_de_trabalho> \
+#  --winner-fork-uuid <fork_uuid_A_do_get_duel> \
+#  --loser-fork-uuid <fork_uuid_B_do_get_duel>
+
+# Consolidate book (manual trigger for canonical path recalculation)
+# Note: Under the "Tribunal of the Future" protocol, the primary way the canonical
+# path is updated is via the Temporal Cascade triggered by `session commit`.
+# This command might be used for recovery, debugging, or initial setup.
+uv run python -m hronir_encyclopedia.cli consolidate-book
+```
+
+The `store` command is crucial for generating new `hrönir` and, through associated forking path entries, the `fork_uuid` necessary to initiate a Judgment Session. The direct `vote` command is now largely superseded by the `session commit` mechanism, which provides a more comprehensive way to influence the narrative.
+
+## 🔏 Proof-of-Work (Mandate for Judgment)
+
+Previously, Proof-of-Work (creating a new `fork_uuid` by storing a hrönir and linking it in a forking path) granted the right to cast a single vote in a specific, system-curated duel via `get-duel` and `vote`.
+
+Under the "Tribunal of the Future" (Protocol v2):
+*   Creating a new `fork_uuid` (at Position `N`) still serves as your Proof-of-Work.
+*   However, this `fork_uuid` now acts as a **mandate** to initiate a `session start --position N --fork-uuid <your_fork_N_uuid>`.
+*   This session gives you the right to cast veredicts on *any subset* of duels from prior positions (`N-1` down to `0`) as presented in the session's static dossier.
+*   The `get-duel` command still shows the current maximum entropy duel for a position, which is what `session start` uses internally to build the dossier. The old direct `vote` command is less central to the new workflow.
+
+This new system elevates the impact of each contribution, allowing a single act of creation to potentially influence the entire preceding narrative history through a structured judgment process.
 
 ## Development Setup
 

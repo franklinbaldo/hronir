@@ -88,15 +88,15 @@ def test_get_ranking_filters_by_canonical_predecessor(temp_data_dir):
     # Chamar get_ranking para Posição 1, com H0_ROOT como predecessor
     ranking_df = get_ranking(
         position=1,
-        canonical_predecessor_uuid=H0_ROOT,
+        predecessor_hronir_uuid=H0_ROOT, # Updated
         forking_path_dir=forking_dir,
-        ratings_base_dir=ratings_dir
+        ratings_dir=ratings_dir # Updated
     )
 
     assert not ranking_df.empty
     # Herdeiros esperados: H1A, H1B, H1C
     expected_heirs = {H1A, H1B, H1C}
-    retrieved_heirs = set(ranking_df["uuid"].tolist())
+    retrieved_heirs = set(ranking_df["hrönir_uuid"].tolist()) # Changed "uuid" to "hrönir_uuid"
     assert retrieved_heirs == expected_heirs
 
     # Verificar Elos (H1A: 2V, 1D vs H1B; H1B: 1V, 2D vs H1A; H1C: 0V, 0D)
@@ -112,26 +112,26 @@ def test_get_ranking_filters_by_canonical_predecessor(temp_data_dir):
     #    H1A_new = 1530.53+32*(0-0.5870)=1530.53-18.78=1511.75
 
     # Elos esperados (arredondados): H1A: 1512, H1B: 1488, H1C: 1500 (Elo base)
-    h1a_data = ranking_df[ranking_df["uuid"] == H1A].iloc[0]
-    h1b_data = ranking_df[ranking_df["uuid"] == H1B].iloc[0]
-    h1c_data = ranking_df[ranking_df["uuid"] == H1C].iloc[0]
+    h1a_data = ranking_df[ranking_df["hrönir_uuid"] == H1A].iloc[0] # Changed "uuid" to "hrönir_uuid"
+    h1b_data = ranking_df[ranking_df["hrönir_uuid"] == H1B].iloc[0] # Changed "uuid" to "hrönir_uuid"
+    h1c_data = ranking_df[ranking_df["hrönir_uuid"] == H1C].iloc[0] # Changed "uuid" to "hrönir_uuid"
 
     assert h1a_data["wins"] == 2
     assert h1a_data["losses"] == 1
-    assert h1a_data["elo"] == 1512 # Arredondado de 1511.75
+    assert h1a_data["elo_rating"] == 1512 # Arredondado de 1511.75. Changed "elo" to "elo_rating"
 
     assert h1b_data["wins"] == 1
     assert h1b_data["losses"] == 2
-    assert h1b_data["elo"] == 1488 # Arredondado de 1488.25
+    assert h1b_data["elo_rating"] == 1488 # Arredondado de 1488.25. Changed "elo" to "elo_rating"
 
     assert h1c_data["wins"] == 0
     assert h1c_data["losses"] == 0
-    assert h1c_data["elo"] == 1500 # Elo base, sem duelos
+    assert h1c_data["elo_rating"] == 1500 # Elo base, sem duelos. Changed "elo" to "elo_rating"
 
     # Verifica a ordem: H1A > H1C > H1B
-    assert ranking_df.iloc[0]["uuid"] == H1A
-    assert ranking_df.iloc[1]["uuid"] == H1C
-    assert ranking_df.iloc[2]["uuid"] == H1B
+    assert ranking_df.iloc[0]["hrönir_uuid"] == H1A # Changed "uuid" to "hrönir_uuid"
+    assert ranking_df.iloc[1]["hrönir_uuid"] == H1C # Changed "uuid" to "hrönir_uuid"
+    assert ranking_df.iloc[2]["hrönir_uuid"] == H1B # Changed "uuid" to "hrönir_uuid"
 
 
 def test_get_ranking_no_heirs_for_predecessor(temp_data_dir):
@@ -143,9 +143,9 @@ def test_get_ranking_no_heirs_for_predecessor(temp_data_dir):
     NON_EXISTENT_PREDECESSOR = _uuid("non_existent_predecessor")
     ranking_df = get_ranking(
         position=1,
-        canonical_predecessor_uuid=NON_EXISTENT_PREDECESSOR,
+        predecessor_hronir_uuid=NON_EXISTENT_PREDECESSOR, # Updated
         forking_path_dir=forking_dir,
-        ratings_base_dir=ratings_dir
+        ratings_dir=ratings_dir # Updated
     )
     assert ranking_df.empty
 
@@ -167,21 +167,21 @@ def test_get_ranking_no_votes_for_heirs(temp_data_dir):
 
     ranking_df = get_ranking(
         position=1,
-        canonical_predecessor_uuid=H0_ROOT,
+        predecessor_hronir_uuid=H0_ROOT, # Updated
         forking_path_dir=forking_dir,
-        ratings_base_dir=ratings_dir
+        ratings_dir=ratings_dir # Updated
     )
 
     assert len(ranking_df) == 2
     expected_heirs = {H1A, H1B}
-    retrieved_heirs = set(ranking_df["uuid"].tolist())
+    retrieved_heirs = set(ranking_df["hrönir_uuid"].tolist()) # Changed "uuid" to "hrönir_uuid"
     assert retrieved_heirs == expected_heirs
 
     for _, row in ranking_df.iterrows():
-        assert row["elo"] == 1500 # Elo base
+        assert row["elo_rating"] == 1500 # Elo base. Changed "elo" to "elo_rating"
         assert row["wins"] == 0
         assert row["losses"] == 0
-        assert row["total_duels"] == 0
+        assert row["games_played"] == 0 # Changed "total_duels" to "games_played" as per get_ranking output
 
 
 def test_get_ranking_for_position_0_no_predecessor(temp_data_dir):
@@ -207,25 +207,25 @@ def test_get_ranking_for_position_0_no_predecessor(temp_data_dir):
 
     ranking_df = get_ranking(
         position=0,
-        canonical_predecessor_uuid=None, # Sem predecessor
+        predecessor_hronir_uuid=None, # Updated (was correct, just for consistency)
         forking_path_dir=forking_dir,
-        ratings_base_dir=ratings_dir
+        ratings_dir=ratings_dir # Updated
     )
 
     assert len(ranking_df) == 2
     expected_pos0_hrs = {H0_ROOT, H0_ALT}
-    retrieved_pos0_hrs = set(ranking_df["uuid"].tolist())
+    retrieved_pos0_hrs = set(ranking_df["hrönir_uuid"].tolist()) # Changed "uuid" to "hrönir_uuid"
     assert retrieved_pos0_hrs == expected_pos0_hrs
 
     # H0_ROOT: 2V, 0D. H0_ALT: 0V, 2D.
     # 1. H0_ROOT(1500) vs H0_ALT(1500) -> Pa=0.5. R(1516), A(1484)
     # 2. H0_ROOT(1516) vs H0_ALT(1484) -> Pa=0.5459. R(1530.53), A(1469.47)
-    h0_root_data = ranking_df[ranking_df["uuid"] == H0_ROOT].iloc[0]
-    h0_alt_data = ranking_df[ranking_df["uuid"] == H0_ALT].iloc[0]
+    h0_root_data = ranking_df[ranking_df["hrönir_uuid"] == H0_ROOT].iloc[0] # Changed "uuid" to "hrönir_uuid"
+    h0_alt_data = ranking_df[ranking_df["hrönir_uuid"] == H0_ALT].iloc[0] # Changed "uuid" to "hrönir_uuid"
 
-    assert h0_root_data["elo"] == 1531 # Arredondado de 1530.53
+    assert h0_root_data["elo_rating"] == 1531 # Arredondado de 1530.53. Changed "elo" to "elo_rating"
     assert h0_root_data["wins"] == 2
-    assert h0_alt_data["elo"] == 1469 # Arredondado de 1469.47
+    assert h0_alt_data["elo_rating"] == 1469 # Arredondado de 1469.47. Changed "elo" to "elo_rating"
     assert h0_alt_data["losses"] == 2
 
 
@@ -239,9 +239,9 @@ def test_get_ranking_empty_forking_path_dir(temp_data_dir):
 
     ranking_df = get_ranking(
         position=1,
-        canonical_predecessor_uuid=H0_ROOT,
+        predecessor_hronir_uuid=H0_ROOT, # Updated
         forking_path_dir=forking_dir_empty,
-        ratings_base_dir=ratings_dir
+        ratings_dir=ratings_dir # Updated
     )
     assert ranking_df.empty, "Ranking deveria ser vazio se não há arquivos de forking_path para encontrar herdeiros."
 
@@ -259,13 +259,13 @@ def test_get_ranking_empty_ratings_files(temp_data_dir):
 
     ranking_df = get_ranking(
         position=1,
-        canonical_predecessor_uuid=H0_ROOT,
+        predecessor_hronir_uuid=H0_ROOT, # Updated
         forking_path_dir=forking_dir,
-        ratings_base_dir=ratings_dir
+        ratings_dir=ratings_dir # Updated
     )
     assert len(ranking_df) == 3 # H1A, H1B, H1C
     for _, row in ranking_df.iterrows():
-        assert row["elo"] == 1500
+        assert row["elo_rating"] == 1500 # Changed "elo" to "elo_rating"
         assert row["wins"] == 0
         assert row["losses"] == 0
 
@@ -273,13 +273,13 @@ def test_get_ranking_empty_ratings_files(temp_data_dir):
     (ratings_dir / "position_001.csv").write_text("")
     ranking_df_zero_bytes = get_ranking(
         position=1,
-        canonical_predecessor_uuid=H0_ROOT,
+        predecessor_hronir_uuid=H0_ROOT, # Updated
         forking_path_dir=forking_dir,
-        ratings_base_dir=ratings_dir
+        ratings_dir=ratings_dir # Updated
     )
     assert len(ranking_df_zero_bytes) == 3
     for _, row in ranking_df_zero_bytes.iterrows():
-        assert row["elo"] == 1500
+        assert row["elo_rating"] == 1500 # Changed "elo" to "elo_rating"
 
 
 def test_get_ranking_malformed_forking_csv(temp_data_dir):
@@ -298,14 +298,14 @@ def test_get_ranking_malformed_forking_csv(temp_data_dir):
 
     ranking_df = get_ranking(
         position=1,
-        canonical_predecessor_uuid=H0_ROOT,
+        predecessor_hronir_uuid=H0_ROOT, # Updated
         forking_path_dir=forking_dir,
-        ratings_base_dir=ratings_dir
+        ratings_dir=ratings_dir # Updated
     )
     # Deve encontrar H1A do good_forks.csv e ignorar bad_forks.csv
     assert len(ranking_df) == 1
-    assert ranking_df.iloc[0]["uuid"] == H1A
-    assert ranking_df.iloc[0]["elo"] == 1500
+    assert ranking_df.iloc[0]["hrönir_uuid"] == H1A # Changed "uuid" to "hrönir_uuid"
+    assert ranking_df.iloc[0]["elo_rating"] == 1500 # Changed "elo" to "elo_rating"
 
 
 def test_get_ranking_malformed_ratings_csv(temp_data_dir):
@@ -319,14 +319,14 @@ def test_get_ranking_malformed_ratings_csv(temp_data_dir):
 
     ranking_df = get_ranking(
         position=1,
-        canonical_predecessor_uuid=H0_ROOT,
+        predecessor_hronir_uuid=H0_ROOT, # Updated
         forking_path_dir=forking_dir,
-        ratings_base_dir=ratings_dir
+        ratings_dir=ratings_dir # Updated
     )
     # Deve encontrar H1A, mas como o ratings é malformado, trata como sem votos.
     assert len(ranking_df) == 1
-    assert ranking_df.iloc[0]["uuid"] == H1A
-    assert ranking_df.iloc[0]["elo"] == 1500 # Elo base
+    assert ranking_df.iloc[0]["hrönir_uuid"] == H1A # Changed "uuid" to "hrönir_uuid"
+    assert ranking_df.iloc[0]["elo_rating"] == 1500 # Elo base. Changed "elo" to "elo_rating"
     assert ranking_df.iloc[0]["wins"] == 0
     assert ranking_df.iloc[0]["losses"] == 0
 
@@ -341,9 +341,9 @@ def test_get_ranking_canonical_predecessor_none_not_pos_0(temp_data_dir):
 
     ranking_df = get_ranking(
         position=1, # Posição não é 0
-        canonical_predecessor_uuid=None, # Mas predecessor é None
+        predecessor_hronir_uuid=None, # Updated (was correct, just for consistency)
         forking_path_dir=forking_dir,
-        ratings_base_dir=ratings_dir
+        ratings_dir=ratings_dir # Updated
     )
     assert ranking_df.empty, "Deveria retornar df vazio para predecessor None em posição != 0"
 
@@ -355,9 +355,9 @@ def test_get_ranking_forking_path_missing_columns(temp_data_dir):
 
     ranking_df = get_ranking(
         position=1,
-        canonical_predecessor_uuid=H0_ROOT,
+        predecessor_hronir_uuid=H0_ROOT, # Updated
         forking_path_dir=forking_dir,
-        ratings_base_dir=ratings_dir
+        ratings_dir=ratings_dir # Updated
     )
     assert ranking_df.empty, "Deveria ser vazio se o único forking_path CSV é inválido."
 
@@ -372,10 +372,10 @@ def test_get_ranking_ratings_path_missing_columns(temp_data_dir):
 
     ranking_df = get_ranking(
         position=1,
-        canonical_predecessor_uuid=H0_ROOT,
+        predecessor_hronir_uuid=H0_ROOT, # Updated
         forking_path_dir=forking_dir,
-        ratings_base_dir=ratings_dir
+        ratings_dir=ratings_dir # Updated
     )
     assert len(ranking_df) == 1
-    assert ranking_df.iloc[0]["uuid"] == H1A
-    assert ranking_df.iloc[0]["elo"] == 1500 # Elo base pois não conseguiu ler os votos
+    assert ranking_df.iloc[0]["hrönir_uuid"] == H1A # Changed "uuid" to "hrönir_uuid"
+    assert ranking_df.iloc[0]["elo_rating"] == 1500 # Elo base pois não conseguiu ler os votos. Changed "elo" to "elo_rating"

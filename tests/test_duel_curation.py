@@ -7,29 +7,53 @@ from hronir_encyclopedia import ratings # ratings.py
 
 # Helper function to generate ranking DataFrame as get_ranking would
 def create_ranking_df(hronirs_data: list[dict]) -> pd.DataFrame:
+    # Columns should match what get_ranking produces: fork_uuid, hrönir_uuid, elo_rating, etc.
+    # 'uuid' from input data will be mapped to 'fork_uuid' for the output DataFrame.
+    # 'hrönir_uuid' will be made same as 'fork_uuid' for simplicity of this mock.
+    output_cols = ["fork_uuid", "hrönir_uuid", "elo_rating", "games_played", "wins", "losses"]
     if not hronirs_data:
-        return pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])
+        return pd.DataFrame(columns=output_cols)
 
     df = pd.DataFrame(hronirs_data)
-    # Ensure standard columns
-    for col in ["uuid", "elo", "wins", "losses", "total_duels"]:
-        if col not in df.columns:
-            if col == "uuid": df[col] = [str(uuid.uuid4()) for _ in range(len(df))]
-            elif col == "elo": df[col] = 1500 # Default Elo if not specified
-            elif col == "wins": df[col] = 0
-            elif col == "losses": df[col] = 0
-            # total_duels will be sum of wins and losses if not provided, or if wins/losses were defaulted
-            if col == "total_duels" and ("wins" in df.columns and "losses" in df.columns):
-                 df[col] = df["wins"] + df["losses"]
-            elif col == "total_duels": # if wins/losses also missing initially
-                 df[col] = 0
 
-    df["elo"] = df["elo"].astype(float)
+    # Rename 'uuid' to 'fork_uuid' if 'uuid' exists from input
+    if "uuid" in df.columns and "fork_uuid" not in df.columns:
+        df.rename(columns={"uuid": "fork_uuid"}, inplace=True)
+    elif "fork_uuid" not in df.columns: # if neither 'uuid' nor 'fork_uuid' provided
+        df["fork_uuid"] = [str(uuid.uuid4()) for _ in range(len(df))]
+
+    # Ensure other standard columns that get_ranking provides
+    if "hrönir_uuid" not in df.columns:
+        df["hrönir_uuid"] = df["fork_uuid"] # Mock simplicity: hrönir_uuid is same as fork_uuid
+
+    if "elo_rating" not in df.columns: # if input used 'elo', map it, else default
+        if "elo" in df.columns:
+            df.rename(columns={"elo": "elo_rating"}, inplace=True)
+        else:
+            df["elo_rating"] = 1500
+
+    for col_default_zero in ["wins", "losses", "games_played"]:
+        if col_default_zero not in df.columns:
+            if col_default_zero == "games_played" and "total_duels" in df.columns: # Handle old 'total_duels' input
+                df[col_default_zero] = df["total_duels"]
+            else:
+                df[col_default_zero] = 0
+
+    # If games_played is still 0 but wins/losses exist, sum them.
+    if "games_played" in df.columns and "wins" in df.columns and "losses" in df.columns:
+        df["games_played"] = df.apply(lambda row: row["wins"] + row["losses"] if row["games_played"] == 0 else row["games_played"], axis=1)
+
+
+    # Ensure types and select final columns
+    df["elo_rating"] = df["elo_rating"].astype(float)
     df["wins"] = df["wins"].astype(int)
     df["losses"] = df["losses"].astype(int)
-    df["total_duels"] = df["total_duels"].astype(int) # Ensure this is calculated/set
+    df["games_played"] = df["games_played"].astype(int)
 
-    return df.sort_values(by="elo", ascending=False).reset_index(drop=True)
+    # Select and reorder columns to match get_ranking's output
+    df = df.reindex(columns=output_cols, fill_value=0) # fill_value for any missing from reindex, though should be handled above
+
+    return df.sort_values(by="elo_rating", ascending=False).reset_index(drop=True)
 
 @pytest.fixture
 def mock_ratings_get_ranking(monkeypatch):
@@ -37,14 +61,16 @@ def mock_ratings_get_ranking(monkeypatch):
     Mocks ratings.get_ranking. The fixture returns a setter function
     that tests can use to define the DataFrame data.
     """
-    df_to_return_holder = [pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])]
+    # Columns should match what get_ranking produces
+    df_to_return_holder = [pd.DataFrame(columns=["fork_uuid", "hrönir_uuid", "elo_rating", "games_played", "wins", "losses"])]
+
 
     # O mock agora precisa aceitar a nova assinatura de get_ranking
-    def _mock_get_ranking(
+    def _mock_get_ranking( # This is the start of the function that needs to be fixed.
         position: int,
-        canonical_predecessor_uuid: str | None,
+        predecessor_hronir_uuid: str | None, # Updated parameter name
         forking_path_dir: Path,
-        ratings_base_dir: Path
+        ratings_dir: Path # Updated parameter name
     ):
         # Os parâmetros extras não são usados pelo mock, pois os dados são definidos diretamente.
         return df_to_return_holder[0].copy()
@@ -84,14 +110,16 @@ class TestDetermineNextDuelPurelyEntropic:
 
         duel_info = ratings.determine_next_duel(
             position=1,
-            canonical_predecessor_uuid="any-pred-uuid",
+            predecessor_hronir_uuid="any-pred-uuid", # Updated
             forking_path_dir=forking_dir,
-            ratings_base_dir=ratings_dir
+            ratings_dir=ratings_dir # Updated
         )
 
         assert duel_info is not None
         assert duel_info["strategy"] == "max_entropy_duel"
-        assert set([duel_info["hronir_A"], duel_info["hronir_B"]]) == set([h1, h2])
+        # The determine_next_duel now returns fork_uuids in "duel_pair"
+        # Assuming the mock_ratings_get_ranking returns 'uuid' as fork_uuid for simplicity here
+        assert set(duel_info["duel_pair"].values()) == set([h1, h2])
         assert duel_info["position"] == 1
         # Entropy for 1600 vs 1590 (diff 10)
         # P_A = 1 / (1 + 10^(-10/400)) approx 0.5143868
@@ -120,14 +148,14 @@ class TestDetermineNextDuelPurelyEntropic:
         ratings_dir.mkdir()
         duel_info = ratings.determine_next_duel(
             position=1,
-            canonical_predecessor_uuid="any-pred-uuid",
+            predecessor_hronir_uuid="any-pred-uuid", # Updated
             forking_path_dir=forking_dir,
-            ratings_base_dir=ratings_dir
+            ratings_dir=ratings_dir # Updated
         )
 
         assert duel_info is not None
         assert duel_info["strategy"] == "max_entropy_duel"
-        assert set([duel_info["hronir_A"], duel_info["hronir_B"]]) == set([h1, h2])
+        assert set(duel_info["duel_pair"].values()) == set([h1, h2]) # Updated assertion
 
     def test_edge_case_no_hronirs(self, tmp_path, mock_ratings_get_ranking):
         set_df_data = mock_ratings_get_ranking
@@ -138,9 +166,9 @@ class TestDetermineNextDuelPurelyEntropic:
         ratings_dir.mkdir()
         duel_info = ratings.determine_next_duel(
             position=1,
-            canonical_predecessor_uuid="any-pred-uuid",
+            predecessor_hronir_uuid="any-pred-uuid", # Updated
             forking_path_dir=forking_dir,
-            ratings_base_dir=ratings_dir
+            ratings_dir=ratings_dir # Updated
         )
         assert duel_info is None
 
@@ -155,9 +183,9 @@ class TestDetermineNextDuelPurelyEntropic:
         ratings_dir.mkdir()
         duel_info = ratings.determine_next_duel(
             position=1,
-            canonical_predecessor_uuid="any-pred-uuid",
+            predecessor_hronir_uuid="any-pred-uuid", # Updated
             forking_path_dir=forking_dir,
-            ratings_base_dir=ratings_dir
+            ratings_dir=ratings_dir # Updated
         )
         assert duel_info is None
 
@@ -175,14 +203,14 @@ class TestDetermineNextDuelPurelyEntropic:
         ratings_dir.mkdir()
         duel_info = ratings.determine_next_duel(
             position=1,
-            canonical_predecessor_uuid="any-pred-uuid",
+            predecessor_hronir_uuid="any-pred-uuid", # Updated
             forking_path_dir=forking_dir,
-            ratings_base_dir=ratings_dir
+            ratings_dir=ratings_dir # Updated
         )
 
         assert duel_info is not None
         assert duel_info["strategy"] == "max_entropy_duel"
-        assert set([duel_info["hronir_A"], duel_info["hronir_B"]]) == set([h1_new, h2_new])
+        assert set(duel_info["duel_pair"].values()) == set([h1_new, h2_new]) # Updated assertion
         # Elo diff 10, entropy. O código parece estar calculando consistentemente como ~0.9994027
         assert duel_info["entropy"] == pytest.approx(0.9994027, abs=1e-5)
 
@@ -201,12 +229,20 @@ class TestDetermineNextDuelPurelyEntropic:
         set_df_data = mock_ratings_get_ranking
         h1_uuid, h2_uuid = str(uuid.uuid4()), str(uuid.uuid4())
 
-        malformed_df_without_total_duels = pd.DataFrame([
-            {"uuid": h1_uuid, "elo": 1600.0, "wins": 10, "losses": 2}, # No total_duels
-            {"uuid": h2_uuid, "elo": 1550.0, "wins": 8, "losses": 3},  # No total_duels
+        # DataFrame should have 'fork_uuid' and 'elo_rating' for determine_next_duel to work.
+        # Missing 'games_played' (formerly 'total_duels') is what this test can focus on.
+        # The input to set_df_data should use 'uuid' and 'elo' if it's a list of dicts,
+        # as create_ranking_df handles the renaming.
+        # Or, if passing a DataFrame directly, it must have the correct final column names.
+        # For this test, we pass a DataFrame directly, so it needs 'fork_uuid' and 'elo_rating'.
+        malformed_df_for_test = pd.DataFrame([
+            # Using 'uuid' here as it will be renamed to 'fork_uuid' by create_ranking_df if not passing df directly
+            # BUT we are passing df directly, so it must be correct from the start.
+            {"fork_uuid": h1_uuid, "hrönir_uuid": h1_uuid, "elo_rating": 1600.0, "wins": 10, "losses": 2}, # Missing games_played
+            {"fork_uuid": h2_uuid, "hrönir_uuid": h2_uuid, "elo_rating": 1550.0, "wins": 8, "losses": 3},  # Missing games_played
         ])
         # Pass this malformed df directly to the mock setter
-        set_df_data(malformed_df_without_total_duels.copy())
+        set_df_data(malformed_df_for_test.copy())
 
         # The new determine_next_duel does not use 'total_duels'. It should still work.
         forking_dir = tmp_path / "forking_path"
@@ -215,13 +251,13 @@ class TestDetermineNextDuelPurelyEntropic:
         ratings_dir.mkdir()
         duel_info = ratings.determine_next_duel(
             position=1,
-            canonical_predecessor_uuid="any-pred-uuid",
+            predecessor_hronir_uuid="any-pred-uuid", # Updated
             forking_path_dir=forking_dir,
-            ratings_base_dir=ratings_dir
+            ratings_dir=ratings_dir # Updated
         )
         assert duel_info is not None
         assert duel_info["strategy"] == "max_entropy_duel"
-        assert set([duel_info["hronir_A"], duel_info["hronir_B"]]) == set([h1_uuid, h2_uuid])
+        assert set(duel_info["duel_pair"].values()) == set([h1_uuid, h2_uuid]) # Updated assertion
 
 
     def test_entropy_calculation_is_correct_for_known_pair(self, tmp_path, mock_ratings_get_ranking):
@@ -238,13 +274,13 @@ class TestDetermineNextDuelPurelyEntropic:
         ratings_dir.mkdir()
         duel_info = ratings.determine_next_duel(
             position=1,
-            canonical_predecessor_uuid="any-pred-uuid",
+            predecessor_hronir_uuid="any-pred-uuid", # Updated
             forking_path_dir=forking_dir,
-            ratings_base_dir=ratings_dir
+            ratings_dir=ratings_dir # Updated
         )
         assert duel_info is not None
         assert duel_info["strategy"] == "max_entropy_duel"
-        assert set([duel_info["hronir_A"], duel_info["hronir_B"]]) == set([h1, h2])
+        assert set(duel_info["duel_pair"].values()) == set([h1, h2]) # Updated assertion
         assert duel_info["entropy"] == pytest.approx(0.9426, abs=1e-4) # Same as before
 
     def test_entropy_low_for_very_different_elos(self, tmp_path, mock_ratings_get_ranking):
@@ -261,9 +297,9 @@ class TestDetermineNextDuelPurelyEntropic:
         ratings_dir.mkdir()
         duel_info = ratings.determine_next_duel(
             position=1,
-            canonical_predecessor_uuid="any-pred-uuid",
+            predecessor_hronir_uuid="any-pred-uuid", # Updated
             forking_path_dir=forking_dir,
-            ratings_base_dir=ratings_dir
+            ratings_dir=ratings_dir # Updated
         )
         assert duel_info is not None
         assert duel_info["strategy"] == "max_entropy_duel"
