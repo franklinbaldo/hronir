@@ -212,59 +212,57 @@ def purge_fake_hronirs(base: Path | str = "the_library") -> int:
     return removed
 
 
-def get_canonical_uuid(position: int, book_index_path: Path) -> str:
+from typing import Optional, Dict # Add Optional and Dict for type hinting
+
+def get_canonical_fork_info(position: int, canonical_path_file: Path = Path("data/canonical_path.json")) -> Optional[Dict[str, str]]:
     """
-    Consulta o book_index.json para revelar a identidade (UUID) do hrönir
-    canônico para a posição especificada.
-    Espera que o book_index.json armazene uma estrutura como:
+    Consulta o arquivo de caminho canônico (ex: data/canonical_path.json) para
+    revelar o fork_uuid e o hrönir_uuid (sucessor) canônicos para a posição especificada.
+
+    Retorna um dicionário {'fork_uuid': str, 'hrönir_uuid': str} se encontrado e válido,
+    caso contrário None.
+
+    Espera que o canonical_path_file armazene uma estrutura como:
     {
-        "chapters": {
-            "0": {"uuid": "actual-uuid-for-pos-0", "filename": "0_file.md"},
-            "1": {"uuid": "actual-uuid-for-pos-1", "filename": "1_file.md"}
-        }
+      "title": "The Hrönir Encyclopedia - Canonical Path",
+      "path": {
+        "0": { "fork_uuid": "...", "hrönir_uuid": "..." },
+        "1": { "fork_uuid": "...", "hrönir_uuid": "..." }
+      }
     }
     """
-    if not book_index_path.exists():
-        raise FileNotFoundError(f"Arquivo de índice do livro não encontrado: {book_index_path}")
+    if not canonical_path_file.exists():
+        return None
 
     try:
-        with open(book_index_path, "r") as f:
-            book_index_data = json.load(f)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Erro ao decodificar JSON do arquivo de índice do livro {book_index_path}: {e}")
-    except Exception as e:
-        raise IOError(f"Erro ao ler o arquivo de índice do livro {book_index_path}: {e}")
+        with open(canonical_path_file, "r") as f:
+            canonical_data = json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return None
 
-    chapters = book_index_data.get("chapters")
-    if not isinstance(chapters, dict):
-        raise ValueError(
-            f"Estrutura inválida no arquivo de índice do livro: "
-            f"a chave 'chapters' não é um dicionário ou está ausente em {book_index_path}."
-        )
+    path_entries = canonical_data.get("path")
+    if not isinstance(path_entries, dict):
+        return None
 
     position_str = str(position)
-    canonical_entry = chapters.get(position_str)
+    canonical_entry = path_entries.get(position_str)
 
     if not isinstance(canonical_entry, dict):
-        raise KeyError(
-            f"Nenhuma entrada de dicionário encontrada para a posição '{position_str}' "
-            f"em 'chapters' no arquivo {book_index_path}."
-        )
+        return None
 
-    canonical_hr_uuid = canonical_entry.get("uuid")
-    if not canonical_hr_uuid:
-        raise ValueError(
-            f"Nenhum 'uuid' encontrado para a posição '{position_str}' "
-            f"em 'chapters' no arquivo {book_index_path}."
-        )
+    fork_uuid = canonical_entry.get("fork_uuid")
+    hrönir_uuid = canonical_entry.get("hrönir_uuid")
 
-    if not is_valid_uuid_v5(canonical_hr_uuid): # Reutilizando a validação de UUID existente
-        raise ValueError(
-            f"UUID inválido '{canonical_hr_uuid}' encontrado para a posição '{position_str}' "
-            f"em 'chapters' no arquivo {book_index_path}."
-        )
+    if not fork_uuid or not hrönir_uuid:
+        return None
 
-    return canonical_hr_uuid
+    if not isinstance(fork_uuid, str) or not is_valid_uuid_v5(fork_uuid):
+        return None
+
+    if not isinstance(hrönir_uuid, str) or not is_valid_uuid_v5(hrönir_uuid):
+        return None
+
+    return {"fork_uuid": fork_uuid, "hrönir_uuid": hrönir_uuid}
 
 
 def append_fork(

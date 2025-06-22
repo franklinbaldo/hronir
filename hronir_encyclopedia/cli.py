@@ -18,18 +18,22 @@ app = typer.Typer(
 # Original functions are kept with minimal changes to their core logic,
 # only adapting their signatures to Typer's way of handling arguments.
 
-@app.command(help="Consolidate chapter rankings and update the canonical book view.")
+@app.command(help="Consolidate fork rankings and update the canonical path.")
 def consolidate_book(
     ratings_dir: Annotated[Path, typer.Option(help="Directory containing rating CSV files.", exists=True, file_okay=False, dir_okay=True, readable=True)] = Path("ratings"),
-    library_dir: Annotated[Path, typer.Option(help="Directory containing all hrönirs.", exists=True, file_okay=False, dir_okay=True, readable=True)] = Path("the_library"),
-    book_dir: Annotated[Path, typer.Option(help="Directory for the canonical book.", file_okay=False, dir_okay=True, writable=True)] = Path("book"),
-    index_file: Annotated[Path, typer.Option(help="Path to the book index JSON file.", dir_okay=False, writable=True)] = Path("book/book_index.json"),
+    # library_dir é implicitamente usado por storage.chapter_exists, mas não diretamente para cópia de arquivos.
+    # Se precisarmos validar a existência do hrönir_uuid do fork, library_dir ainda é relevante.
+    # Por enquanto, a lógica de `ratings.get_ranking` e `storage.get_canonical_fork_info`
+    # não depende de `library_dir` diretamente nesta função.
+    # library_dir: Annotated[Path, typer.Option(help="Directory containing all hrönirs.", exists=True, file_okay=False, dir_okay=True, readable=True)] = Path("the_library"),
     forking_path_dir: Annotated[Path, typer.Option(help="Directory containing forking path CSV files.", exists=True, file_okay=False, dir_okay=True, readable=True)] = Path("forking_path"),
+    canonical_path_file: Annotated[Path, typer.Option(help="Path to the canonical path JSON file.", dir_okay=False, writable=True)] = Path("data/canonical_path.json"),
+    max_positions_to_consolidate: Annotated[int, typer.Option(help="Maximum number of positions to attempt to consolidate.")] = 100 # Evita loop infinito
 ):
     """
-    Analyzes chapter rankings and updates the canonical version of the book.
-    Iterates sequentially through positions, determining the canonical hrönir for each
-    based on the winner of the previous position.
+    Analyzes fork rankings and updates the canonical path of forks.
+    Iterates sequentially through positions, determining the canonical fork for each
+    based on the winning fork of the previous position's canonical hrönir.
     """
     if not ratings_dir.is_dir():
         typer.echo(f"Ratings directory not found: {ratings_dir}", err=True)
@@ -39,176 +43,101 @@ def consolidate_book(
         raise typer.Exit(code=1)
 
     try:
-        book_index = (
-            json.loads(index_file.read_text())
-            if index_file.exists()
-            else {"title": "The Hrönir Encyclopedia", "chapters": {}}
+        canonical_path_data = (
+            json.loads(canonical_path_file.read_text())
+            if canonical_path_file.exists()
+            else {"title": "The Hrönir Encyclopedia - Canonical Path", "path": {}}
         )
     except json.JSONDecodeError:
-        typer.echo(f"Error reading or parsing book index file: {index_file}", err=True)
-        book_index = {"title": "The Hrönir Encyclopedia", "chapters": {}}
+        typer.echo(f"Error reading or parsing canonical path file: {canonical_path_file}", err=True)
+        canonical_path_data = {"title": "The Hrönir Encyclopedia - Canonical Path", "path": {}}
 
-    updated_positions = 0
+    if "path" not in canonical_path_data or not isinstance(canonical_path_data["path"], dict):
+        canonical_path_data["path"] = {}
 
-    # Determinar o intervalo de posições a serem processadas.
-    # Pode ser de 0 até a maior posição encontrada nos arquivos de ratings,
-    # ou um limite definido. Por agora, vamos iterar pelas posições nos arquivos de ratings.
-    # NOTA: A Tarefa 3.2 especifica um loop sequencial que usa o campeão de N-1 para N.
-    # Esta implementação atual ainda não faz a propagação em cascata completa,
-    # mas ajusta a chamada a get_ranking. A lógica de loop sequencial
-    # e atualização de `current_canonical_uuid_for_prev_position` será implementada na Tarefa 3.2.
 
-    # Coletar todas as posições únicas dos arquivos de ratings para iterar
-    # Isso não garante ordem sequencial estrita se houver "buracos", mas é um começo.
-    # A verdadeira lógica sequencial virá na Tarefa 3.2.
-    available_positions = sorted(list(set(
-        int(rf.stem.split("_")[1]) for rf in ratings_dir.glob("position_*.csv")
-        if "_" in rf.stem and rf.stem.split("_")[1].isdigit()
-    )))
+    updated_any_position = False
+    current_predecessor_hronir_uuid: str | None = None
 
-    current_canonical_uuid_for_prev_pos: str | None = None
+    for position_idx in range(max_positions_to_consolidate):
+        position_str = str(position_idx)
 
-    for position in available_positions:
-        if position == 0:
-            # Para a Posição 0, o predecessor canônico é None.
-            canonical_predecessor_uuid = None
+        if position_idx == 0:
+            predecessor_hronir_uuid_for_ranking = None
         else:
-            # Para Posição N > 0, obter o UUID canônico da Posição N-1.
-            # Isso assume que book_index já foi preenchido para N-1
-            # ou que current_canonical_uuid_for_prev_pos foi atualizado na iteração anterior.
-            # Esta parte será mais robusta na Tarefa 3.2.
-            # Por agora, tentamos ler do book_index. Se falhar, não podemos prosseguir para esta posição.
-            try:
-                # Usar a função get_canonical_uuid que lê a estrutura {"uuid": ..., "filename": ...}
-                # Esta função será implementada na Tarefa 1.1.
-                # Se Tarefa 1.1 não estiver feita, esta chamada pode precisar de ajuste temporário
-                # ou o book_index.json precisa já ter o formato novo.
-                # Assumindo que Tarefa 1.1 está feita e book_index.json está no formato novo.
-                # No plano, Tarefa 1.1 (get_canonical_uuid) é feita ANTES da Tarefa 1.2 (get_ranking)
-                # e ANTES da Tarefa 3.2 (consolidate_book).
-                # No entanto, esta modificação em consolidate_book está sendo feita *antes* da Tarefa 3.2.
-                # A lógica real de `consolidate_book` na Tarefa 3.2 irá definir
-                # `current_canonical_uuid_for_prev_pos` iterativamente.
-                # Para esta etapa intermediária, vamos tentar ler do arquivo.
-                # Se `position-1` não estiver no `book_index` ou `get_canonical_uuid` falhar,
-                # não podemos determinar o ranking para `position`.
-                if position -1 < 0 : # Segurança, embora o loop comece em 0.
-                     typer.echo(f"Skipping position {position}: predecessor position {position-1} is invalid.", err=True)
-                     continue
+            # Obter o hrönir_uuid sucessor do fork canônico da posição anterior
+            prev_pos_canonical_info = storage.get_canonical_fork_info(position_idx - 1, canonical_path_file)
+            if not prev_pos_canonical_info or "hrönir_uuid" not in prev_pos_canonical_info:
+                typer.echo(f"Canonical fork for position {position_idx - 1} not found or invalid. Stopping consolidation.")
+                # Se o caminho canônico quebrou, remove todas as posições subsequentes
+                keys_to_remove = [k for k in canonical_path_data["path"] if int(k) >= position_idx]
+                if keys_to_remove:
+                    typer.echo(f"Removing subsequent canonical entries from position {position_idx} onwards due to broken path.")
+                    for k in keys_to_remove:
+                        del canonical_path_data["path"][k]
+                    updated_any_position = True # Marcamos como atualizado porque removemos algo
+                break
+            predecessor_hronir_uuid_for_ranking = prev_pos_canonical_info["hrönir_uuid"]
 
-                # Este é o ponto crucial: `consolidate_book` deve *construir* o book_index.
-                # Na primeira iteração para pos=0, current_canonical_uuid_for_prev_pos é None.
-                # Para pos=1, usa-se o winner_uuid da pos=0, e assim por diante.
-                # A lógica abaixo é um placeholder até a Tarefa 3.2.
-                # Para fazer os testes passarem agora, `consolidate_book` precisa de *algum* predecessor.
-                # O teste `test_cli_consolidate` configura um `book_index.json` inicial.
-                # A Tarefa 3.2 irá refinar este loop.
-                if position > 0:
-                    # A Tarefa 1.1 modifica `get_canonical_uuid` para ler {"uuid": ..., "filename": ...}
-                    # O `book_index.json` inicial no teste `test_cli_consolidate` tem o formato antigo.
-                    # Isso vai falhar até que `book_index.json` seja atualizado para o novo formato
-                    # ou `get_canonical_uuid` seja feito para lidar com ambos (o que não é o plano).
-                    # SOLUÇÃO TEMPORÁRIA para `test_cli_consolidate`:
-                    # O teste `test_cli_consolidate` espera que a posição 0 seja lida do `book_index.json`
-                    # e não recalculada. Para as outras posições, ele espera que o ranking seja calculado.
-                    # O `book_index.json` no teste tem: "0": "0_chapC_uuid[:8].md"
-                    # Precisamos do UUID completo de chap_C_uuid para a posição 1.
-                    # A Tarefa 1.1 não implementa a leitura do UUID a partir do metadata.json do arquivo.
-                    # Ela espera que book_index.json já tenha o UUID.
-                    # Isso cria um impasse para esta correção intermediária.
+        typer.echo(f"Consolidating position {position_idx} (predecessor hrönir: {predecessor_hronir_uuid_for_ranking or 'None'})...")
 
-                    # Modificação para esta correção:
-                    # Se `current_canonical_uuid_for_prev_pos` (que seria o campeão da pos N-1)
-                    # não estiver definido (porque estamos apenas adaptando a chamada, não fazendo o loop completo),
-                    # então não podemos prosseguir para pos > 0 de forma significativa.
-                    # A Tarefa 3.2 é que realmente implementa o loop sequencial.
-                    # Para agora, vamos permitir que `canonical_predecessor_uuid` seja None para a Posição 0,
-                    # e para posições > 0, se não tivermos um predecessor da iteração anterior (o que não temos ainda),
-                    # o comportamento de `get_ranking` com `canonical_predecessor_uuid=None` para pos > 0 é retornar df vazio.
-                    # Isso fará com que o teste `test_cli_consolidate` falhe de forma diferente, mas é o mais próximo
-                    # que podemos chegar sem implementar toda a Tarefa 3.2.
-                    # O teste `test_cli_consolidate` espera que pos 1 use o campeão da pos 0 (chap_C_uuid).
-                    # Vamos simular isso lendo do `book_index` se `position-1` for 0.
-                    if position == 1: # Específico para fazer o teste passar minimamente
-                        prev_pos_entry = book_index["chapters"].get(str(0))
-                        if prev_pos_entry and isinstance(prev_pos_entry, str): # Formato antigo no teste
-                             # Extrair UUID do nome do arquivo se for o formato antigo
-                             # Ex: "0_chapC_uuid[:8].md" ou "0_uuidcompleto.md"
-                             # Isso é um HACK para o teste, a Tarefa 1.1/3.2 corrigirá o formato.
-                             # O teste usa _create_dummy_chapter que não cria metadata.json facilmente acessível aqui.
-                             # O teste `test_cli_consolidate` tem `chap_C_uuid` disponível.
-                             # Este é um forte indicador de que a Tarefa 1.1 e 3.2 precisam ser feitas antes.
-                             # Por ora, para `consolidate_book` funcionar minimamente com a nova assinatura:
-                             # Se pos=0, predecessor é None.
-                             # Se pos >0, e não temos o predecessor da iteração anterior,
-                             # `get_ranking` retornará vazio, o que é correto.
-                             # O teste `test_cli_consolidate` precisa ser adaptado ou esta função
-                             # não pode ser totalmente corrigida até a Tarefa 3.2.
-                             # Vamos assumir que `current_canonical_uuid_for_prev_pos` é o que importa.
-                             # E na Tarefa 3.2, ele será atualizado.
-                             pass # `current_canonical_uuid_for_prev_pos` será usado.
-
-                canonical_predecessor_uuid = current_canonical_uuid_for_prev_pos
-            except (KeyError, FileNotFoundError, ValueError) as e:
-                typer.echo(f"Não foi possível determinar o predecessor canônico para a posição {position} a partir da posição {position-1}. Erro: {e}", err=True)
-                continue # Pular para a próxima posição
-
+        # `ratings.get_ranking` agora retorna ranking de fork_uuids
         ranking_df = ratings.get_ranking(
-            position=position,
-            canonical_predecessor_uuid=canonical_predecessor_uuid,
+            position=position_idx,
+            predecessor_hronir_uuid=predecessor_hronir_uuid_for_ranking,
             forking_path_dir=forking_path_dir,
-            ratings_base_dir=ratings_dir
+            ratings_dir=ratings_dir # Corrigido de ratings_base_dir
         )
 
         if ranking_df.empty:
-            typer.echo(f"Nenhum dado de ranking para os herdeiros da posição {position} (predecessor: {canonical_predecessor_uuid}).")
-            # Antes de continuar, devemos garantir que se esta posição estava no book_index, ela seja removida
-            # se nenhum novo canônico puder ser determinado. Essa lógica virá na Tarefa 3.2.
-            if str(position) in book_index["chapters"]:
-                # Lógica de remoção/vanish na Tarefa 3.2
-                pass
-            continue
+            typer.echo(f"No ranking found for eligible forks at position {position_idx}. Path ends here.")
+            # Se esta posição tinha uma entrada canônica, e agora não tem mais ranking, ela deve ser removida.
+            # E todas as subsequentes.
+            keys_to_remove = [k for k in canonical_path_data["path"] if int(k) >= position_idx]
+            if keys_to_remove:
+                typer.echo(f"Removing canonical entries from position {position_idx} onwards as path ends.")
+                for k in keys_to_remove:
+                    if k in canonical_path_data["path"]: # Segurança
+                        del canonical_path_data["path"][k]
+                        updated_any_position = True
+            break # Fim do caminho canônico
 
-        winner_uuid = ranking_df.iloc[0]["uuid"]
-        # current_canonical_uuid_for_prev_pos será atualizado com este winner_uuid
-        # na Tarefa 3.2 para a próxima iteração.
-        winner_elo = ranking_df.iloc[0]["elo"]
+        # O campeão é o fork_uuid no topo do ranking
+        champion_fork_uuid = ranking_df.iloc[0]["fork_uuid"]
+        champion_hronir_uuid = ranking_df.iloc[0]["hrönir_uuid"] # hrönir_uuid sucessor do fork campeão
+        champion_elo = ranking_df.iloc[0]["elo_rating"]
 
-        if not storage.chapter_exists(winner_uuid, base=library_dir):
-            typer.echo(f"Winner chapter {winner_uuid} for position {position} not found in library.", err=True)
-            continue
+        current_entry_in_path = canonical_path_data["path"].get(position_str)
+        new_entry_for_path = {"fork_uuid": champion_fork_uuid, "hrönir_uuid": champion_hronir_uuid}
 
-        book_dir.mkdir(parents=True, exist_ok=True) # Ensure book_dir exists
-        for old_file in book_dir.glob(f"{position}_*.md"):
-            old_file.unlink()
-
-        new_filename = f"{position}_{winner_uuid[:8]}.md"
-        destination_path = book_dir / new_filename
-        source_path = storage.uuid_to_path(winner_uuid, library_dir) / "index.md"
-
-        try:
-            shutil.copyfile(source_path, destination_path)
-            book_index["chapters"][str(position)] = new_filename
+        if current_entry_in_path != new_entry_for_path:
+            canonical_path_data["path"][position_str] = new_entry_for_path
             typer.echo(
-                f"Position {position}: Set chapter {winner_uuid[:8]} (Elo: {winner_elo}) "
-                f"as canonical. Copied to {destination_path}"
+                f"Position {position_idx}: Set fork {champion_fork_uuid[:8]} (hrönir: {champion_hronir_uuid[:8]}, Elo: {champion_elo}) as canonical."
             )
-            updated_positions += 1
-        except Exception as e:
-            typer.echo(f"Error copying chapter {winner_uuid} for position {position}: {e}", err=True)
-            continue
+            updated_any_position = True
+        else:
+            typer.echo(f"Position {position_idx}: Canonical fork {champion_fork_uuid[:8]} remains unchanged.")
 
-    if updated_positions > 0:
+        # O hrönir_uuid sucessor do fork campeão atual se torna o predecessor para a próxima posição
+        # Esta linha não é mais necessária aqui pois `predecessor_hronir_uuid_for_ranking` é determinado no início do loop
+        # current_predecessor_hronir_uuid = champion_hronir_uuid
+
+        # Se não houve atualização nesta posição e não há mais posições nos ratings, podemos parar.
+        # (Esta condição de parada é heurística, o loop principal por max_positions ou quebra de caminho é mais robusto)
+
+    if updated_any_position:
         try:
-            index_file.parent.mkdir(parents=True, exist_ok=True) # Ensure parent dir for index exists
-            index_file.write_text(json.dumps(book_index, indent=2))
-            typer.echo(f"Book index updated: {index_file}")
+            canonical_path_file.parent.mkdir(parents=True, exist_ok=True)
+            canonical_path_file.write_text(json.dumps(canonical_path_data, indent=2))
+            typer.echo(f"Canonical path file updated: {canonical_path_file}")
         except Exception as e:
-            typer.echo(f"Error writing book index file: {e}", err=True)
+            typer.echo(f"Error writing canonical path file: {e}", err=True)
+            raise typer.Exit(code=1)
     else:
-        typer.echo("No positions were updated in the book index.")
+        typer.echo("No changes to the canonical path.")
 
-    typer.echo("Book consolidation complete.")
+    typer.echo("Canonical path consolidation complete.")
 
 
 # @app.command(help="Export the canonical book to a file.") # Command removed
@@ -312,73 +241,144 @@ def store(
     typer.echo(uuid_str)
 
 
-@app.command(help="Record a duel result (vote).")
-def vote(
-    position: Annotated[int, typer.Option(help="Chapter position being voted on.")],
-    voter: Annotated[str, typer.Option(help="UUID of the forking path or entity casting the vote.")],
-    winner: Annotated[str, typer.Option(help="Winning chapter UUID.")],
-    loser: Annotated[str, typer.Option(help="Losing chapter UUID.")],
-):
-    """
-    Records a vote for a winner against a loser for a given chapter position.
-    """
-    with database.open_database() as conn: # Assuming database.py handles the DB connection details
-        ratings.record_vote(position, voter, winner, loser, conn=conn)
-    typer.echo("Vote recorded.")
+# Helper function to find successor hrönir_uuid for a given fork_uuid
+# This could also live in storage.py if it's deemed generally useful
+def _get_successor_hronir_for_fork(fork_uuid_to_find: str, forking_path_dir: Path) -> str | None:
+    if not forking_path_dir.is_dir():
+        return None
+    for csv_file in forking_path_dir.glob("*.csv"):
+        if csv_file.stat().st_size > 0:
+            try:
+                df_forks = pd.read_csv(csv_file, dtype=str) # Ler tudo como string
+                # Ensure required columns are present
+                if not all(col in df_forks.columns for col in ["fork_uuid", "uuid"]):
+                    continue
+                # Search for the fork_uuid
+                # Using .astype(str) again for fork_uuid just in case, though dtype=str should handle it.
+                match = df_forks[df_forks["fork_uuid"].astype(str) == fork_uuid_to_find]
+                if not match.empty:
+                    return match.iloc[0]["uuid"] # 'uuid' is the successor hrönir_uuid
+            except pd.errors.EmptyDataError:
+                continue
+            except Exception: # Broad exception for other parsing errors
+                # Consider logging this error
+                continue
+    return None
 
 
-@app.command(help="Record a duel result (vote).")
+# A primeira definição de 'vote' será sobrescrita por esta, que é a desejada.
+@app.command(help="Record a voted duel result between two forks.")
 def vote(
     position: Annotated[int, typer.Option(help="Chapter position being voted on.")],
-    voter: Annotated[str, typer.Option(help="UUID of the forking path or entity casting the vote.")],
-    winner: Annotated[str, typer.Option(help="Winning chapter UUID.")],
-    loser: Annotated[str, typer.Option(help="Losing chapter UUID.")],
+    voter_fork_uuid: Annotated[str, typer.Option(help="Fork UUID of the voter (their PoW).")],
+    winner_fork_uuid: Annotated[str, typer.Option(help="Winning Fork UUID of the duel.")],
+    loser_fork_uuid: Annotated[str, typer.Option(help="Losing Fork UUID of the duel.")],
     ratings_dir: Annotated[Path, typer.Option(help="Directory containing rating CSV files.")] = Path("ratings"),
+    forking_path_dir: Annotated[Path, typer.Option(help="Directory containing forking path CSV files.")] = Path("forking_path"),
+    canonical_path_file: Annotated[Path, typer.Option(help="Path to the canonical path JSON file.")] = Path("data/canonical_path.json"),
 ):
     """
-    Records a vote for a winner against a loser for a given chapter position,
-    only if the vote corresponds to the officially curated duel (max_entropy_duel).
+    Records a vote for a winner_fork_uuid against a loser_fork_uuid for a given chapter position,
+    only if the vote corresponds to the officially curated duel for that position's lineage.
+    The vote itself is recorded in terms of the successor hrönir_uuids of these forks.
     """
-    official_duel = ratings.determine_next_duel(position, base=ratings_dir)
+    if winner_fork_uuid == loser_fork_uuid:
+        typer.echo(json.dumps({"error": "Winner fork and loser fork cannot be the same.", "submitted_winner_fork": winner_fork_uuid, "submitted_loser_fork": loser_fork_uuid}, indent=2))
+        raise typer.Exit(code=1)
 
-    if not official_duel:
+    # 1. Get the canonical predecessor hrönir_uuid for the current position
+    predecessor_hronir_uuid: str | None = None
+    if position > 0:
+        canonical_fork_info_prev_pos = storage.get_canonical_fork_info(position - 1, canonical_path_file)
+        if not canonical_fork_info_prev_pos or "hrönir_uuid" not in canonical_fork_info_prev_pos:
+            typer.echo(json.dumps({
+                "error": f"Could not determine canonical predecessor hrönir from position {position - 1} using {canonical_path_file}.",
+                "position_requested": position
+            }, indent=2))
+            raise typer.Exit(code=1)
+        predecessor_hronir_uuid = canonical_fork_info_prev_pos["hrönir_uuid"]
+    elif position < 0:
+         typer.echo(json.dumps({"error": "Invalid position. Must be >= 0.", "position_requested": position}, indent=2))
+         raise typer.Exit(code=1)
+
+    # 2. Determine the official duel of forks for the position
+    official_duel_info = ratings.determine_next_duel(
+        position=position,
+        predecessor_hronir_uuid=predecessor_hronir_uuid,
+        forking_path_dir=forking_path_dir,
+        ratings_dir=ratings_dir
+    )
+
+    if not official_duel_info or "duel_pair" not in official_duel_info:
         typer.echo(json.dumps({
-            "error": "Não foi possível determinar um duelo oficial para esta posição. Voto não pode ser validado.",
-            "position": position
+            "error": "Could not determine an official duel for this position and lineage. Vote cannot be validated.",
+            "position": position,
+            "predecessor_hronir_uuid_used": predecessor_hronir_uuid
         }, indent=2))
         raise typer.Exit(code=1)
 
-    official_hronir_A = official_duel.get("hronir_A")
-    official_hronir_B = official_duel.get("hronir_B")
+    official_fork_A = official_duel_info["duel_pair"].get("fork_A")
+    official_fork_B = official_duel_info["duel_pair"].get("fork_B")
 
-    # Normaliza o par submetido para comparação (ordem não importa)
-    submitted_pair = set([winner, loser])
-    official_pair = set([official_hronir_A, official_hronir_B])
-
-    if submitted_pair != official_pair:
+    if not official_fork_A or not official_fork_B:
         typer.echo(json.dumps({
-            "error": "Voto rejeitado. O par submetido não corresponde ao duelo curado oficialmente.",
-            "submitted_duel": {"hronir_A": winner, "hronir_B": loser},
-            "expected_duel": {"hronir_A": official_hronir_A, "hronir_B": official_hronir_B},
-            "strategy": official_duel.get("strategy"), # Será sempre max_entropy_duel
-            "position": position
+            "error": "Official duel data is incomplete. Cannot validate vote.",
+            "official_duel_info": official_duel_info
         }, indent=2))
         raise typer.Exit(code=1)
 
-    # Se a validação passar, registra o voto
-    # A função record_vote não mudou e não precisa de 'base' se 'conn' for fornecido.
-    # No entanto, o CLI original pode não estar usando 'conn' aqui.
-    # Vou manter a lógica original de record_vote do CLI que usa 'conn'.
-    with database.open_database() as conn:
-        ratings.record_vote(position, voter, winner, loser, conn=conn) # 'base' não é usado aqui
+    # 3. Validate submitted vote against the official duel
+    submitted_fork_pair = set([winner_fork_uuid, loser_fork_uuid])
+    official_fork_pair = set([official_fork_A, official_fork_B])
+
+    if submitted_fork_pair != official_fork_pair:
+        typer.echo(json.dumps({
+            "error": "Vote rejected. The submitted fork pair does not match the officially curated duel.",
+            "submitted_duel_forks": {"winner": winner_fork_uuid, "loser": loser_fork_uuid},
+            "expected_duel_forks": {"fork_A": official_fork_A, "fork_B": official_fork_B},
+            "position": position,
+            "predecessor_hronir_uuid_used": predecessor_hronir_uuid
+        }, indent=2))
+        raise typer.Exit(code=1)
+
+    # 4. Map validated winner/loser fork_uuids to their successor hrönir_uuids
+    winner_hronir_uuid = _get_successor_hronir_for_fork(winner_fork_uuid, forking_path_dir)
+    loser_hronir_uuid = _get_successor_hronir_for_fork(loser_fork_uuid, forking_path_dir)
+
+    if not winner_hronir_uuid or not loser_hronir_uuid:
+        typer.echo(json.dumps({
+            "error": "Could not map one or both duel forks to their successor hrönir_uuids. Check forking_path data.",
+            "winner_fork_uuid": winner_fork_uuid, "mapped_hronir": winner_hronir_uuid,
+            "loser_fork_uuid": loser_fork_uuid, "mapped_hronir": loser_hronir_uuid
+        }, indent=2))
+        raise typer.Exit(code=1)
+
+    # 5. Record the vote (using hrönir_uuids for the actual record, voter is a fork_uuid)
+    try:
+        with database.open_database() as conn:
+            ratings.record_vote(
+                position=position,
+                voter=voter_fork_uuid, # Voter is a fork_uuid
+                winner=winner_hronir_uuid, # Winner is a hrönir_uuid (successor of winner_fork)
+                loser=loser_hronir_uuid,   # Loser is a hrönir_uuid (successor of loser_fork)
+                conn=conn
+            )
+    except Exception as e: # Catch potential DB errors or other issues from record_vote
+        typer.echo(json.dumps({
+            "error": f"Failed to record vote in the database: {e}",
+            "position": position, "voter": voter_fork_uuid,
+            "winner_hronir": winner_hronir_uuid, "loser_hronir": loser_hronir_uuid
+        }, indent=2))
+        raise typer.Exit(code=1)
 
     typer.echo(json.dumps({
-        "message": "Voto registrado. A incerteza do sistema foi reduzida.",
+        "message": "Vote for forks successfully validated and recorded (as hrönir duel). System uncertainty reduced.",
         "position": position,
-        "winner": winner,
-        "loser": loser,
-        "voter": voter,
-        "duel_strategy": official_duel.get("strategy")
+        "voter_fork_uuid": voter_fork_uuid,
+        "winner_fork_uuid": winner_fork_uuid,
+        "loser_fork_uuid": loser_fork_uuid,
+        "recorded_duel_hrönirs": {"winner": winner_hronir_uuid, "loser": loser_hronir_uuid},
+        "duel_strategy": official_duel_info.get("strategy")
     }, indent=2))
 
 
@@ -440,38 +440,59 @@ def ranking(
         # otherwise, it falls back to standard print. For explicit control, use to_string().
         typer.echo(ranking_data.to_string(index=False))
 
-@app.command(help="Obtém o duelo de máxima entropia para uma posição.")
+@app.command(help="Obtém o duelo de máxima entropia entre forks para uma posição.")
 def get_duel(
-    position: Annotated[int, typer.Option(help="A posição do capítulo para a qual obter o duelo.")],
+    position: Annotated[int, typer.Option(help="A posição do capítulo para a qual obter o duelo de forks.")],
     ratings_dir: Annotated[Path, typer.Option(help="Diretório contendo arquivos CSV de classificação.")] = Path("ratings"),
+    forking_path_dir: Annotated[Path, typer.Option(help="Diretório contendo arquivos CSV de caminhos de bifurcação.")] = Path("forking_path"),
+    canonical_path_file: Annotated[Path, typer.Option(help="Caminho para o arquivo JSON do caminho canônico.")] = Path("data/canonical_path.json"),
 ):
     """
-    Obtém o duelo de máxima entropia para uma determinada posição.
-    A estratégia será sempre 'max_entropy_duel'.
+    Obtém o duelo de forks de máxima entropia para uma determinada posição,
+    considerando a linhagem canônica.
     """
-    duel_info = ratings.determine_next_duel(position, base=ratings_dir)
+    predecessor_hronir_uuid: str | None = None
+    if position > 0:
+        canonical_fork_info_prev_pos = storage.get_canonical_fork_info(position - 1, canonical_path_file)
+        if not canonical_fork_info_prev_pos or "hrönir_uuid" not in canonical_fork_info_prev_pos:
+            typer.echo(json.dumps({
+                "error": f"Não foi possível determinar o hrönir predecessor canônico da posição {position - 1}. "
+                         f"Execute 'consolidate-book' ou verifique o arquivo {canonical_path_file}.",
+                "position_requested": position
+            }, indent=2))
+            raise typer.Exit(code=1)
+        predecessor_hronir_uuid = canonical_fork_info_prev_pos["hrönir_uuid"]
+    elif position < 0:
+        typer.echo(json.dumps({"error": "Posição inválida. Deve ser >= 0.", "position_requested": position}, indent=2))
+        raise typer.Exit(code=1)
+
+    # `determine_next_duel` agora lida com forks
+    duel_info = ratings.determine_next_duel(
+        position=position,
+        predecessor_hronir_uuid=predecessor_hronir_uuid,
+        forking_path_dir=forking_path_dir,
+        ratings_dir=ratings_dir
+    )
+
     if duel_info:
-        # A estrutura de duel_info já deve ser:
+        # O formato de duel_info já é:
         # {
-        #   "strategy": "max_entropy_duel",
-        #   "hronir_A": hronir_A_uuid,
-        #   "hronir_B": hronir_B_uuid,
-        #   "entropy": max_entropy_value,
         #   "position": position,
+        #   "strategy": "max_entropy_duel",
+        #   "entropy": max_entropy,
+        #   "duel_pair": {
+        #       "fork_A": duel_fork_A_uuid,
+        #       "fork_B": duel_fork_B_uuid,
+        #   }
         # }
-        # Para manter o formato de output anterior que tinha "duel_pair":
-        output_data = {
-            "position": duel_info.get("position"),
-            "strategy": duel_info.get("strategy"),
-            "entropy": duel_info.get("entropy"),
-            "duel_pair": {
-                "hronir_A": duel_info.get("hronir_A"),
-                "hronir_B": duel_info.get("hronir_B"),
-            }
-        }
-        typer.echo(json.dumps(output_data, indent=2))
+        typer.echo(json.dumps(duel_info, indent=2))
     else:
-        typer.echo(json.dumps({"error": "Não foi possível determinar um duelo. Verifique se há hrönirs suficientes (pelo menos 2).", "position": position}, indent=2))
+        typer.echo(json.dumps({
+            "error": "Não foi possível determinar um duelo de forks. "
+                     "Verifique se existem forks elegíveis suficientes (pelo menos 2) para a linhagem e posição.",
+            "position": position,
+            "predecessor_hronir_uuid_used": predecessor_hronir_uuid
+            }, indent=2))
 
 
 def _git_remove_deleted_files(): # Renamed to avoid conflict and be more descriptive

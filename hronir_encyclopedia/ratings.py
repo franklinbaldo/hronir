@@ -70,289 +70,211 @@ def record_vote(
 
 def get_ranking(
     position: int,
-    canonical_predecessor_uuid: str | None, # None para Posição 0
+    predecessor_hronir_uuid: str | None, # UUID do hrönir sucessor do fork canônico anterior
     forking_path_dir: Path,
-    ratings_base_dir: Path
+    ratings_dir: Path
 ) -> pd.DataFrame:
     """
-    Calcula o ranking Elo para hrönirs de uma dada 'position', considerando
-    apenas os herdeiros diretos do 'canonical_predecessor_uuid'.
-    Para a Posição 0, 'canonical_predecessor_uuid' pode ser None,
-    e todos os hrönirs da Posição 0 são considerados.
-    """
-    # 1. Identificar os Herdeiros
-    heir_uuids = set()
-    all_forking_files = list(forking_path_dir.glob("*.csv"))
+    Calcula o ranking Elo para fork_uuid's de uma dada 'position', considerando
+    apenas os forks que descendem diretamente do 'predecessor_hronir_uuid'.
+    Para a Posição 0, 'predecessor_hronir_uuid' é None.
 
-    if not all_forking_files and canonical_predecessor_uuid is not None:
-        # Se não há arquivos de forking path, não pode haver herdeiros de um predecessor específico.
-        # No entanto, se canonical_predecessor_uuid é None (caso da Posição 0),
-        # continuaremos para tentar encontrar hrönirs da Posição 0 diretamente dos votos.
-        return pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])
+    Retorna um DataFrame com colunas: fork_uuid, hrönir_uuid (sucessor), elo_rating,
+                                     games_played, wins, losses.
+    """
+    output_columns = ["fork_uuid", "hrönir_uuid", "elo_rating", "games_played", "wins", "losses"]
+    empty_df = pd.DataFrame(columns=output_columns)
+
+    # 1. Identificar Herdeiros (Fork UUIDs Elegíveis e seus sucessores hrönir_uuid)
+    # eligible_fork_infos será uma lista de dicts: [{'fork_uuid': str, 'hrönir_uuid': str}]
+    eligible_fork_infos_list = []
+    if not forking_path_dir.exists() or not forking_path_dir.is_dir():
+        return empty_df
+
+    all_forking_files = list(forking_path_dir.glob("*.csv"))
+    if not all_forking_files:
+        return empty_df
 
     for csv_file in all_forking_files:
         if csv_file.stat().st_size == 0:
             continue
         try:
-            df_forks = pd.read_csv(csv_file)
+            df_forks = pd.read_csv(csv_file, dtype={'position': 'Int64', 'prev_uuid': str, 'uuid': str, 'fork_uuid': str})
+            if df_forks.empty or not all(col in df_forks.columns for col in ["position", "prev_uuid", "uuid", "fork_uuid"]):
+                continue
+
+            # Garantir que a coluna position seja int para comparação
+            df_forks = df_forks[pd.to_numeric(df_forks["position"], errors='coerce') == position]
             if df_forks.empty:
                 continue
 
-            # Filtrar por posição e predecessor canônico
-            # Certificar que as colunas de posição são comparadas como o mesmo tipo
-            df_forks["position"] = df_forks["position"].astype(int)
-
-            if canonical_predecessor_uuid is None: # Caso especial para Posição 0
-                 # Considera todos os hrönirs na Posição 0 como "herdeiros"
-                # desde que não tenham um prev_uuid (ou um prev_uuid específico para raiz, se definido)
-                # Por simplicidade, se canonical_predecessor_uuid é None, pegamos todos da Posição 0.
-                # O `prev_uuid` para a Posição 0 pode ser variado ou NaN.
-                # A lógica aqui é que se estamos pedindo ranking para Posição 0 sem predecessor,
-                # então todos os hrönirs na Posição 0 são candidatos.
-                # No entanto, a especificação da tarefa é que `get_ranking` é chamado com N e N-1.
-                # Se N=0, N-1 é -1. `get_canonical_uuid(-1)` falharia.
-                # A "Consideração Adicional" do plano sugere que Posição 0 pode ter `None` como predecessor.
-                # Se `canonical_predecessor_uuid` é `None`, isso implica que estamos buscando
-                # os hrönirs da `position` que *não têm* um `prev_uuid` ou cujo `prev_uuid` é um
-                # valor especial indicando a raiz (ex: "ROOT_UUID" ou pd.NA).
-                # Para a Posição 0, geralmente não há `prev_uuid`.
-                # Se o `forking_path` para a Posição 0 tiver `prev_uuid` como NaN/None/vazio,
-                # eles seriam selecionados aqui.
-                # O plano diz: "Para a Posição 0, canonical_predecessor_uuid será um valor fixo especial (ex: None)"
-                # "que get_ranking interpretará como "sem predecessor, considere todos os hrönirs da posição 0".
-                # Isso significa que o filtro em `prev_uuid` deve ser diferente.
-                # Se `canonical_predecessor_uuid` é None, queremos hrönirs da `position` (que deve ser 0)
-                # cujo `prev_uuid` é efetivamente nulo ou não especificado.
-                # Assumindo que para Posição 0, `prev_uuid` nos CSVs é NaN ou uma string vazia.
+            if predecessor_hronir_uuid is None: # Caso Posição 0
                 if position == 0:
-                    # Para a posição 0, `prev_uuid` deve ser nulo ou ausente.
-                    # Pandas lê colunas vazias como NaN por padrão.
-                    potential_heirs = df_forks[
-                        (df_forks["position"] == position) &
-                        (df_forks["prev_uuid"].isnull() | (df_forks["prev_uuid"] == ""))
-                    ]["uuid"].tolist()
-                    heir_uuids.update(potential_heirs)
+                    # `prev_uuid` deve ser nulo/vazio/NaN
+                    selected_forks = df_forks[df_forks["prev_uuid"].fillna('').isin(['', 'nan', 'None'])]
                 else:
-                    # Se canonical_predecessor_uuid é None, mas a posição não é 0,
-                    # isso é um estado inesperado baseado no plano. Retornar vazio.
-                    return pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])
+                    # predecessor_hronir_uuid é None para posição != 0 é um estado inesperado.
+                    continue # ou return empty_df se for uma condição de erro global
+            else: # predecessor_hronir_uuid is not None
+                selected_forks = df_forks[df_forks["prev_uuid"] == predecessor_hronir_uuid]
 
-            else: # canonical_predecessor_uuid is not None
-                potential_heirs = df_forks[
-                    (df_forks["position"] == position) &
-                    (df_forks["prev_uuid"] == canonical_predecessor_uuid)
-                ]["uuid"].tolist()
-                heir_uuids.update(potential_heirs)
+            for _, row in selected_forks.iterrows():
+                eligible_fork_infos_list.append({"fork_uuid": row["fork_uuid"], "hrönir_uuid": row["uuid"]})
 
         except pd.errors.EmptyDataError:
-            continue # Arquivo CSV vazio
-        except Exception:
-            # Ignorar arquivos CSV malformados ou com colunas ausentes por enquanto,
-            # ou adicionar logging se necessário.
-            # Idealmente, o sistema deve ser robusto a isso.
+            continue
+        except Exception: # Trata outros erros de parsing ou de arquivo
+            # Adicionar logging aqui seria útil
             continue
 
-    # Se nenhum herdeiro for encontrado E não estamos no caso especial da Posição 0
-    # (onde herdeiros podem vir diretamente dos votos se não houver forking_path),
-    # então não há ninguém para classificar.
-    # if not heir_uuids and (canonical_predecessor_uuid is not None or position != 0):
-    # Modificação: Se não houver herdeiros do forking_path, não há como rankear.
-    if not heir_uuids:
-        return pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])
+    if not eligible_fork_infos_list:
+        return empty_df
 
-    # 2. Filtrar os Anais dos Duelos
-    ratings_csv_path = ratings_base_dir / f"position_{position:03d}.csv"
-    if not ratings_csv_path.exists() or ratings_csv_path.stat().st_size == 0:
-        # Se não há votos, mas existem herdeiros, eles terão Elo base, 0 vitórias/derrotas.
-        # Ou retornar DataFrame vazio se nenhum duelo significa nenhum ranking.
-        # O comportamento atual do Elo é inicializar apenas UUIDs presentes nos duelos.
-        # Para consistência, se não há duelos, não há Elo calculado.
-        # No entanto, queremos mostrar os herdeiros.
-        # Vamos criar um ranking com Elo base para os herdeiros sem duelos.
-        ELO_BASE = 1500 # Consistente com o cálculo abaixo
-        ranking_data = [{"uuid": hid, "elo": ELO_BASE, "wins": 0, "losses": 0, "total_duels": 0} for hid in heir_uuids]
-        if not ranking_data: # Segurança extra
-             return pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])
-        final_df = pd.DataFrame(ranking_data)
-        final_df = final_df.sort_values(by=["elo", "wins", "total_duels"], ascending=[False, False, False])
-        return final_df
+    # Criar um mapeamento de hrönir_uuid (sucessor) para fork_uuid para os forks elegíveis
+    # Nota: Um hrönir_uuid pode ser sucessor de múltiplos forks se vier de diferentes CSVs,
+    # mas dentro da mesma linhagem (mesmo predecessor_hronir_uuid e posição),
+    # o par (prev_uuid, uuid) deve ser único por fork_uuid.
+    # Se um hrönir_uuid é sucessor de múltiplos forks ELEGÍVEIS, isso é um problema de dados.
+    # Por simplicidade, assumimos que cada hrönir_uuid sucessor em eligible_fork_infos_list
+    # está associado a um único fork_uuid elegível nesta chamada.
+    # Se um hrönir_uuid pudesse ser o sucessor de MÚLTIPLOS forks elegíveis (mesma posição, mesmo predecessor),
+    # precisaríamos de uma regra para desambiguar a qual fork um voto para esse hrönir se aplica.
+    # O design atual de fork_uuid (position, prev_uuid, cur_uuid) garante que se cur_uuid é o mesmo,
+    # e prev_uuid é o mesmo (nosso predecessor_hronir_uuid), então o fork_uuid será o mesmo.
+    # Então, o mapeamento de hrönir_uuid para fork_uuid dentro dos elegíveis deve ser 1:1.
 
-    try:
-        df_votes = pd.read_csv(ratings_csv_path)
-        if df_votes.empty: # Similar ao caso de arquivo não existente
-            ELO_BASE = 1500
-            ranking_data = [{"uuid": hid, "elo": ELO_BASE, "wins": 0, "losses": 0, "total_duels": 0} for hid in heir_uuids]
-            if not ranking_data:
-                return pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])
-            final_df = pd.DataFrame(ranking_data)
-            final_df = final_df.sort_values(by=["elo", "wins", "total_duels"], ascending=[False, False, False])
-            return final_df
+    # eligible_fork_df para fácil lookup e inicialização de ranking
+    eligible_fork_df = pd.DataFrame(eligible_fork_infos_list).drop_duplicates(subset=['fork_uuid'])
+    if eligible_fork_df.empty: # Após drop_duplicates, se algo estranho acontecer
+        return empty_df
 
-    except pd.errors.EmptyDataError:
-        # Tratar como se não houvesse votos
-        ELO_BASE = 1500
-        ranking_data = [{"uuid": hid, "elo": ELO_BASE, "wins": 0, "losses": 0, "total_duels": 0} for hid in heir_uuids]
-        if not ranking_data:
-            return pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])
-        final_df = pd.DataFrame(ranking_data)
-        final_df = final_df.sort_values(by=["elo", "wins", "total_duels"], ascending=[False, False, False])
-        return final_df
-    except Exception: # Outro erro de leitura, incluindo falha ao encontrar colunas
-        # Se houver qualquer erro na leitura ou o arquivo for inválido (e.g. colunas faltando),
-        # trata como se não houvesse votos válidos para os herdeiros.
-        ELO_BASE = 1500
-        ranking_data = [{"uuid": hid, "elo": ELO_BASE, "wins": 0, "losses": 0, "total_duels": 0} for hid in heir_uuids]
-        if not ranking_data: # Segurança
-             return pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])
-        final_df = pd.DataFrame(ranking_data)
-        final_df = final_df.sort_values(by=["elo", "wins", "total_duels"], ascending=[False, False, False])
-        return final_df
+    # Mapeamento de hrönir_uuid (sucessor) para seu fork_uuid elegível
+    hronir_to_eligible_fork_map = pd.Series(eligible_fork_df.fork_uuid.values, index=eligible_fork_df.hrönir_uuid).to_dict()
 
-    # Verificar se as colunas 'winner' e 'loser' existem
-    if 'winner' not in df_votes.columns or 'loser' not in df_votes.columns:
-        # Colunas essenciais ausentes, tratar como sem votos válidos.
-        ELO_BASE = 1500
-        ranking_data = [{"uuid": hid, "elo": ELO_BASE, "wins": 0, "losses": 0, "total_duels": 0} for hid in heir_uuids]
-        if not ranking_data:
-             return pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])
-        final_df = pd.DataFrame(ranking_data)
-        final_df = final_df.sort_values(by=["elo", "wins", "total_duels"], ascending=[False, False, False])
-        return final_df
-
-    # Manter apenas duelos onde ambos os participantes são herdeiros
-    # Nota: df_votes['winner'] e df_votes['loser'] devem ser strings para a comparação com heir_uuids (que são strings)
-    df_votes['winner'] = df_votes['winner'].astype(str)
-    df_votes['loser'] = df_votes['loser'].astype(str)
-
-    filtered_votes = df_votes[
-        df_votes["winner"].isin(heir_uuids) & df_votes["loser"].isin(heir_uuids)
-    ]
-
-    if filtered_votes.empty:
-        # Não há duelos entre os herdeiros. Retornar herdeiros com Elo base.
-        ELO_BASE = 1500
-        ranking_data = [{"uuid": hid, "elo": ELO_BASE, "wins": 0, "losses": 0, "total_duels": 0} for hid in heir_uuids]
-        if not ranking_data: # Segurança
-             return pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])
-        final_df = pd.DataFrame(ranking_data)
-        final_df = final_df.sort_values(by=["elo", "wins", "total_duels"], ascending=[False, False, False])
-        return final_df
-
-    # 3. Calcular a Hierarquia (Elo)
+    # 2. Preparar DataFrame de Ranking com Elo Base para todos os forks elegíveis
     ELO_BASE = 1500
-    K_FACTOR = 32
+    ranking_list = [
+        {
+            "fork_uuid": fork_info["fork_uuid"],
+            "hrönir_uuid": fork_info["hrönir_uuid"], # Este é o hrönir SUCESSOR do fork
+            "elo_rating": ELO_BASE, "games_played": 0, "wins": 0, "losses": 0
+        }
+        for fork_info in eligible_fork_df.to_dict('records')
+    ]
+    # Usar fork_uuid como índice para fácil atualização
+    current_ranking_df = pd.DataFrame(ranking_list).set_index("fork_uuid")
 
-    # Inicializar Elo para todos os herdeiros
-    elo_ratings = {uuid_str: ELO_BASE for uuid_str in heir_uuids}
-    wins_map = {uuid_str: 0 for uuid_str in heir_uuids}
-    losses_map = {uuid_str: 0 for uuid_str in heir_uuids}
+    # 3. Ler e Processar os Votos
+    ratings_csv_path = ratings_dir / f"position_{position:03d}.csv"
 
-    # Iterar sobre cada duelo FILTRADO para atualizar os ratings Elo
-    for _, row in filtered_votes.iterrows():
-        winner_uuid = row["winner"]
-        loser_uuid = row["loser"]
+    if ratings_csv_path.exists() and ratings_csv_path.stat().st_size > 0:
+        try:
+            df_votes = pd.read_csv(ratings_csv_path, dtype=str) # Ler tudo como string inicialmente
+            if not df_votes.empty and 'winner' in df_votes.columns and 'loser' in df_votes.columns:
 
-        # Adicionar aos contadores de vitórias/derrotas (apenas para herdeiros)
-        if winner_uuid in wins_map: wins_map[winner_uuid] += 1
-        if loser_uuid in losses_map: losses_map[loser_uuid] += 1
+                # Mapear winner/loser hrönir_uuids para fork_uuids elegíveis
+                df_votes["winner_fork_uuid"] = df_votes["winner"].map(hronir_to_eligible_fork_map)
+                df_votes["loser_fork_uuid"] = df_votes["loser"].map(hronir_to_eligible_fork_map)
 
-        # Ratings atuais
-        r_winner = elo_ratings[winner_uuid]
-        r_loser = elo_ratings[loser_uuid]
+                # Filtrar votos onde ambos os hrönirs mapeiam para forks elegíveis
+                valid_duel_votes = df_votes.dropna(subset=["winner_fork_uuid", "loser_fork_uuid"])
 
-        expected_winner = _calculate_elo_probability(r_winner, r_loser)
-        expected_loser = 1 - expected_winner # _calculate_elo_probability(r_loser, r_winner)
+                # Garantir que o winner_fork e loser_fork não sejam o mesmo
+                valid_duel_votes = valid_duel_votes[valid_duel_votes["winner_fork_uuid"] != valid_duel_votes["loser_fork_uuid"]]
 
-        new_r_winner = r_winner + K_FACTOR * (1 - expected_winner)
-        new_r_loser = r_loser + K_FACTOR * (0 - expected_loser)
+                if not valid_duel_votes.empty:
+                    K_FACTOR = 32
+                    for _, vote_row in valid_duel_votes.iterrows():
+                        winner_fork = vote_row["winner_fork_uuid"]
+                        loser_fork = vote_row["loser_fork_uuid"]
 
-        elo_ratings[winner_uuid] = new_r_winner
-        elo_ratings[loser_uuid] = new_r_loser
+                        # Atualizar contagens no current_ranking_df (indexado por fork_uuid)
+                        current_ranking_df.loc[winner_fork, "wins"] += 1
+                        current_ranking_df.loc[loser_fork, "losses"] += 1
+                        current_ranking_df.loc[winner_fork, "games_played"] += 1
+                        current_ranking_df.loc[loser_fork, "games_played"] += 1
 
-    # Criar DataFrame a partir dos ratings Elo calculados e contagens de vitórias/derrotas para os herdeiros
-    ranking_data = []
-    for uuid_val in heir_uuids: # Iterar sobre os herdeiros, não sobre todos os que participaram
-        ranking_data.append({
-            "uuid": uuid_val,
-            "elo": int(round(elo_ratings[uuid_val])),
-            "wins": wins_map[uuid_val],
-            "losses": losses_map[uuid_val],
-            "total_duels": wins_map[uuid_val] + losses_map[uuid_val]
-        })
+                        r_winner_fork = current_ranking_df.loc[winner_fork, "elo_rating"]
+                        r_loser_fork = current_ranking_df.loc[loser_fork, "elo_rating"]
 
-    if not ranking_data: # Caso extremo, se heir_uuids estivesse vazio após tudo.
-        return pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])
+                        expected_winner = _calculate_elo_probability(r_winner_fork, r_loser_fork)
 
-    ranking_df = pd.DataFrame(ranking_data)
-    ranking_df = ranking_df.sort_values(by=["elo", "wins", "total_duels"], ascending=[False, False, False])
+                        new_r_winner_fork = r_winner_fork + K_FACTOR * (1 - expected_winner)
+                        new_r_loser_fork = r_loser_fork + K_FACTOR * (0 - (1 - expected_winner))
 
-    return ranking_df[["uuid", "elo", "wins", "losses", "total_duels"]]
+                        current_ranking_df.loc[winner_fork, "elo_rating"] = new_r_winner_fork
+                        current_ranking_df.loc[loser_fork, "elo_rating"] = new_r_loser_fork
+
+                    current_ranking_df["elo_rating"] = current_ranking_df["elo_rating"].round().astype(int)
+
+        except pd.errors.EmptyDataError:
+            pass
+        except Exception:
+            # Adicionar logging
+            pass
+
+    # Resetar índice para ter fork_uuid como coluna e ordenar
+    final_df = current_ranking_df.reset_index()
+    final_df = final_df.sort_values(
+        by=["elo_rating", "wins", "games_played"],
+        ascending=[False, False, True]
+    )
+
+    return final_df[output_columns]
 
 
 def determine_next_duel(
     position: int,
-    canonical_predecessor_uuid: str | None,
+    predecessor_hronir_uuid: str | None,
     forking_path_dir: Path,
-    ratings_base_dir: Path
+    ratings_dir: Path
 ) -> dict | None:
     """
-    Determina o próximo duelo para uma posição, considerando apenas os herdeiros
-    do canonical_predecessor_uuid, selecionando o par de hrönirs (herdeiros)
+    Determina o próximo duelo para uma posição, considerando apenas os forks elegíveis
+    que descendem do predecessor_hronir_uuid. Seleciona o par de FORK_UUIDs
     com a maior entropia.
     """
-    ranking_df = get_ranking(position, canonical_predecessor_uuid, forking_path_dir, ratings_base_dir)
-    if len(ranking_df) < 2:
+    # get_ranking agora retorna um DataFrame de fork_uuid's
+    # Colunas: fork_uuid, hrönir_uuid (sucessor), elo_rating, games_played, wins, losses
+    ranking_df = get_ranking(position, canonical_predecessor_uuid, forking_path_dir, ratings_dir)
+
+    if ranking_df.empty or len(ranking_df) < 2:
         return None
 
-    # Utiliza a heurística otimizada: a maior entropia geralmente ocorre
-    # entre vizinhos no ranking ordenado por Elo.
-    # get_ranking já retorna ordenado, mas re-ordenar aqui garante.
-    ranking_df = ranking_df.sort_values(by="elo", ascending=False).reset_index(drop=True)
+    # Ordenar por elo_rating (get_ranking já deve retornar ordenado, mas para garantir)
+    # A ordenação de get_ranking é: by=["elo_rating", "wins", "games_played"], ascending=[False, False, True]
+    # Para a heurística de vizinhos, a ordenação primária por elo_rating é o que importa.
+    # Se já estiver ordenado, esta linha não muda nada. Se não, garante a ordem correta.
+    ranking_df = ranking_df.sort_values(by="elo_rating", ascending=False).reset_index(drop=True)
 
-    # Calcula a entropia para cada par de vizinhos
-    # Inicializa a coluna com um valor que indica que a entropia não foi calculada (e.g. < 0)
-    ranking_df["entropy_with_next"] = -1.0
+    # Calcula a entropia para cada par de vizinhos no ranking de forks
+    max_entropy = -1.0
+    duel_fork_A_uuid = None
+    duel_fork_B_uuid = None
 
-    entropies_calculated = []
     for i in range(len(ranking_df) - 1):
-        elo_a = ranking_df.loc[i, "elo"]
-        elo_b = ranking_df.loc[i + 1, "elo"]
-        entropy = _calculate_duel_entropy(elo_a, elo_b)
-        ranking_df.loc[i, "entropy_with_next"] = entropy
-        entropies_calculated.append(entropy) # Guardar para verificar se alguma entropia foi calculada
+        elo_a = ranking_df.loc[i, "elo_rating"]
+        elo_b = ranking_df.loc[i + 1, "elo_rating"]
 
-    if not entropies_calculated: # Se nenhum par de vizinhos existia (len(ranking_df) < 2, já tratado) ou algo deu errado
+        current_entropy = _calculate_duel_entropy(elo_a, elo_b)
+
+        if current_entropy > max_entropy:
+            max_entropy = current_entropy
+            duel_fork_A_uuid = ranking_df.loc[i, "fork_uuid"]
+            duel_fork_B_uuid = ranking_df.loc[i + 1, "fork_uuid"]
+
+    if duel_fork_A_uuid is None or duel_fork_B_uuid is None : # Não encontrou nenhum par (deveria ser coberto por len < 2)
         return None
 
-    # Encontra o índice da maior entropia. idxmax() ignora NaNs e valores não numéricos se existirem,
-    # mas nossa coluna deve ser float. Se todas as entropias forem -1.0 (caso de 2 hrönirs onde o apply não é ideal),
-    # idxmax() pegaria o primeiro.
-    # Se houver apenas um par (2 hrönirs), a entropia será calculada para ranking_df.loc[0, "entropy_with_next"]
-    # e idxmax() o encontrará.
-
-    # Se todas as entropias calculadas forem 0 (e.g. Elos muito distantes), idxmax() ainda pega o primeiro.
-    # Isso é aceitável; um duelo de baixa entropia é melhor que nenhum, se for o máximo disponível.
-    max_entropy_idx = ranking_df["entropy_with_next"].idxmax()
-
-    # Verifica se max_entropy_idx é válido e se o valor de entropia é de fato > -1.0 (ou seja, foi calculado)
-    # Isso é uma segurança extra, pois se len(ranking_df) == 2, o loop roda uma vez para i=0.
-    # ranking_df.loc[0, "entropy_with_next"] será atualizado.
-    # ranking_df.loc[1, "entropy_with_next"] permanecerá -1.0. idxmax() pegaria o índice 0.
-    if ranking_df.loc[max_entropy_idx, "entropy_with_next"] < 0:
-         # Isso não deveria acontecer se len(ranking_df) >= 2, pois pelo menos uma entropia seria calculada.
-         # A menos que todas as entropias sejam 0 e, de alguma forma, o valor inicial -1.0 fosse o máximo.
-         # Mas _calculate_duel_entropy retorna >= 0.
-        return None # Segurança: nenhuma entropia válida foi encontrada.
-
-    hronir_A_uuid = ranking_df.iloc[max_entropy_idx]["uuid"]
-    # O par de max_entropy_idx é com max_entropy_idx + 1
-    hronir_B_uuid = ranking_df.iloc[max_entropy_idx + 1]["uuid"]
-    max_entropy_value = ranking_df.loc[max_entropy_idx, "entropy_with_next"]
-
+    # O critério de aceitação é: Retorna `{ "fork_A": "...", "fork_B": "..." }`
+    # O plano menciona: `{"duel_pair": {"fork_A": "fork_uuid_1", "fork_B": "fork_uuid_2"}, "entropy": E, ...}`
+    # Vou seguir o formato com "duel_pair" para consistência com o plano.
     return {
-        "strategy": "max_entropy_duel", # Estratégia é sempre esta agora
-        "hronir_A": hronir_A_uuid,
-        "hronir_B": hronir_B_uuid,
-        "entropy": max_entropy_value,
-        "position": position, # Adicionando position para consistência com output anterior
+        "position": position,
+        "strategy": "max_entropy_duel", # Estratégia é sempre esta
+        "entropy": max_entropy,
+        "duel_pair": {
+            "fork_A": duel_fork_A_uuid,
+            "fork_B": duel_fork_B_uuid,
+        }
     }
