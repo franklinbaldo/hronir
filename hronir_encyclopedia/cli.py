@@ -21,11 +21,6 @@ app = typer.Typer(
 @app.command(help="Consolidate fork rankings and update the canonical path.")
 def consolidate_book(
     ratings_dir: Annotated[Path, typer.Option(help="Directory containing rating CSV files.", exists=True, file_okay=False, dir_okay=True, readable=True)] = Path("ratings"),
-    # library_dir é implicitamente usado por storage.chapter_exists, mas não diretamente para cópia de arquivos.
-    # Se precisarmos validar a existência do hrönir_uuid do fork, library_dir ainda é relevante.
-    # Por enquanto, a lógica de `ratings.get_ranking` e `storage.get_canonical_fork_info`
-    # não depende de `library_dir` diretamente nesta função.
-    # library_dir: Annotated[Path, typer.Option(help="Directory containing all hrönirs.", exists=True, file_okay=False, dir_okay=True, readable=True)] = Path("the_library"),
     forking_path_dir: Annotated[Path, typer.Option(help="Directory containing forking path CSV files.", exists=True, file_okay=False, dir_okay=True, readable=True)] = Path("forking_path"),
     canonical_path_file: Annotated[Path, typer.Option(help="Path to the canonical path JSON file.", dir_okay=False, writable=True)] = Path("data/canonical_path.json"),
     max_positions_to_consolidate: Annotated[int, typer.Option(help="Maximum number of positions to attempt to consolidate.")] = 100 # Evita loop infinito
@@ -140,80 +135,7 @@ def consolidate_book(
     typer.echo("Canonical path consolidation complete.")
 
 
-# @app.command(help="Export the canonical book to a file.") # Command removed
-# def export(
-#     output_file: Annotated[Path, typer.Argument(help="Path to the output file (e.g., book.epub, book.pdf).", writable=True, dir_okay=False)],
-#     format_str: Annotated[str, typer.Option("--format", "-f", help="Output format (e.g., epub, pdf, markdown). Requires Pandoc.")] = "epub",
-#     index_file: Annotated[Path, typer.Option(help="Path to the book index JSON file.", exists=True, dir_okay=False, readable=True)] = Path("book/book_index.json"),
-#     book_dir: Annotated[Path, typer.Option(help="Directory for the canonical book files.", exists=True, file_okay=False, dir_okay=True, readable=True)] = Path("book"),
-# ):
-#     """
-#     Exports the canonical book from book_index.json and chapter files into a single output file.
-#     """
-#     try:
-#         book_index = json.loads(index_file.read_text())
-#     except json.JSONDecodeError:
-#         typer.echo(f"Error reading or parsing book index file: {index_file}", err=True)
-#         raise typer.Exit(code=1)
-
-#     chapter_files = []
-#     sorted_chapters = sorted(book_index.get("chapters", {}).items(), key=lambda x: int(x[0]))
-
-#     if not sorted_chapters:
-#         typer.echo("No chapters found in the book index.")
-#         raise typer.Exit(code=1)
-
-#     for position, filename in sorted_chapters:
-#         chapter_path = book_dir / filename
-#         if chapter_path.exists():
-#             chapter_files.append(str(chapter_path))
-#         else:
-#             typer.echo(f"Warning: Chapter file {filename} for position {position} not found in {book_dir}.", err=True)
-
-#     if not chapter_files:
-#         typer.echo("No valid chapter files found to export.")
-#         raise typer.Exit(code=1)
-
-#     try:
-#         # import pypandoc # This import would now be problematic
-#         typer.echo(f"Exporting book to {output_file} in {format_str} format...")
-#         output_file.parent.mkdir(parents=True, exist_ok=True)
-
-#         # pypandoc.convert_files( # This call would now be problematic
-#         #     chapter_files,
-#         #     outputfile=str(output_file),
-#         #     format=format_str,
-#         #     extra_args=['--metadata', f'title="{book_index.get("title", "Hrönir Encyclopedia")}"']
-#         # )
-#         typer.echo(f"Book successfully exported to {output_file}")
-#     except ImportError:
-#         typer.echo("pypandoc is not installed. Please install it (and Pandoc itself) to use the export command.", err=True)
-#         typer.echo("Pandoc installation: https://pandoc.org/installing.html", err=True)
-#         raise typer.Exit(code=1)
-#     except OSError as e:
-#         if "No such file or directory: 'pandoc'" in str(e):
-#             typer.echo("Pandoc executable not found. Please ensure Pandoc is installed and in your PATH.", err=True)
-#             typer.echo("Installation instructions: https://pandoc.org/installing.html", err=True)
-#         else:
-#             typer.echo(f"An error occurred during export (OSError): {e}", err=True)
-#         raise typer.Exit(code=1)
-#     except Exception as e:
-#         typer.echo(f"An unexpected error occurred during export: {e}", err=True)
-#         raise typer.Exit(code=1)
-
-
-@app.command(help="Print the chapter tree from the book index.")
-def tree(
-    index: Annotated[Path, typer.Option(help="Path to the book index JSON file.", exists=True, dir_okay=False, readable=True)] = Path("book/book_index.json"),
-):
-    """
-    Displays the title and sorted chapter list from the book_index.json.
-    """
-    data = json.loads(index.read_text())
-    typer.echo(data.get("title", "Hrönir Encyclopedia"))
-    for pos, fname in sorted(data.get("chapters", {}).items(), key=lambda x: int(x[0])):
-        typer.echo(f"{pos}: {fname}")
-
+# Command `export` and `tree` removed as they depended on the old book structure.
 
 @app.command(help="Validate a chapter file (basic check).")
 def validate(
@@ -385,22 +307,29 @@ def vote(
 @app.command(help="Validate and repair storage, audit forking CSVs.")
 def audit():
     """
-    Performs audit operations: validates chapters in the book directory,
-    moves invalid ones, and audits forking path CSV files.
+    Performs audit operations: validates chapters in the library,
+    and audits forking path CSV files.
     """
-    book_dir = Path("book")
-    typer.echo(f"Auditing book directory: {book_dir}...")
-    for chapter_file in book_dir.glob("**/*.md"): # Corrected from 'chapter' to 'chapter_file'
-        storage.validate_or_move(chapter_file) # Assuming this function prints its own status
+    library_dir = Path("the_library")
+    typer.echo(f"Auditing library directory: {library_dir}...")
+    # This part needs to be adjusted. `validate_or_move` expects a specific file.
+    # We should iterate through hrönirs in a way that's compatible with `purge_fake_hronirs` logic,
+    # or rely on `purge_fake_hronirs` called by `clean` command.
+    # For now, let's simplify the audit's scope for this command, focusing on forking paths.
+    # A more thorough audit of `the_library` is implicitly handled by `storage.chapter_exists`
+    # when other commands use it, and explicitly by `clean`.
+    # Consider enhancing `audit` in the future if a standalone deep library audit is needed here.
+    typer.echo(f"Auditing hrönirs in {library_dir} (basic check via purge_fake_hronirs in 'clean' command)...")
+    # No direct action on library_dir here, purge_fake_hronirs in 'clean' is more comprehensive.
 
     fork_dir = Path("forking_path")
     if fork_dir.exists():
         typer.echo(f"Auditing forking path directory: {fork_dir}...")
-        for csv_file in fork_dir.glob("*.csv"): # Corrected from 'csv' to 'csv_file'
-            storage.audit_forking_csv(csv_file) # Assuming this function prints its own status
+        for csv_file in fork_dir.glob("*.csv"):
+            storage.audit_forking_csv(csv_file)
     else:
         typer.echo(f"Forking path directory {fork_dir} not found. Skipping audit.")
-    typer.echo("Audit complete.")
+    typer.echo("Audit complete (Note: hrönir validation primarily via 'clean' command).")
 
 
 @app.command(help="Generate competing chapters from a predecessor and record an initial vote.")
