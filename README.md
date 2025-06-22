@@ -50,10 +50,10 @@ The encyclopedia grows through interconnected processes:
 
 - **Generation**: AI creates new chapter variants (`hrönirs`) from the accumulated narrative space.
 - **Collaboration**: Human contributors submit chapter variants via GitHub pull requests.
-- **Selection (Votação Guiada Puramente por Entropia)**: O sistema de votação é governado por um único princípio: maximizar a informação. A cada momento, o sistema identifica o **"Duelo de Máxima Entropia"** — o confronto entre os dois `hrönirs` (para uma dada posição) cujo resultado é mais incerto (ou seja, seus Elos são mais próximos) e que, portanto, mais beneficiará o ranking com um novo voto. Não há duelos de calibração especiais; hrönirs novos entram no pool e são selecionados quando sua participação em um duelo maximiza a entropia.
-- **Evolution**: Elo rankings, atualizados por estes duelos de máxima entropia, determinam o emergente caminho canônico através do reconhecimento coletivo.
+- **Selection (Votação Guiada Puramente por Entropia de Bifurcações)**: O sistema de votação é governado por um único princípio: maximizar a informação sobre qual **transição narrativa (fork)** é a mais inevitável. A cada momento, o sistema identifica o **"Duelo de Máxima Entropia"** — o confronto entre os dois `forks` (para uma dada posição e linhagem canônica) cujo resultado é mais incerto (ou seja, seus Elos são mais próximos) e que, portanto, mais beneficiará o ranking com um novo voto.
+- **Evolution**: Elo rankings de `forks`, atualizados por estes duelos, determinam o emergente **caminho canônico de bifurcações** (`data/canonical_path.json`) através do reconhecimento coletivo. O cânone não é uma coleção de capítulos, mas uma sequência de decisões de bifurcação.
 
-Este sistema puramente entrópico garante que cada voto seja o mais impactante possível, focando a atenção do leitor no ponto de maior ambiguidade atual do sistema.
+Este sistema puramente entrópico garante que cada voto seja o mais impactante possível, focando a atenção do leitor na escolha da transição narrativa mais ambígua e crucial do sistema.
 
 ## 🤖 Daily Automated Generation
 
@@ -166,14 +166,13 @@ Forking paths are stored in `forking_path/yu-tsun.csv`, named after the protagon
 
 
 ```
-the_library/                       # Chapters stored by UUID
-book/                              # Current canonical version
-├── 00_tlon_uqbar.md             # Seed chapter (position 0)
-├── book_index.json              # Canonical path index
+the_library/                       # Hrönirs (conteúdo textual) armazenados por UUID
+data/
+└── canonical_path.json          # O caminho canônico de forks (UUIDs de bifurcações)
 forking_path/
-└── yu-tsun.csv                  # Narrative branches
+└── *.csv                        # Definições de forks (posição, prev_hrönir_uuid, hrönir_uuid_sucessor, fork_uuid)
 ratings/
-└── position_002.csv             # Recorded votes per chapter position
+└── position_*.csv               # Votos registrados para duelos de forks em cada posição
 ```
 
 ---
@@ -181,17 +180,15 @@ ratings/
 ## ⚙️ Quickstart CLI Usage
 
 ### Generate new chapters and cast a vote automatically:
-
+(Nota: `synthesize` pode precisar de atualização para refletir a lógica de `fork_uuid` se for usado para votação direta)
 ```bash
 uv run python -m hronir_encyclopedia.cli synthesize \
-  --position 3 \
-  --prev 123e4567-e89b-12d3-a456-426614174000 \
+  --position 1 \
+  --prev <uuid_do_hronir_predecessor_canonico_da_posicao_0>
 
-# View the current narrative tree (prints a simple list for now)
-uv run python -m hronir_encyclopedia.cli tree
-
-# Check Elo rankings for a specific position
-uv run python -m hronir_encyclopedia.cli ranking --position 2
+# Check Elo rankings for a specific position (ranking de forks)
+uv run python -m hronir_encyclopedia.cli ranking --position 1
+# (O comando ranking pode precisar ser adaptado para mostrar rankings de forks se ainda mostra hrönirs)
 
 # Validate a human-contributed chapter
 uv run python -m hronir_encyclopedia.cli validate --chapter drafts/03_my_variant.md
@@ -213,34 +210,35 @@ uv run python -m hronir_encyclopedia.cli clean --git
 # Export the highest-ranked path as EPUB
 # uv run python -m hronir_encyclopedia.cli export --format epub --path canonical # Temporariamente comentado se o comando export não estiver pronto
 
-# Obtenha o Duelo de Máxima Entropia para uma posição:
+# Obtenha o Duelo de Máxima Entropia entre forks para uma posição:
 uv run python -m hronir_encyclopedia.cli get-duel --position 1
 
 # Exemplo de saída:
 # {
 #   "position": 1,
 #   "strategy": "max_entropy_duel",
-#   "entropy": 0.998, # Valor de entropia do duelo
-#   "duel_pair": { "hronir_A": "uuid_A...", "hronir_B": "uuid_B..." }
+#   "entropy": 0.998,
+#   "duel_pair": { "fork_A": "fork_uuid_A...", "fork_B": "fork_uuid_B..." }
 # }
 
-# Submeta seu voto para o duelo apresentado por get-duel:
+# Submeta seu voto para o duelo de forks apresentado por get-duel:
 uv run python -m hronir_encyclopedia.cli vote \
   --position 1 \
-  --voter <seu_fork_uuid> \
-  --winner <uuid_A_do_get_duel> --loser <uuid_B_do_get_duel>
+  --voter-fork-uuid <seu_fork_uuid_de_prova_de_trabalho> \
+  --winner-fork-uuid <fork_uuid_A_do_get_duel> \
+  --loser-fork-uuid <fork_uuid_B_do_get_duel>
 # (Substitua os placeholders <> pelos valores reais)
 ```
 
-## 🔏 Proof-of-Work e Votação Entrópica
+## 🔏 Proof-of-Work e Votação Entrópica de Bifurcações
 
-O direito de votar é conquistado contribuindo para a expansão da narrativa (Proof-of-Work). Ao usar `store` para novos `hrönirs` e conectá-los em `forking_path/`, o `fork_uuid` gerado atua como sua identidade de votante.
+O direito de votar é conquistado contribuindo para a expansão da narrativa (Proof-of-Work). Ao usar `store` para novos `hrönirs` e conectá-los em `forking_path/*.csv`, o `fork_uuid` gerado para essa conexão atua como sua identidade de votante (seu PoW).
 
-Com seu `fork_uuid`, você participa do processo de votação guiado por entropia:
-1. Use `hronir_encyclopedia.cli get-duel --position <num>` para descobrir o "Duelo de Máxima Entropia" que o sistema identificou como o mais crítico para resolver a incerteza no ranking daquela posição.
-2. Use `hronir_encyclopedia.cli vote --position <num> --voter <seu_fork_uuid> --winner <uuid_A> --loser <uuid_B>` para registrar seu voto **apenas para o par exato apresentado por `get-duel`**.
+Com seu `fork_uuid` de PoW, você participa do processo de votação guiado por entropia:
+1. Use `hronir_encyclopedia.cli get-duel --position <num>` para descobrir o "Duelo de Máxima Entropia" entre dois `forks` que o sistema identificou como o mais crítico para resolver a incerteza no ranking daquela posição e linhagem.
+2. Use `hronir_encyclopedia.cli vote --position <num> --voter-fork-uuid <seu_fork_uuid_pow> --winner-fork-uuid <fork_A_uuid> --loser-fork-uuid <fork_B_uuid>` para registrar seu voto **apenas para o par de `forks` exato apresentado por `get-duel`**.
 
-Este processo de dois passos garante que seu esforço intelectual seja direcionado ao ponto de maior necessidade informacional na estrutura evolutiva da enciclopédia. Consulte [docs/proof_of_work_voting.md](docs/proof_of_work_voting.md) para uma explicação mais profunda.
+Este processo de dois passos garante que seu esforço intelectual seja direcionado à escolha da transição narrativa (fork) de maior necessidade informacional na estrutura evolutiva da enciclopédia. Consulte [docs/proof_of_work_voting.md](docs/proof_of_work_voting.md) para uma explicação mais profunda.
 
 ## Development Setup
 

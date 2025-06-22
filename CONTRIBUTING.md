@@ -45,15 +45,15 @@ To participate in voting (after obtaining a `fork_uuid` as described in `docs/pr
     ```bash
     uv run python -m hronir_encyclopedia.cli get-duel --position 1
     ```
-    This will output JSON indicating the `hronir_A` and `hronir_B` for the duel, which the system has identified as the most informative one to vote on.
+    This will output JSON indicating the `fork_A` (e.g., `"fork_uuid_A..."`) and `fork_B` (e.g., `"fork_uuid_B..."`) for the duel of forks.
 
-2.  Cast your vote for the presented duel:
+2.  Cast your vote for the presented duel of forks:
     ```bash
     uv run python -m hronir_encyclopedia.cli vote \
       --position 1 \
-      --voter <your_fork_uuid> \
-      --winner <uuid_A_from_get_duel> \
-      --loser <uuid_B_from_get_duel>
+      --voter-fork-uuid <your_pow_fork_uuid> \
+      --winner-fork-uuid <fork_A_uuid_from_get_duel> \
+      --loser-fork-uuid <fork_B_uuid_from_get_duel>
     ```
 
 Generate two new hrönir variants from a predecessor and record an initial assessment (this is mainly for automated agents but can be used manually; it does not bypass the `get-duel` requirement for general voting):
