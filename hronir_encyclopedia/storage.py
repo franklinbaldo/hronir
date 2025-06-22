@@ -212,6 +212,59 @@ def purge_fake_hronirs(base: Path | str = "the_library") -> int:
     return removed
 
 
+from typing import Optional, Dict # Add Optional and Dict for type hinting
+
+def get_canonical_fork_info(position: int, canonical_path_file: Path = Path("data/canonical_path.json")) -> Optional[Dict[str, str]]:
+    """
+    Consulta o arquivo de caminho canônico (ex: data/canonical_path.json) para
+    revelar o fork_uuid e o hrönir_uuid (sucessor) canônicos para a posição especificada.
+
+    Retorna um dicionário {'fork_uuid': str, 'hrönir_uuid': str} se encontrado e válido,
+    caso contrário None.
+
+    Espera que o canonical_path_file armazene uma estrutura como:
+    {
+      "title": "The Hrönir Encyclopedia - Canonical Path",
+      "path": {
+        "0": { "fork_uuid": "...", "hrönir_uuid": "..." },
+        "1": { "fork_uuid": "...", "hrönir_uuid": "..." }
+      }
+    }
+    """
+    if not canonical_path_file.exists():
+        return None
+
+    try:
+        with open(canonical_path_file, "r") as f:
+            canonical_data = json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return None
+
+    path_entries = canonical_data.get("path")
+    if not isinstance(path_entries, dict):
+        return None
+
+    position_str = str(position)
+    canonical_entry = path_entries.get(position_str)
+
+    if not isinstance(canonical_entry, dict):
+        return None
+
+    fork_uuid = canonical_entry.get("fork_uuid")
+    hrönir_uuid = canonical_entry.get("hrönir_uuid")
+
+    if not fork_uuid or not hrönir_uuid:
+        return None
+
+    if not isinstance(fork_uuid, str) or not is_valid_uuid_v5(fork_uuid):
+        return None
+
+    if not isinstance(hrönir_uuid, str) or not is_valid_uuid_v5(hrönir_uuid):
+        return None
+
+    return {"fork_uuid": fork_uuid, "hrönir_uuid": hrönir_uuid}
+
+
 def append_fork(
     csv_file: Path,
     position: int,

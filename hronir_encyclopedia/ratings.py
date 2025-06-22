@@ -68,160 +68,213 @@ def record_vote(
     df.to_csv(csv_path, index=False)
 
 
-def get_ranking(position: int, base: Path | str = "ratings") -> pd.DataFrame:
-    csv_path = Path(base) / f"position_{position:03d}.csv"
-    if not csv_path.exists():
-        return pd.DataFrame(columns=["uuid", "elo", "wins", "losses"])  # Elo a ser implementado
-
-    df = pd.read_csv(csv_path)
-    # Ensure DataFrame is not empty to prevent errors with value_counts
-    if df.empty:
-        return pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])
-
-    wins = df["winner"].value_counts().reset_index()
-    wins.columns = ["uuid", "wins"]
-
-    losses = df["loser"].value_counts().reset_index()
-    losses.columns = ["uuid", "losses"]
-
-    ranking_df = pd.merge(wins, losses, on="uuid", how="outer").fillna(0)
-    ranking_df["wins"] = ranking_df["wins"].astype(int)
-    ranking_df["losses"] = ranking_df["losses"].astype(int)
-    ranking_df["total_duels"] = ranking_df["wins"] + ranking_df["losses"]
-
-    # Implementação do cálculo de Elo mínimo
-    ELO_BASE = 1000
-    POINTS_PER_WIN = 15
-    POINTS_PER_LOSS = 10  # Poderia ser igual a POINTS_PER_WIN se quisermos um impacto simétrico
-
-    # Implementação do cálculo de Elo tradicional
-    ELO_BASE = 1500  # Rating inicial comum para novos jogadores
-    K_FACTOR = 32    # Fator K comum, determina a sensibilidade do rating
-
-    # Inicializar Elo para todos os UUIDs únicos presentes nos duelos
-    all_uuids = pd.unique(df[["winner", "loser"]].values.ravel("K"))
-    elo_ratings = {uuid: ELO_BASE for uuid in all_uuids}
-
-    wins_map = {uuid: 0 for uuid in all_uuids}
-    losses_map = {uuid: 0 for uuid in all_uuids}
-
-    # Iterar sobre cada duelo para atualizar os ratings Elo
-    for _, row in df.iterrows():
-        winner_uuid = row["winner"]
-        loser_uuid = row["loser"]
-
-        # Adicionar aos contadores de vitórias/derrotas
-        wins_map[winner_uuid] = wins_map.get(winner_uuid, 0) + 1
-        losses_map[loser_uuid] = losses_map.get(loser_uuid, 0) + 1
-
-        # Ratings atuais
-        r_winner = elo_ratings[winner_uuid]
-        r_loser = elo_ratings[loser_uuid]
-
-        # Calcular probabilidades esperadas
-        # E_winner = 1 / (1 + 10^((r_loser - r_winner) / 400))
-        # E_loser  = 1 / (1 + 10^((r_winner - r_loser) / 400))
-
-        # q_winner = 10^(r_winner / 400) # Esta não é a fórmula correta para E_winner
-        # q_loser = 10^(r_loser / 400)   # Esta não é a fórmula correta para E_loser
-        # expected_winner = q_winner / (q_winner + q_loser)
-        # expected_loser = q_loser / (q_winner + q_loser)
-
-        # Usando a fórmula correta para a expectativa (E_A = 1 / (1 + 10^((R_B - R_A) / 400)))
-        expected_winner = 1 / (1 + 10**((r_loser - r_winner) / 400))
-        expected_loser = 1 / (1 + 10**((r_winner - r_loser) / 400))
-
-
-        # Atualizar ratings
-        # R'_winner = R_winner + K * (S_winner - E_winner)
-        # S_winner = 1 para vitória, 0 para derrota
-        new_r_winner = r_winner + K_FACTOR * (1 - expected_winner)
-        new_r_loser = r_loser + K_FACTOR * (0 - expected_loser) # S_loser = 0
-
-        elo_ratings[winner_uuid] = new_r_winner
-        elo_ratings[loser_uuid] = new_r_loser
-
-    # Criar DataFrame a partir dos ratings Elo calculados e contagens de vitórias/derrotas
-    ranking_data = []
-    for uuid_val in all_uuids:
-        ranking_data.append({
-            "uuid": uuid_val,
-            "elo": int(round(elo_ratings[uuid_val])), # Elo geralmente é inteiro
-            "wins": wins_map.get(uuid_val, 0),
-            "losses": losses_map.get(uuid_val, 0)
-        })
-
-    ranking_df = pd.DataFrame(ranking_data)
-
-    if ranking_df.empty: # Caso não haja duelos, retorna df vazio com colunas corretas
-        return pd.DataFrame(columns=["uuid", "elo", "wins", "losses", "total_duels"])
-
-    ranking_df["total_duels"] = ranking_df["wins"] + ranking_df["losses"]
-
-    # Ordenar pelo Elo calculado, depois por vitórias para desempate
-    ranking_df = ranking_df.sort_values(by=["elo", "wins", "total_duels"], ascending=[False, False, False])
-
-    return ranking_df[["uuid", "elo", "wins", "losses", "total_duels"]]
-
-
-def determine_next_duel(position: int, base: Path | str = "ratings") -> dict | None:
+def get_ranking(
+    position: int,
+    predecessor_hronir_uuid: str | None, # UUID do hrönir sucessor do fork canônico anterior
+    forking_path_dir: Path,
+    ratings_dir: Path
+) -> pd.DataFrame:
     """
-    Determina o próximo duelo para uma posição selecionando o par de hrönirs
-    com a maior entropia, ou seja, o resultado mais incerto.
+    Calcula o ranking Elo para fork_uuid's de uma dada 'position', considerando
+    apenas os forks que descendem diretamente do 'predecessor_hronir_uuid'.
+    Para a Posição 0, 'predecessor_hronir_uuid' é None.
+
+    Retorna um DataFrame com colunas: fork_uuid, hrönir_uuid (sucessor), elo_rating,
+                                     games_played, wins, losses.
     """
-    ranking_df = get_ranking(position, base=base)
-    if len(ranking_df) < 2:
+    output_columns = ["fork_uuid", "hrönir_uuid", "elo_rating", "games_played", "wins", "losses"]
+    empty_df = pd.DataFrame(columns=output_columns)
+
+    # 1. Identificar Herdeiros (Fork UUIDs Elegíveis e seus sucessores hrönir_uuid)
+    # eligible_fork_infos será uma lista de dicts: [{'fork_uuid': str, 'hrönir_uuid': str}]
+    eligible_fork_infos_list = []
+    if not forking_path_dir.exists() or not forking_path_dir.is_dir():
+        return empty_df
+
+    all_forking_files = list(forking_path_dir.glob("*.csv"))
+    if not all_forking_files:
+        return empty_df
+
+    for csv_file in all_forking_files:
+        if csv_file.stat().st_size == 0:
+            continue
+        try:
+            df_forks = pd.read_csv(csv_file, dtype={'position': 'Int64', 'prev_uuid': str, 'uuid': str, 'fork_uuid': str})
+            if df_forks.empty or not all(col in df_forks.columns for col in ["position", "prev_uuid", "uuid", "fork_uuid"]):
+                continue
+
+            # Garantir que a coluna position seja int para comparação
+            df_forks = df_forks[pd.to_numeric(df_forks["position"], errors='coerce') == position]
+            if df_forks.empty:
+                continue
+
+            if predecessor_hronir_uuid is None: # Caso Posição 0
+                if position == 0:
+                    # `prev_uuid` deve ser nulo/vazio/NaN
+                    selected_forks = df_forks[df_forks["prev_uuid"].fillna('').isin(['', 'nan', 'None'])]
+                else:
+                    # predecessor_hronir_uuid é None para posição != 0 é um estado inesperado.
+                    continue # ou return empty_df se for uma condição de erro global
+            else: # predecessor_hronir_uuid is not None
+                selected_forks = df_forks[df_forks["prev_uuid"] == predecessor_hronir_uuid]
+
+            for _, row in selected_forks.iterrows():
+                eligible_fork_infos_list.append({"fork_uuid": row["fork_uuid"], "hrönir_uuid": row["uuid"]})
+
+        except pd.errors.EmptyDataError:
+            continue
+        except Exception: # Trata outros erros de parsing ou de arquivo
+            # Adicionar logging aqui seria útil
+            continue
+
+    if not eligible_fork_infos_list:
+        return empty_df
+
+    # Criar um mapeamento de hrönir_uuid (sucessor) para fork_uuid para os forks elegíveis
+    # Nota: Um hrönir_uuid pode ser sucessor de múltiplos forks se vier de diferentes CSVs,
+    # mas dentro da mesma linhagem (mesmo predecessor_hronir_uuid e posição),
+    # o par (prev_uuid, uuid) deve ser único por fork_uuid.
+    # Se um hrönir_uuid é sucessor de múltiplos forks ELEGÍVEIS, isso é um problema de dados.
+    # Por simplicidade, assumimos que cada hrönir_uuid sucessor em eligible_fork_infos_list
+    # está associado a um único fork_uuid elegível nesta chamada.
+    # Se um hrönir_uuid pudesse ser o sucessor de MÚLTIPLOS forks elegíveis (mesma posição, mesmo predecessor),
+    # precisaríamos de uma regra para desambiguar a qual fork um voto para esse hrönir se aplica.
+    # O design atual de fork_uuid (position, prev_uuid, cur_uuid) garante que se cur_uuid é o mesmo,
+    # e prev_uuid é o mesmo (nosso predecessor_hronir_uuid), então o fork_uuid será o mesmo.
+    # Então, o mapeamento de hrönir_uuid para fork_uuid dentro dos elegíveis deve ser 1:1.
+
+    # eligible_fork_df para fácil lookup e inicialização de ranking
+    eligible_fork_df = pd.DataFrame(eligible_fork_infos_list).drop_duplicates(subset=['fork_uuid'])
+    if eligible_fork_df.empty: # Após drop_duplicates, se algo estranho acontecer
+        return empty_df
+
+    # Mapeamento de hrönir_uuid (sucessor) para seu fork_uuid elegível
+    hronir_to_eligible_fork_map = pd.Series(eligible_fork_df.fork_uuid.values, index=eligible_fork_df.hrönir_uuid).to_dict()
+
+    # 2. Preparar DataFrame de Ranking com Elo Base para todos os forks elegíveis
+    ELO_BASE = 1500
+    ranking_list = [
+        {
+            "fork_uuid": fork_info["fork_uuid"],
+            "hrönir_uuid": fork_info["hrönir_uuid"], # Este é o hrönir SUCESSOR do fork
+            "elo_rating": ELO_BASE, "games_played": 0, "wins": 0, "losses": 0
+        }
+        for fork_info in eligible_fork_df.to_dict('records')
+    ]
+    # Usar fork_uuid como índice para fácil atualização
+    current_ranking_df = pd.DataFrame(ranking_list).set_index("fork_uuid")
+
+    # 3. Ler e Processar os Votos
+    ratings_csv_path = ratings_dir / f"position_{position:03d}.csv"
+
+    if ratings_csv_path.exists() and ratings_csv_path.stat().st_size > 0:
+        try:
+            df_votes = pd.read_csv(ratings_csv_path, dtype=str) # Ler tudo como string inicialmente
+            if not df_votes.empty and 'winner' in df_votes.columns and 'loser' in df_votes.columns:
+
+                # Mapear winner/loser hrönir_uuids para fork_uuids elegíveis
+                df_votes["winner_fork_uuid"] = df_votes["winner"].map(hronir_to_eligible_fork_map)
+                df_votes["loser_fork_uuid"] = df_votes["loser"].map(hronir_to_eligible_fork_map)
+
+                # Filtrar votos onde ambos os hrönirs mapeiam para forks elegíveis
+                valid_duel_votes = df_votes.dropna(subset=["winner_fork_uuid", "loser_fork_uuid"])
+
+                # Garantir que o winner_fork e loser_fork não sejam o mesmo
+                valid_duel_votes = valid_duel_votes[valid_duel_votes["winner_fork_uuid"] != valid_duel_votes["loser_fork_uuid"]]
+
+                if not valid_duel_votes.empty:
+                    K_FACTOR = 32
+                    for _, vote_row in valid_duel_votes.iterrows():
+                        winner_fork = vote_row["winner_fork_uuid"]
+                        loser_fork = vote_row["loser_fork_uuid"]
+
+                        # Atualizar contagens no current_ranking_df (indexado por fork_uuid)
+                        current_ranking_df.loc[winner_fork, "wins"] += 1
+                        current_ranking_df.loc[loser_fork, "losses"] += 1
+                        current_ranking_df.loc[winner_fork, "games_played"] += 1
+                        current_ranking_df.loc[loser_fork, "games_played"] += 1
+
+                        r_winner_fork = current_ranking_df.loc[winner_fork, "elo_rating"]
+                        r_loser_fork = current_ranking_df.loc[loser_fork, "elo_rating"]
+
+                        expected_winner = _calculate_elo_probability(r_winner_fork, r_loser_fork)
+
+                        new_r_winner_fork = r_winner_fork + K_FACTOR * (1 - expected_winner)
+                        new_r_loser_fork = r_loser_fork + K_FACTOR * (0 - (1 - expected_winner))
+
+                        current_ranking_df.loc[winner_fork, "elo_rating"] = new_r_winner_fork
+                        current_ranking_df.loc[loser_fork, "elo_rating"] = new_r_loser_fork
+
+                    current_ranking_df["elo_rating"] = current_ranking_df["elo_rating"].round().astype(int)
+
+        except pd.errors.EmptyDataError:
+            pass
+        except Exception:
+            # Adicionar logging
+            pass
+
+    # Resetar índice para ter fork_uuid como coluna e ordenar
+    final_df = current_ranking_df.reset_index()
+    final_df = final_df.sort_values(
+        by=["elo_rating", "wins", "games_played"],
+        ascending=[False, False, True]
+    )
+
+    return final_df[output_columns]
+
+
+def determine_next_duel(
+    position: int,
+    predecessor_hronir_uuid: str | None,
+    forking_path_dir: Path,
+    ratings_dir: Path
+) -> dict | None:
+    """
+    Determina o próximo duelo para uma posição, considerando apenas os forks elegíveis
+    que descendem do predecessor_hronir_uuid. Seleciona o par de FORK_UUIDs
+    com a maior entropia.
+    """
+    # get_ranking agora retorna um DataFrame de fork_uuid's
+    # Colunas: fork_uuid, hrönir_uuid (sucessor), elo_rating, games_played, wins, losses
+    ranking_df = get_ranking(position, canonical_predecessor_uuid, forking_path_dir, ratings_dir)
+
+    if ranking_df.empty or len(ranking_df) < 2:
         return None
 
-    # Utiliza a heurística otimizada: a maior entropia geralmente ocorre
-    # entre vizinhos no ranking ordenado por Elo.
-    # get_ranking já retorna ordenado, mas re-ordenar aqui garante.
-    ranking_df = ranking_df.sort_values(by="elo", ascending=False).reset_index(drop=True)
+    # Ordenar por elo_rating (get_ranking já deve retornar ordenado, mas para garantir)
+    # A ordenação de get_ranking é: by=["elo_rating", "wins", "games_played"], ascending=[False, False, True]
+    # Para a heurística de vizinhos, a ordenação primária por elo_rating é o que importa.
+    # Se já estiver ordenado, esta linha não muda nada. Se não, garante a ordem correta.
+    ranking_df = ranking_df.sort_values(by="elo_rating", ascending=False).reset_index(drop=True)
 
-    # Calcula a entropia para cada par de vizinhos
-    # Inicializa a coluna com um valor que indica que a entropia não foi calculada (e.g. < 0)
-    ranking_df["entropy_with_next"] = -1.0
+    # Calcula a entropia para cada par de vizinhos no ranking de forks
+    max_entropy = -1.0
+    duel_fork_A_uuid = None
+    duel_fork_B_uuid = None
 
-    entropies_calculated = []
     for i in range(len(ranking_df) - 1):
-        elo_a = ranking_df.loc[i, "elo"]
-        elo_b = ranking_df.loc[i + 1, "elo"]
-        entropy = _calculate_duel_entropy(elo_a, elo_b)
-        ranking_df.loc[i, "entropy_with_next"] = entropy
-        entropies_calculated.append(entropy) # Guardar para verificar se alguma entropia foi calculada
+        elo_a = ranking_df.loc[i, "elo_rating"]
+        elo_b = ranking_df.loc[i + 1, "elo_rating"]
 
-    if not entropies_calculated: # Se nenhum par de vizinhos existia (len(ranking_df) < 2, já tratado) ou algo deu errado
+        current_entropy = _calculate_duel_entropy(elo_a, elo_b)
+
+        if current_entropy > max_entropy:
+            max_entropy = current_entropy
+            duel_fork_A_uuid = ranking_df.loc[i, "fork_uuid"]
+            duel_fork_B_uuid = ranking_df.loc[i + 1, "fork_uuid"]
+
+    if duel_fork_A_uuid is None or duel_fork_B_uuid is None : # Não encontrou nenhum par (deveria ser coberto por len < 2)
         return None
 
-    # Encontra o índice da maior entropia. idxmax() ignora NaNs e valores não numéricos se existirem,
-    # mas nossa coluna deve ser float. Se todas as entropias forem -1.0 (caso de 2 hrönirs onde o apply não é ideal),
-    # idxmax() pegaria o primeiro.
-    # Se houver apenas um par (2 hrönirs), a entropia será calculada para ranking_df.loc[0, "entropy_with_next"]
-    # e idxmax() o encontrará.
-
-    # Se todas as entropias calculadas forem 0 (e.g. Elos muito distantes), idxmax() ainda pega o primeiro.
-    # Isso é aceitável; um duelo de baixa entropia é melhor que nenhum, se for o máximo disponível.
-    max_entropy_idx = ranking_df["entropy_with_next"].idxmax()
-
-    # Verifica se max_entropy_idx é válido e se o valor de entropia é de fato > -1.0 (ou seja, foi calculado)
-    # Isso é uma segurança extra, pois se len(ranking_df) == 2, o loop roda uma vez para i=0.
-    # ranking_df.loc[0, "entropy_with_next"] será atualizado.
-    # ranking_df.loc[1, "entropy_with_next"] permanecerá -1.0. idxmax() pegaria o índice 0.
-    if ranking_df.loc[max_entropy_idx, "entropy_with_next"] < 0:
-         # Isso não deveria acontecer se len(ranking_df) >= 2, pois pelo menos uma entropia seria calculada.
-         # A menos que todas as entropias sejam 0 e, de alguma forma, o valor inicial -1.0 fosse o máximo.
-         # Mas _calculate_duel_entropy retorna >= 0.
-        return None # Segurança: nenhuma entropia válida foi encontrada.
-
-    hronir_A_uuid = ranking_df.iloc[max_entropy_idx]["uuid"]
-    # O par de max_entropy_idx é com max_entropy_idx + 1
-    hronir_B_uuid = ranking_df.iloc[max_entropy_idx + 1]["uuid"]
-    max_entropy_value = ranking_df.loc[max_entropy_idx, "entropy_with_next"]
-
+    # O critério de aceitação é: Retorna `{ "fork_A": "...", "fork_B": "..." }`
+    # O plano menciona: `{"duel_pair": {"fork_A": "fork_uuid_1", "fork_B": "fork_uuid_2"}, "entropy": E, ...}`
+    # Vou seguir o formato com "duel_pair" para consistência com o plano.
     return {
-        "strategy": "max_entropy_duel", # Estratégia é sempre esta agora
-        "hronir_A": hronir_A_uuid,
-        "hronir_B": hronir_B_uuid,
-        "entropy": max_entropy_value,
-        "position": position, # Adicionando position para consistência com output anterior
+        "position": position,
+        "strategy": "max_entropy_duel", # Estratégia é sempre esta
+        "entropy": max_entropy,
+        "duel_pair": {
+            "fork_A": duel_fork_A_uuid,
+            "fork_B": duel_fork_B_uuid,
+        }
     }
