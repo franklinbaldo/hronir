@@ -87,8 +87,10 @@ def forking_path_exists(
 ) -> bool:
     """Return True if fork_uuid appears in any forking path table or CSV."""
     import pandas as pd
+    # print(f"DEBUG: storage.forking_path_exists searching for fork_uuid: {fork_uuid} in dir: {fork_dir}") # DEBUG REMOVED
 
     if conn is not None:
+        # print(f"DEBUG: storage.forking_path_exists using DB conn") # DEBUG REMOVED
         with conn.connect() as con:
             tables = [
                 row[0]
@@ -106,15 +108,36 @@ def forking_path_exists(
                     return True
             return False
 
-    fork_dir = Path(fork_dir)
-    for csv in fork_dir.glob("*.csv"):
-        try:
-            df = pd.read_csv(csv)
-        except Exception:
-            continue
-        if "fork_uuid" in df.columns and fork_uuid in df["fork_uuid"].astype(str).values:
-            return True
-    return False
+    fork_dir_obj = Path(fork_dir)
+    resolved_fork_dir = fork_dir_obj.resolve() # Resolve the path
+    found_in_csv = False
+    # print(f"DEBUG: storage.forking_path_exists iterating items in {resolved_fork_dir}") # DEBUG REMOVED
+
+    if resolved_fork_dir.is_dir(): # Check if directory exists before iterating
+        for item_path in resolved_fork_dir.iterdir():
+            # print(f"DEBUG: storage.forking_path_exists found item: {item_path}, is_file: {item_path.is_file()}, name: {item_path.name}") # DEBUG REMOVED
+            if item_path.is_file() and item_path.name.endswith(".csv"):
+                csv_file_path = item_path
+                # print(f"DEBUG: storage.forking_path_exists checking CSV: {csv_file_path}") # DEBUG REMOVED
+                try:
+                    # Read only 'fork_uuid' column if possible, for efficiency, though pandas reads all by default.
+                    df = pd.read_csv(csv_file_path, usecols=["fork_uuid"], dtype={"fork_uuid": str}) # type: ignore
+                    if fork_uuid in df["fork_uuid"].values: # More direct check
+                        # print(f"DEBUG: storage.forking_path_exists FOUND fork_uuid {fork_uuid} in {csv_file_path}") # DEBUG REMOVED
+                        found_in_csv = True
+                        break
+                except ValueError: # Happens if 'fork_uuid' column is not in CSV or other read issues
+                    # print(f"DEBUG: storage.forking_path_exists ValueError (likely missing 'fork_uuid' col) in {csv_file_path}: {ve}") # DEBUG REMOVED
+                    pass # Ignore files that don't have fork_uuid or are malformed for this check
+                except Exception:
+                    # print(f"DEBUG: storage.forking_path_exists error reading {csv_file_path}: {e}") # DEBUG REMOVED
+                    continue # Ignore other read errors for this specific check
+            if found_in_csv: # Break outer loop if found
+                break
+
+    # if not found_in_csv: # DEBUG REMOVED
+        # print(f"DEBUG: storage.forking_path_exists DID NOT FIND fork_uuid {fork_uuid} in any CSV in {resolved_fork_dir}") # DEBUG REMOVED
+    return found_in_csv
 
 
 def validate_or_move(chapter_file: Path, base: Path | str = "the_library") -> str:

@@ -32,6 +32,7 @@ def record_vote(
 ) -> None:
     """Append a vote to the ratings table."""
     if conn is not None:
+        # print(f"DEBUG_RATINGS: record_vote for position {position} using DB connection: {conn}") # REMOVED DEBUG
         table = f"position_{position:03d}"
         with conn.begin() as con:
             con.exec_driver_sql(
@@ -49,6 +50,8 @@ def record_vote(
                 (str(uuid.uuid4()), voter, winner, loser),
             )
         return
+    # else: # conn is None
+        # print(f"DEBUG_RATINGS: record_vote for position {position} using CSV logic, base: {base}") # REMOVED DEBUG
 
     base = Path(base)
     base.mkdir(exist_ok=True)
@@ -236,7 +239,7 @@ def determine_next_duel(
     """
     # get_ranking agora retorna um DataFrame de fork_uuid's
     # Colunas: fork_uuid, hrönir_uuid (sucessor), elo_rating, games_played, wins, losses
-    ranking_df = get_ranking(position, canonical_predecessor_uuid, forking_path_dir, ratings_dir)
+    ranking_df = get_ranking(position, predecessor_hronir_uuid, forking_path_dir, ratings_dir)
 
     if ranking_df.empty or len(ranking_df) < 2:
         return None

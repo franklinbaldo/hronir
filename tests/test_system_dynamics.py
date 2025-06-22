@@ -239,7 +239,11 @@ def test_system_dynamics_cascade(setup_test_environment):
         ],
         catch_exceptions=False
     )
-    assert result_vote.exit_code == 0
+    # This block is at the function's top level of indentation
+    if result_vote.exit_code != 0:
+        print(f"Vote command failed. Output:\n{result_vote.stdout}")
+    assert result_vote.exit_code == 0 # This should also be at the function's top level
+
     vote_output = json.loads(result_vote.stdout)
     assert vote_output["message"] == "Vote for forks successfully validated and recorded (as hrönir duel). System uncertainty reduced."
     assert vote_output["winner_fork_uuid"] == vote_winner_fork
