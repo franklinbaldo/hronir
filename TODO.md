@@ -1,129 +1,142 @@
 # TODO.md · Development Roadmap — **Hrönir Encyclopedia**
 
-This document outlines the tasks required to implement the **Hrönir Encyclopedia** project as described in the README. The project is currently at an early stage, with only the README finalized.
+This document outlines the development roadmap for the **Hrönir Encyclopedia** project. The core **Protocol v2** architecture has been implemented, featuring sophisticated judgment sessions, temporal cascades, and fork lifecycle management.
 
-## ✅ Phase 0 — Repository Setup
+## ✅ Completed Core Implementation
 
-- [x] Initialize git repository structure:
-  - [x] `hronir_encyclopedia/` (Python package)
-  - [x] `book/` (canonical encyclopedia)
-  - [x] `ratings/` (Elo rankings)
-  - [x] `.github/workflows/` (for CI/CD)
-- [x] Create essential files:
-  - [x] `.gitignore`
-  - [x] `LICENSE` (MIT)
-  - [x] `requirements.txt`
-  - [x] `book_index.json` (initial narrative tree)
+### Phase 0 — Foundation ✅
+- [x] Repository structure with `hronir_encyclopedia/` Python package
+- [x] Data architecture: `the_library/`, `data/`, `forking_path/`, `ratings/`
+- [x] Essential files: `.gitignore`, `LICENSE`, `pyproject.toml`, `uv.lock`
+- [x] Development environment with `uv` package manager
 
----
+### Phase 1 — Protocol v2 Core ✅
+- [x] **Storage System**: UUID-based deterministic chapter storage
+- [x] **Fork Management**: Position-based forking with UUID generation
+- [x] **Elo Ranking System**: Sophisticated rating calculations with duel mechanics
+- [x] **Session Management**: Judgment sessions with static dossiers
+- [x] **Transaction Ledger**: Immutable blockchain-like transaction recording
+- [x] **Temporal Cascade**: Canonical path recalculation system
 
-## 🚧 Phase 1 — Seed Chapter & Basic CLI
+### Phase 2 — CLI Interface ✅
+- [x] **Core Commands**: `store`, `ranking`, `get-duel`, `audit`, `clean`
+- [x] **Session Commands**: `session start`, `session commit`
+- [x] **Advanced Features**: `recover-canon`, `synthesize`, `metrics`
+- [x] **Validation**: Comprehensive chapter and fork validation
+- [x] **Status Management**: Fork lifecycle (PENDING → QUALIFIED → SPENT)
 
-- [x] Write Chapter 0 seed (`00_tlon_uqbar.md`)
-- [x] Implement minimal CLI (`cli.py`):
-  - [ ] Generate initial branches (`continue` command)
-  - [ ] Update `book_index.json`
+### Phase 3 — AI Integration ✅
+- [x] **Gemini Integration**: Automated chapter generation
+- [x] **Semantic Extraction**: Narrative space analysis
+- [x] **Prompt Building**: Synthesis from accumulated narrative
+- [x] **Auto-voting**: AI agent participation in duels
 
----
-
-## 🚧 Phase 2 — Narrative Space Synthesis
-
-- [ ] Implement semantic extraction module:
-  - [ ] Generate embeddings from existing chapters (0 to n-1)
-- [ ] Develop synthesis prompt builder:
-  - [ ] Combine narrative space into unified prompt for LLM
-- [ ] Generate chapters using LLM (Gemini/OpenAI):
-  - [ ] Test initial generations for coherence and consistency
-
----
-
-## 🚧 Phase 3 — Chapter Management
-
-- [ ] Define clear file structure and naming conventions:
-  - canonical chapters: `book/<position>.md`
-  - new variants stored under `the_library/<uuid>/index.md`
-- [x] Implement UUID-based chapter storage under `the_library/`
-- [ ] Update `book_index.json` dynamically with new chapters
-- [ ] Automate commit/version control of chapters
+### Phase 4 — Quality Assurance ✅
+- [x] **Test Suite**: Comprehensive protocol testing
+- [x] **Validation Logic**: Fake content detection and removal
+- [x] **Pre-commit Hooks**: Automated validation and cleanup
+- [x] **Linting**: Ruff and Black code formatting
 
 ---
 
-## 🚧 Phase 4 — Reader Voting & Elo System
+## 🚧 Active Development Areas
 
-- [ ] Implement voting API:
-  - [ ] Endpoint `/vote` (JSON payload)
-- [ ] Set up Elo ranking logic:
-  - [ ] Calculate Elo ratings per chapter position
-  - [x] Persist rankings in `ratings/position_<n>.csv`
-- [ ] Create reader voting interface (CLI/web)
+### Phase 5 — Automation & Workflows 🔄
+- [x] **Daily Generation**: GitHub Actions for automated content creation
+- [ ] **Enhanced Scheduling**: Multiple generation strategies (morning/evening)
+- [ ] **Agent Diversification**: Multiple AI personalities for generation
+- [ ] **Performance Monitoring**: Generation success metrics
 
----
-
-## 🚧 Phase 5 — CLI & API Completeness
-
-- [ ] Expand CLI functionality:
-  - [ ] `generate`
-  - [x] `vote`
-  - [ ] `ranking`
-  - [x] `tree`
-- [ ] Implement comprehensive logging and error handling
-- [ ] Document CLI usage extensively
+### Phase 6 — Protocol Enhancements 🔄
+- [ ] **Advanced Qualification**: Multi-criteria fork promotion logic
+- [ ] **Session Analytics**: Judgment session performance tracking
+- [ ] **Cascade Optimization**: Performance improvements for large narratives
+- [ ] **Mandate Economics**: Token-like mechanics for judgment rights
 
 ---
 
-## 🚧 Phase 6 — Web Interface & Visualization
+## 🎯 Planned Features
 
-- [ ] Build web interface (e.g., Streamlit/FastAPI):
-  - [ ] Visualize narrative tree
-  - [ ] Allow interactive reading & voting
-  - [ ] Display Elo rankings per chapter
+### Phase 7 — User Interfaces
+- [ ] **Web Dashboard**: Real-time protocol state visualization
+- [ ] **Interactive Reader**: Navigate canonical and alternative paths
+- [ ] **Session Interface**: Web-based judgment session participation
+- [ ] **Analytics Dashboard**: Fork performance and canonical path evolution
 
----
+### Phase 8 — Export & Distribution
+- [ ] **EPUB Generation**: Interactive books with path selection
+- [ ] **HTML Export**: Static site generation for canonical narrative
+- [ ] **API Endpoints**: REST API for external integrations
+- [ ] **Mobile Reading**: Responsive interfaces for mobile devices
 
-## 🚧 Phase 7 — Export & Distribution
+### Phase 9 — Advanced Agent Systems
+- [ ] **Multi-Agent Protocols**: Coordinated AI agent interactions
+- [ ] **Specialization**: Genre-specific or style-specific AI agents
+- [ ] **Learning Systems**: Agents that adapt based on success rates
+- [ ] **Human-AI Collaboration**: Hybrid judgment sessions
 
-- [ ] Develop EPUB/HTML export functionality:
-  - [ ] Interactive EPUB generation with selected path
-- [ ] Provide export/download via web interface
-
----
-
-## 🚧 Phase 8 — Quality Assurance
-
-- [ ] Write comprehensive unit and integration tests
-- [ ] Set up GitHub Actions workflows for continuous testing
-- [ ] Maintain test coverage ≥ 80%
-
----
-
-## 📌 Long-term Ideas & Enhancements
-
-- [ ] Advanced narrative analytics (heatmaps of reader preferences)
-- [ ] Integration with large-scale collaborative platforms
-- [ ] Narrative pathway recommendations (AI-driven)
+### Phase 10 — Scalability & Performance
+- [ ] **Database Migration**: Optional PostgreSQL backend for large datasets
+- [ ] **Distributed Processing**: Horizontal scaling for large narratives
+- [ ] **Caching Systems**: Performance optimization for frequent operations
+- [ ] **Archive Management**: Long-term storage strategies
 
 ---
 
-## 🗓️ Current Status
+## 🔬 Research & Experimental Features
 
-- **README**: ✅ completed
-- **Repository structure**: ✅ completed (Phase 0)
-- **Seed chapter (Tlön)**: ✅ completed (Phase 1)
+### Narrative Science
+- [ ] **Emergence Metrics**: Measure narrative coherence and inevitability
+- [ ] **Reader Psychology**: Analysis of preference patterns
+- [ ] **Collaborative Dynamics**: Study of human-AI creative interaction
+- [ ] **Temporal Analysis**: How canonical paths evolve over time
 
-This document will be updated as development progresses.
+### Protocol Extensions
+- [ ] **Multi-Narrative Support**: Parallel encyclopedia instances
+- [ ] **Cross-Pollination**: Chapter sharing between encyclopedia instances
+- [ ] **Versioning Systems**: Protocol upgrade mechanisms
+- [ ] **Governance Models**: Community-driven protocol evolution
 
 ---
 
-## 🛠️ Post-Refactor Action Items (Post-PR #1)
+## 🐛 Known Issues & Technical Debt
 
-These items were identified during or after the initial engineering backlog implementation:
+### Development Environment
+- [ ] **Pre-commit Resolution**: Fix `core.hooksPath` conflicts for clean setup
+- [ ] **Documentation**: Expand inline documentation and type hints
+- [ ] **Error Handling**: Improve robustness of file operations
+- [ ] **Logging**: Implement structured logging throughout the system
 
-- **Pre-commit Hook Installation:**
-  - The `pre-commit install` command failed during initial environment setup due to a potential conflict with `core.hooksPath`. This needs to be investigated and resolved to ensure hooks are automatically active in local development environments.
-- **Remaining Linting Errors:**
-  - After running `pre-commit run --all-files`, the following Ruff linting errors remained and need manual correction:
-    - `E501 Line too long (> 100 characters)`: Several files may have lines exceeding the configured limit.
-    - `E402 Module level import not at top of file`: Some imports might not be at the very top of their respective files.
-    - `F841 Unused local variable`: There might be variables that are assigned but never used.
-- **`git status` Anomaly during Subtasks:**
-  - During subtask execution (e.g., `pre-commit run --all-files`), file modifications made by tools were reported, but `git status` within the same subtask often showed a clean working tree immediately after. This behavior should be understood, as it might affect how changes are automatically staged or committed in future automated tasks.
+### Protocol Robustness
+- [ ] **Concurrency**: Handle concurrent session commits safely
+- [ ] **Recovery**: Robust recovery from corrupted state
+- [ ] **Validation**: Additional edge case handling in validation logic
+- [ ] **Performance**: Optimize large dataset operations
+
+### Code Quality
+- [ ] **Refactoring**: Simplify complex functions in `cli.py`
+- [ ] **Type Safety**: Complete type annotation coverage
+- [ ] **Test Coverage**: Expand edge case testing
+- [ ] **Dependencies**: Regular security and compatibility updates
+
+---
+
+## 🗓️ Current Status (Protocol v2)
+
+- **Core Architecture**: ✅ Protocol v2 fully implemented
+- **CLI Interface**: ✅ Complete with session management
+- **AI Integration**: ✅ Gemini-based generation active
+- **Quality Assurance**: ✅ Comprehensive testing and validation
+- **Documentation**: ✅ README, CLAUDE.md, and architecture docs complete
+
+**Next Priority**: Web interface development and advanced agent systems.
+
+---
+
+## 📊 Success Metrics
+
+- **Protocol Stability**: Zero data corruption incidents
+- **Generation Quality**: AI-generated content passes validation >95%
+- **Session Efficiency**: Judgment sessions complete without errors
+- **Canonical Coherence**: Temporal cascades maintain narrative consistency
+- **Developer Experience**: New contributors can onboard within 1 hour

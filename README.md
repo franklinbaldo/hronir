@@ -61,11 +61,12 @@ graph TD
    cp .env.example .env  # and add your GEMINI_API_KEY to .env
    ```
 
-Dependencies are managed with `uv` using `pyproject.toml` and `uv.lock`. Core libraries include [**click**](https://palletsprojects.com/p/click/) for the CLI and [**pandas**](https://pandas.pydata.org/) for data manipulation. New packages such as [**Pydantic**](https://docs.pydantic.dev/), [**SQLAlchemy**](https://www.sqlalchemy.org/) and [**NetworkX**](https://networkx.org/) are installed automatically when you run `uv sync`.
+Dependencies are managed with `uv` using `pyproject.toml` and `uv.lock`. Core libraries include [**typer**](https://typer.tiangolo.com/) for the CLI and [**pandas**](https://pandas.pydata.org/) for data manipulation. New packages such as [**Pydantic**](https://docs.pydantic.dev/), [**SQLAlchemy**](https://www.sqlalchemy.org/) and [**NetworkX**](https://networkx.org/) are installed automatically when you run `uv sync`.
 
 The CLI loads rating and forking path CSVs into a lightweight SQLite database via SQLAlchemy. This temporary database provides transactional updates and easier queries while the canonical CSV files remain on disk.
 
 For an overview of how these libraries work together see [docs/new_libs_plan.md](docs/new_libs_plan.md).
+
 ### Key Libraries
 - **Pydantic** – validates and serializes the protocol's data models.
 - **SQLAlchemy** – powers the SQLite database used for transactional updates.
@@ -111,20 +112,20 @@ Agents (human or AI) interact with the protocol primarily through the Command Li
 2.  **Register the `hrönir` and Create a `fork` (`store` command)**:
     Use the `store` command to add your `hrönir` to `the_library/` and, crucially, to register a new `fork` (a new narrative transition) in the system. This command is your "Proof-of-Work" and will provide you with a `fork_uuid`.
     ```bash
-    uv run hronir_encyclopedia.cli store drafts/my_chapter.md --prev <uuid_of_previous_hronir>
+    uv run hronir store drafts/my_chapter.md --prev <uuid_of_previous_hronir>
     ```
     The output will include the new `hrönir`'s UUID and the associated `fork_uuid`, which is essential for the next step.
 
 3.  **Initiate a Judgment Session (`session start` command)**:
     With the `fork_uuid` obtained (representing your new `fork` at Position `N`), you gain the right to start a "Judgment Session." This session will present you with a dossier of maximum entropy duels for all previous positions (`N-1` down to `0`).
     ```bash
-    uv run hronir_encyclopedia.cli session start --position <N> --fork-uuid <your_fork_uuid_from_position_N>
+    uv run hronir session start --fork-uuid <your_fork_uuid_from_position_N>
     ```
 
 4.  **Submit Veredicts (`session commit` command)**:
     After analyzing the dossier, you submit your veredicts for the duels you choose to judge. This is an atomic act that records your votes and can trigger a "Temporal Cascade," potentially altering the canonical path of the story.
     ```bash
-    uv run hronir_encyclopedia.cli session commit --session-id <session_id> --verdicts '{"<pos>": "<winning_fork_uuid>", ...}'
+    uv run hronir session commit --session-id <session_id> --verdicts '{"<pos>": "<winning_fork_uuid>", ...}'
     ```
 
 This cycle of `store` -> `session start` -> `session commit` is the main mechanism by which agents (whether they are humans operating the CLI or automated AI programs) interact with the protocol to shape the narrative. "Collaboration" occurs at the level of competition and judgment governed by the protocol.
@@ -164,7 +165,7 @@ The "Tribunal of the Future" is, therefore, the process by which the system cont
 
 ## 🗂️ Repository Structure
 
-Forking paths are stored in `forking_path/yu-tsun.csv`, named after the protagonist of *The Garden of Forking Paths*.
+Forking paths are stored in `forking_path/*.csv` files, with the directory named after the protagonist of *The Garden of Forking Paths*.
 
 ```
 the_library/                       # Hrönirs (textual content) stored by UUID. Each Hrönir is stored in a directory named after its UUID (e.g., the_library/<UUID>/index.md).
@@ -191,7 +192,7 @@ The core mechanism for evolving the canonical narrative is the "Tribunal of the 
     Use your qualified `fork_uuid` to start a session. The system provides a `session_id` and a "dossier" of duels for prior positions.
     ```bash
     # Your new fork at position 10 has been QUALIFIED.
-    uv run hronir_encyclopedia.cli session start \
+    uv run hronir session start \
       --fork-uuid <your_qualified_fork_uuid>
     ```
 
@@ -202,7 +203,7 @@ The core mechanism for evolving the canonical narrative is the "Tribunal of the 
     Submit your veredicts in a single, atomic commit using the `session_id`.
     ```bash
     # Provide veredicts as a JSON string mapping position -> winning_fork_uuid
-    uv run hronir_encyclopedia.cli session commit \
+    uv run hronir session commit \
       --session-id <your_session_id> \
       --verdicts '{"9": "winning_fork_for_pos9", "2": "winning_fork_for_pos2"}'
     ```
@@ -219,24 +220,27 @@ The core mechanism for evolving the canonical narrative is the "Tribunal of the 
 ### Basic Operations
 ```bash
 # Store a new hrönir chapter
-uv run hronir_encyclopedia.cli store drafts/my_chapter.md --prev <uuid_of_previous_hronir_in_path>
+uv run hronir store drafts/my_chapter.md --prev <uuid_of_previous_hronir_in_path>
 
 # Check Elo rankings for forks at a specific position
-uv run hronir_encyclopedia.cli ranking --position 1
+uv run hronir ranking 1
 
 # Validate a human-contributed chapter (basic check)
-uv run hronir_encyclopedia.cli validate --chapter drafts/my_chapter.md
+uv run hronir validate drafts/my_chapter.md
 
 # Audit and repair stored hrönirs, forking paths, and votes
-uv run hronir_encyclopedia.cli audit
+uv run hronir audit
 
 # Remove invalid hrönirs, forking paths, or votes
-uv run hronir_encyclopedia.cli clean --git
+uv run hronir clean --git
 
 # Get the current "Duel of Maximum Entropy" for a position (used internally by `session start`)
 # This can be useful to understand what duel a new session might present for a given position.
 # Under Protocol v2, this is mainly for inspection; user voting is via `session commit`.
-uv run hronir_encyclopedia.cli get-duel --position 1
+uv run hronir get-duel --position 1
+
+# Generate fork status metrics in Prometheus format
+uv run hronir metrics
 
 # Recover canon / Consolidate book (trigger Temporal Cascade from position 0)
 # Under the "Tribunal of the Future" protocol, the canonical path is primarily updated
@@ -244,7 +248,7 @@ uv run hronir_encyclopedia.cli get-duel --position 1
 # The `recover-canon` (formerly `consolidate-book`) command serves as a manual way
 # to trigger this cascade from the very beginning (position 0), useful for initialization,
 # full recalculations, or recovery.
-uv run hronir_encyclopedia.cli recover-canon
+uv run hronir recover-canon
 ```
 
 ## 🔏 Proof-of-Work (Mandate for Judgment)
@@ -287,11 +291,21 @@ chmod +x scripts/fix_hooks.sh
 
 ## 🚧 Project Roadmap
 
-- [x] Initial structure (seed chapter, basic branching)
-- [ ] Complete implementation of generation from full narrative space
-- [ ] Comprehensive CLI (generation, voting, Elo ranking)
-- [ ] Web interface for comparative reading and voting
-- [ ] Interactive EPUB/HTML export with user-selected narrative paths
+### ✅ Completed (Protocol v2)
+- [x] **Core Protocol**: Fork lifecycle, session management, temporal cascade
+- [x] **Comprehensive CLI**: All core commands with session management
+- [x] **Elo System**: Sophisticated ranking with duel mechanics
+- [x] **AI Integration**: Gemini-based automated generation
+- [x] **Transaction Ledger**: Immutable session commit recording
+- [x] **Validation System**: Content integrity and cleanup tools
+- [x] **Daily Automation**: GitHub Actions for continuous generation
+
+### 🎯 Next Phase
+- [ ] **Web Interface**: Real-time protocol visualization and interaction
+- [ ] **Interactive Reading**: Navigate canonical and alternative narrative paths
+- [ ] **Advanced Analytics**: Fork performance and canonical evolution metrics
+- [ ] **EPUB/HTML Export**: Interactive books with user-selected paths
+- [ ] **Multi-Agent Systems**: Coordinated AI agent interactions
 
 ---
 
@@ -306,6 +320,39 @@ Just as the **Library of Babel** contains every possible book, the `the_library/
 
 The project explores fundamental questions about literary truth: Is authenticity inherent in a text, or does it emerge through recognition? Can computational generation achieve the same inevitability as human inspiration? When human and artificial minds collaborate unknowingly, which produces the more "true" version? In the end, the readers themselves become the final arbiters of what feels most inevitable, regardless of its origin.
 [^menard]: This approach echoes Borges' 'Pierre Menard, Author of the Quixote' (1939), in which identical text gains new meaning through context.
+
+---
+
+## 🤝 Contributing to the Protocol
+
+The Hrönir Encyclopedia is a **protocol for autonomous narrative agents**, not a traditional collaborative writing platform. Contributions happen through direct interaction with the protocol mechanics.
+
+### For Developers
+If you're working on the codebase itself, see **[CLAUDE.md](CLAUDE.md)** for comprehensive development guidance including:
+- Development commands and environment setup
+- Project architecture and key components
+- Testing procedures and code quality standards
+- CLI usage and Protocol v2 features
+
+### For Narrative Contributors
+To influence the canonical narrative:
+
+1. **Create High-Quality Hrönirs**: Write Markdown chapters following Borgesian themes
+2. **Use the Protocol**: Store chapters via `uv run hronir store` to create forks
+3. **Earn Qualification**: Your fork must prove itself through duel performance
+4. **Exercise Judgment**: Use qualified forks to start sessions and shape the canon
+
+```bash
+# Example contribution workflow
+uv run hronir store my_chapter.md --prev <predecessor_uuid>
+# Wait for fork to become QUALIFIED through duels
+uv run hronir session start --fork-uuid <qualified_fork_uuid>
+uv run hronir session commit --session-id <id> --verdicts '{"pos": "winner"}'
+```
+
+**Style Guidelines**: Write in concise, philosophical style with metafictional hints. Aim for 300-500 words per chapter. Reference earlier themes to maintain narrative continuity.
+
+Human interfaces and traditional collaboration tools are considered *downstream* applications built upon this protocol's API.
 
 ---
 
