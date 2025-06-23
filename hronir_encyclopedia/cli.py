@@ -316,8 +316,19 @@ def ranking(
     """
     Displays the Elo rankings for hrönirs at a specific chapter position.
     """
-    # The 'base' argument for get_ranking was Path(base), so passing ratings_dir directly.
-    ranking_data = ratings.get_ranking(position, base=ratings_dir)
+    # Need to determine predecessor from canonical path for position > 0
+    predecessor_hronir_uuid = None
+    if position > 0:
+        canonical_path_file = Path("data/canonical_path.json")
+        if canonical_path_file.exists():
+            import json
+            with open(canonical_path_file) as f:
+                canonical_data = json.load(f)
+                if str(position - 1) in canonical_data.get("path", {}):
+                    predecessor_hronir_uuid = canonical_data["path"][str(position - 1)]["hrönir_uuid"]
+    
+    forking_path_dir = Path("forking_path")
+    ranking_data = ratings.get_ranking(position, predecessor_hronir_uuid, forking_path_dir, ratings_dir)
     if ranking_data.empty:
         typer.echo(f"No ranking data found for position {position}.")
     else:

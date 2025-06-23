@@ -55,3 +55,7 @@ f5afbd73-e4a9-41dc-b949-fb786e8f4807,dummy-voter-fork-uuid-for-promo-test,256883
 ca08a85c-f1f6-43a4-9c61-c0f4fcf30967,dummy_qualifier_agent_ds,1faf7c14-607a-532e-ae2c-f151fb78239c,9387c2db-ed9b-5bce-bd12-2cb04ff54e77
 d8c2b5fd-afba-4f9c-b1f8-7e17de246fc1,dummy_qualifier_agent_ds,1faf7c14-607a-532e-ae2c-f151fb78239c,9387c2db-ed9b-5bce-bd12-2cb04ff54e77
 3ab3fbac-cdd1-4925-a334-77a9c0a9a387,dummy_qualifier_agent_ds,1faf7c14-607a-532e-ae2c-f151fb78239c,9387c2db-ed9b-5bce-bd12-2cb04ff54e77
+test-vote-1,test-voter-metafiction,fb69f2e8-9a33-50e0-a465-a207d02d4dc8,cc59fe7a-ab1c-5fe4-8851-e25d59ac7ab5
+test-vote-2,test-voter-metafiction,fb69f2e8-9a33-50e0-a465-a207d02d4dc8,cc59fe7a-ab1c-5fe4-8851-e25d59ac7ab5
+test-vote-3,test-voter-metafiction,fb69f2e8-9a33-50e0-a465-a207d02d4dc8,cc59fe7a-ab1c-5fe4-8851-e25d59ac7ab5
+test-vote-4,test-voter-metafiction,fb69f2e8-9a33-50e0-a465-a207d02d4dc8,cc59fe7a-ab1c-5fe4-8851-e25d59ac7ab5
