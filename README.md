@@ -49,11 +49,9 @@ Dependencies are managed with `uv` using `pyproject.toml` and `uv.lock`. Core li
 The encyclopedia grows through interconnected processes:
 
 - **Generation**: AI creates new chapter variants (`hrönirs`) from the accumulated narrative space.
-- **Collaboration**: Human contributors submit chapter variants via GitHub pull requests.
-- **Selection (Votação Guiada Puramente por Entropia de Bifurcações)**: O sistema de votação é governado por um único princípio: maximizar a informação sobre qual **transição narrativa (fork)** é a mais inevitável. A cada momento, o sistema identifica o **"Duelo de Máxima Entropia"** — o confronto entre os dois `forks` (para uma dada posição e linhagem canônica) cujo resultado é mais incerto (ou seja, seus Elos são mais próximos) e que, portanto, mais beneficiará o ranking com um novo voto.
-- **Evolution**: Elo rankings de `forks`, atualizados por estes duelos, determinam o emergente **caminho canônico de bifurcações** (`data/canonical_path.json`) através do reconhecimento coletivo. O cânone não é uma coleção de capítulos, mas uma sequência de decisões de bifurcação.
-
-Este sistema puramente entrópico garante que cada voto seja o mais impactante possível, focando a atenção do leitor na escolha da transição narrativa mais ambígua e crucial do sistema.
+- **Collaboration**: Human contributors submit chapter variants.
+- **Selection (Tribunal of the Future)**: The encyclopedia's canon evolves through the **Tribunal of the Future**. Instead of single votes, influence is now wielded through **Judgment Sessions**. When a contributor creates a new, high-quality fork that proves its relevance by performing well in duels, it becomes **`QUALIFIED`**. This grants a one-time right to initiate a session, acting as a judge over all of prior history. This mechanism ensures that only meaningful contributions can shape the past, providing a robust defense against low-effort Sybil attacks.
+- **Evolution**: Veredicts from Judgment Sessions update Elo rankings for forks. The **Temporal Cascade**, triggered by `session commit`, recalculates the canonical path (`data/canonical_path.json`), which is a sequence of fork decisions representing the most "inevitable" narrative.
 
 ## 🤖 Daily Automated Generation
 
@@ -182,69 +180,48 @@ ratings/
 
 ---
 
-## ⚖️ The Tribunal of the Future: Judgment Sessions
+## ⚖️ The Tribunal of the Future: The Main Workflow
 
-The core mechanism for evolving the canonical narrative is the "Tribunal of the Future." Creating a new hrönir and its corresponding fork at position `N` grants you a one-time "mandate" (using its `fork_uuid`) to initiate a **Judgment Session**.
+The core mechanism for evolving the canonical narrative is the "Tribunal of the Future." After your new fork becomes **`QUALIFIED`** through duels, you can initiate a Judgment Session.
 
 1.  **Initiate a Session (`session start`):**
-    Use your new `fork_uuid` (from position `N`) to start a session. The system provides a `session_id` and a "dossier" of duels for all prior positions (`N-1` down to `0`). Each duel in the dossier is the "duel of maximum entropy" for its respective position at that moment.
+    Use your qualified `fork_uuid` to start a session. The system provides a `session_id` and a "dossier" of duels for prior positions.
     ```bash
-    # Example: Your new fork at position 10 is fork_N_uuid
-    uv run python -m hronir_encyclopedia.cli session start \
-      --position 10 \
-      --fork-uuid <fork_N_uuid>
+    # Your new fork at position 10 (fork_N_uuid) has been QUALIFIED.
+    uv run hronir_encyclopedia.cli session start \
+      --fork-uuid <your_qualified_fork_uuid>
     ```
-    This returns a `session_id` and the dossier.
 
 2.  **Deliberate and Form Veredicts (Offline):**
-    Review the static dossier. You have complete freedom to choose which duels to vote on. For each duel you address, select a winner. Abstention is implicit for duels you don't include in your veredict.
+    Review the static dossier. For each duel you wish to judge, select a winner.
 
 3.  **Commit Veredicts (`session commit`):**
-    Submit all your chosen veredicts in a single, atomic commit using the `session_id`.
-    Provide veredicts as a JSON string or a path to a JSON file. The JSON object maps position numbers (as strings) to the `fork_uuid` you chose as the winner for that position's duel.
+    Submit your veredicts in a single, atomic commit using the `session_id`.
     ```bash
-    # Example: Veredicts in a JSON string
-    uv run python -m hronir_encyclopedia.cli session commit \
+    # Provide veredicts as a JSON string mapping position -> winning_fork_uuid
+    uv run hronir_encyclopedia.cli session commit \
       --session-id <your_session_id> \
-      --verdicts '{"9": "winning_fork_for_pos9", "7": "winning_fork_for_pos7", "2": "winning_fork_for_pos2"}'
-
-    # Example: Veredicts from a file (e.g., my_verdicts.json)
-    # Contents of my_verdicts.json:
-    # {
-    #   "9": "winning_fork_for_pos9",
-    #   "7": "winning_fork_for_pos7",
-    #   "2": "winning_fork_for_pos2"
-    # }
-    uv run python -m hronir_encyclopedia.cli session commit \
-      --session-id <your_session_id> \
-      --verdicts my_verdicts.json
+      --verdicts '{"9": "winning_fork_for_pos9", "2": "winning_fork_for_pos2"}'
     ```
 
 **Consequences of Committing:**
-*   **Votes Recorded:** Your veredicts are recorded as votes in the respective `ratings/position_*.csv` files.
-*   **Transaction Logged:** The entire session commit (your identity, veredicts, timestamp, previous transaction) is immutably recorded in the `data/transactions/` ledger.
-*   **Temporal Cascade Triggered:** The "Temporal Cascade" recalculates the canonical path (`data/canonical_path.json`) starting from the oldest position you voted on, propagating changes forward. This is the sole mechanism for updating the canon.
-
-This process ensures that every significant contribution (a new fork) has the potential to reshape the entire history that precedes it, governed by transparent, auditable rules.
+*   Your veredicts are recorded as permanent votes.
+*   The session is immutably logged in the `data/transactions/` ledger.
+*   The **Temporal Cascade** is triggered, recalculating the canonical path from the oldest position you judged. This is now the sole mechanism for updating the canon.
 
 ---
 
-## ⚙️ Other CLI Usage
+## ⚙️ Advanced/Legacy Commands
 
 ### Basic Operations
 ```bash
-# Store a new hrönir chapter (and create its forking path entry implicitly or explicitly)
-# This is your Proof-of-Work to get a <fork_uuid> for starting a session.
+# Store a new hrönir chapter
 uv run python -m hronir_encyclopedia.cli store drafts/my_chapter.md --prev <uuid_of_previous_hronir_in_path>
-# The output will include the new hrönir's UUID. You'll also need to ensure a forking_path entry is made.
-# (The `store` command might need enhancement to also create/output the `fork_uuid` directly)
 
 # Check Elo rankings for forks at a specific position
 uv run python -m hronir_encyclopedia.cli ranking --position 1
 
 # Validate a human-contributed chapter (basic check)
-# Note: Validation is primarily for the textual content. The hrönir's place in the
-# narrative structure is defined by its forking path entry.
 uv run python -m hronir_encyclopedia.cli validate --chapter drafts/my_chapter.md
 
 # Audit and repair stored hrönirs, forking paths, and votes
@@ -255,26 +232,21 @@ uv run python -m hronir_encyclopedia.cli clean --git
 
 # Get the current "Duel of Maximum Entropy" for a position (used internally by `session start`)
 # This can be useful to understand what duel a new session might present for a given position.
+# Under Protocol v2, this is mainly for inspection; user voting is via `session commit`.
 uv run python -m hronir_encyclopedia.cli get-duel --position 1
 
-# Consolidate book (trigger Temporal Cascade from position 0)
+# Recover canon / Consolidate book (trigger Temporal Cascade from position 0)
 # Under the "Tribunal of the Future" protocol, the canonical path is primarily updated
-# by the Temporal Cascade triggered by `session commit` (starting from the oldest voted position).
-# The `consolidate-book` command now serves as a manual way to trigger this cascade
-# from the very beginning (position 0), useful for initialization, full recalculations, or recovery.
-uv run python -m hronir_encyclopedia.cli consolidate-book
+# by the Temporal Cascade triggered by `session commit`.
+# The `recover-canon` (formerly `consolidate-book`) command serves as a manual way
+# to trigger this cascade from the very beginning (position 0), useful for initialization,
+# full recalculations, or recovery.
+uv run python -m hronir_encyclopedia.cli recover-canon
 ```
-
-The `store` command is crucial for generating new `hrönir` and, through associated forking path entries, the `fork_uuid` necessary to initiate a Judgment Session. Direct voting via a `vote` command is deprecated; all judgments are now channeled through the `session commit` mechanism.
 
 ## 🔏 Proof-of-Work (Mandate for Judgment)
 
-Creating a new `fork_uuid` (by storing a hrönir at Position `N` and ensuring its corresponding entry in a forking path CSV) serves as your Proof-of-Work.
-
-This `fork_uuid` acts as a **mandate** to initiate a `session start --position N --fork-uuid <your_fork_N_uuid>`.
-This session grants you the right to cast veredicts on *any subset* of duels from prior positions (`N-1` down to `0`), as presented in the session's static dossier. Each duel in the dossier is the one of maximum entropy for its position at the time the session was started.
-
-This system elevates the impact of each contribution, allowing a single act of creation to potentially influence the entire preceding narrative history through a structured and auditable judgment process. The `get-duel` command can still be used to see what the current maximum entropy duel for a specific position is, which is what `session start` uses internally to build the dossier.
+Under Protocol v2, Proof-of-Work has been elevated. Creating a new fork is just the beginning. True influence—the **mandate for judgment**—is earned through **Proof of Relevance**. Only when your fork proves its value in duels and becomes `QUALIFIED` do you gain the right to initiate a `session` and reshape the narrative's history.
 
 ## Development Setup
 

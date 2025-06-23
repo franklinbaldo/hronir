@@ -296,18 +296,34 @@ def check_fork_qualification(
     all_forks_in_position_df: pd.DataFrame # DataFrame of all forks in that same position (e.g. from storage)
 ) -> bool:
     """
-    Verifica se um fork_uuid atinge o limiar de qualificação com base no Elo ou número de vitórias.
+    Checks if a fork meets the criteria to be marked as 'QUALIFIED'.
+
+    A fork can become qualified through two primary mechanisms:
+    1.  **Elo Threshold:** If the fork's Elo rating reaches or exceeds a defined
+        threshold (e.g., 1550).
+    2.  **Minimum Wins:** If the fork accumulates a minimum number of wins. This
+        minimum is calculated based on the total number of unique competing forks (`N`)
+        at the same position and lineage: `ceil(log2(N))`. If N=0 or N=1, specific
+        rules apply (effectively 0 wins needed for N=1, impossible for N=0 if the fork itself exists).
+
+    The function first checks the Elo threshold. If met, the fork is qualified.
+    If not, it then checks the minimum wins criteria.
 
     Args:
-        fork_uuid: O UUID do fork a ser verificado.
-        ratings_df: DataFrame contendo 'fork_uuid', 'elo_rating', 'wins'.
-                    Normalmente o output de get_ranking para a posição do fork.
-        all_forks_in_position_df: DataFrame contendo todos os forks competindo na mesma posição.
-                                   Usado para determinar N para o cálculo de vitórias mínimas.
-                                   Deve conter pelo menos o fork_uuid em questão.
+        fork_uuid (str): The UUID of the fork to be checked for qualification.
+        ratings_df (pd.DataFrame): A DataFrame containing the ranking information for
+            the fork's specific position and lineage. This DataFrame is typically the
+            output of `get_ranking()` and must include columns: 'fork_uuid',
+            'elo_rating', and 'wins'.
+        all_forks_in_position_df (pd.DataFrame): A DataFrame listing all unique forks
+            that are competing in the same position and lineage as the `fork_uuid`
+            being checked. This is used to determine `N` (the number of competitors)
+            for the minimum wins calculation. It must contain a 'fork_uuid' column.
 
     Returns:
-        True se o fork estiver qualificado, False caso contrário.
+        bool: True if the fork meets either the Elo threshold or the minimum wins
+              criteria, False otherwise. Returns False if the `fork_uuid` is not found
+              in `ratings_df` or if essential data is missing.
     """
     ELO_QUALIFICATION_THRESHOLD = 1550
 

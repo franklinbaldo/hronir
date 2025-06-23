@@ -20,7 +20,7 @@ app = typer.Typer(
 # Original functions are kept with minimal changes to their core logic,
 # only adapting their signatures to Typer's way of handling arguments.
 
-@app.command("recover-canon", help="Manual tool to recover/rebuild the canonical path from position 0. Not for normal operational flow.")
+@app.command("recover-canon", help="Manual recovery tool: Triggers Temporal Cascade from position 0 to rebuild canon. Use with caution.")
 def recover_canon(
     ratings_dir: Annotated[Path, typer.Option(help="Directory containing rating CSV files.")] = Path("ratings"),
     forking_path_dir: Annotated[Path, typer.Option(help="Directory containing forking path CSV files.")] = Path("forking_path"),
@@ -304,21 +304,63 @@ app.add_typer(session_app, name="session")
 import uuid # Added import for uuid
 from . import session_manager # Placed here to avoid circular import if session_manager needs cli parts
 
-@session_app.command("start", help="Start a new judgment session (SC.8, SC.9).")
+@session_app.command("start", help="Initiate a Judgment Session using a QUALIFIED fork's mandate.")
 def session_start(
-    position: Annotated[int, typer.Option("--position", "-p", help="The current position N of the new fork being created.")],
-    fork_uuid: Annotated[str, typer.Option("--fork-uuid", "-f", help="The fork_uuid of the new fork at position N, serving as the 'mandate'.")],
+    # position: Annotated[int, typer.Option("--position", "-p", help="The current position N of the new fork being created.")], # Position is now derived from fork_uuid
+    fork_uuid: Annotated[str, typer.Option("--fork-uuid", "-f", help="The QUALIFIED fork_uuid granting the mandate for this session.")],
     ratings_dir: Annotated[Path, typer.Option(help="Directory containing rating CSV files.")] = Path("ratings"),
     forking_path_dir: Annotated[Path, typer.Option(help="Directory containing forking path CSV files.")] = Path("forking_path"),
     canonical_path_file: Annotated[Path, typer.Option(help="Path to the canonical path JSON file.")] = Path("data/canonical_path.json"),
 ):
     """
-    Starts a new judgment session.
-    A new fork at 'position' N (identified by 'fork_uuid') grants the right to judge positions N-1 down to 0.
-    Generates a static dossier of duels for these prior positions.
+    Initiates a new Judgment Session (SC.8, SC.9).
+
+    This command allows a user to exercise the 'mandate for judgment' granted by a
+    fork that has achieved `QUALIFIED` status. The `fork_uuid` of this qualified
+    fork must be provided.
+
+    The system will:
+    1. Validate the provided `fork_uuid`:
+        - Ensure it exists.
+        - Confirm its status is `QUALIFIED`.
+        - Verify it has an associated `mandate_id`.
+        - Check it hasn't been `SPENT` (i.e., already used for a session).
+    2. Determine `N`, the position of the qualified `fork_uuid`.
+    3. Generate a static "dossier" containing the duel of maximum entropy for each
+       prior position (from `N-1` down to `0`), based on the canonical path at the
+       moment the session is started.
+    4. Create a new session record, store the dossier, and mark the `fork_uuid` as
+       consumed for session initiation purposes.
+    5. Output the `session_id` and the dossier to the user.
+
+    If `N=0` (the qualified fork is at position 0), no prior positions exist to be
+    judged. An empty dossier is created, and the session is immediately ready for
+    a (vacuous) commit, primarily to log the use of the mandate.
     """
-    if position < 0:
-        typer.echo(json.dumps({"error": "Position N cannot be negative."}, indent=2))
+    # Position is now derived from the fork_uuid itself, not passed as a separate CLI arg.
+    # This makes the command simpler and less prone to user error.
+    # We will fetch the fork's details to get its position N.
+
+    # Validate the fork_uuid - it must exist in forking_path
+    fork_data = storage.get_fork_file_and_data(fork_uuid, fork_dir=forking_path_dir)
+
+    if not fork_data:
+        typer.echo(json.dumps({"error": f"Fork UUID {fork_uuid} not found in any forking path CSV. Cannot start session."}, indent=2))
+        raise typer.Exit(code=1)
+
+    # Get position N from the fork_data
+    position_n_str = fork_data.get("position")
+    if position_n_str is None:
+        typer.echo(json.dumps({"error": f"Fork UUID {fork_uuid} is missing position information."}, indent=2))
+        raise typer.Exit(code=1)
+    try:
+        position = int(position_n_str) # position_n is N
+    except ValueError:
+        typer.echo(json.dumps({"error": f"Fork UUID {fork_uuid} has an invalid position: {position_n_str}."}, indent=2))
+        raise typer.Exit(code=1)
+
+    if position < 0: # Should be caught by storage validation, but good to check.
+        typer.echo(json.dumps({"error": f"Fork UUID {fork_uuid} has an invalid negative position: {position}."}, indent=2))
         raise typer.Exit(code=1)
 
     # Validate the fork_uuid - it must exist in forking_path
@@ -540,21 +582,44 @@ def run_temporal_cascade(
 
 from . import transaction_manager # Import transaction_manager
 
-@session_app.command("commit", help="Commit verdicts for a session and trigger temporal cascade (SC.10, SC.11, SYS.1).")
+@session_app.command("commit", help="Submit verdicts for a Judgment Session, record transaction, and trigger Temporal Cascade.")
 def session_commit(
-    session_id: Annotated[str, typer.Option("--session-id", "-s", help="The ID of the session to commit.")],
-    verdicts_input: Annotated[str, typer.Option("--verdicts", "-v", help="JSON string or path to a JSON file containing verdicts '{\"pos\": \"winning_fork_uuid\"}'.")],
-    ratings_dir: Annotated[Path, typer.Option(help="Directory containing rating CSV files.")] = Path("ratings"),
-    forking_path_dir: Annotated[Path, typer.Option(help="Directory containing forking path CSV files.")] = Path("forking_path"),
-    canonical_path_file: Annotated[Path, typer.Option(help="Path to the canonical path JSON file.")] = Path("data/canonical_path.json"),
-    max_cascade_positions: Annotated[int, typer.Option(help="Maximum number of positions for temporal cascade.")] = 100, # Similar to consolidate_book
+    session_id: Annotated[str, typer.Option("--session-id", "-s", help="The ID of the active Judgment Session to commit.")],
+    verdicts_input: Annotated[str, typer.Option("--verdicts", "-v", help="JSON string or path to a JSON file containing verdicts. Format: '{\"position_str\": \"winning_fork_uuid\"}'. Example: '{\"9\": \"fork_uuid_abc\", \"2\": \"fork_uuid_xyz\"}'. ")],
+    ratings_dir: Annotated[Path, typer.Option(help="Directory containing rating CSV files.")] = Path("ratings"), # Retained for run_temporal_cascade
+    forking_path_dir: Annotated[Path, typer.Option(help="Directory containing forking path CSV files.")] = Path("forking_path"), # Retained for _get_successor_hronir_for_fork and cascade
+    canonical_path_file: Annotated[Path, typer.Option(help="Path to the canonical path JSON file.")] = Path("data/canonical_path.json"), # Retained for run_temporal_cascade
+    max_cascade_positions: Annotated[int, typer.Option(help="Maximum number of positions for temporal cascade calculation.")] = 100,
 ):
     """
-    Commits the verdicts for an active session.
-    - Validates verdicts against the session's dossier.
-    - Records votes.
-    - Creates a transaction in the chronological ledger.
-    - Triggers the Temporal Cascade to update the canonical path.
+    Commits the verdicts for an active Judgment Session (SC.10, SC.11, SYS.1).
+
+    This command finalizes a judgment session by:
+    1.  Retrieving the specified active session and its static dossier.
+    2.  Parsing the provided `verdicts_input` (either a JSON string or a file path
+        to a JSON file). The verdicts map position numbers (as strings) to the
+        `fork_uuid` chosen as the winner for that position's duel.
+    3.  Validating each submitted verdict:
+        - Ensures the position exists in the session's dossier.
+        - Confirms the chosen winning `fork_uuid` was one of the two forks presented
+          in the dossier for that position (Sovereignty of Curadoria, SC.10).
+    4.  Preparing a list of valid votes, mapping winning/losing `fork_uuid`s to their
+        respective successor `hrönir_uuid`s (needed for `ratings.record_vote`).
+    5.  Invoking `transaction_manager.record_transaction` to:
+        - Record all valid votes.
+        - Check for any forks that become `QUALIFIED` as a result of these votes
+          and update their status/mandate_id.
+        - Create an immutable transaction block in the `data/transactions/` ledger (SYS.1),
+          linking it to the previous transaction.
+    6.  Updating the status of the session-initiating `fork_uuid` to `SPENT`.
+    7.  Triggering the "Temporal Cascade" (`run_temporal_cascade`) starting from the
+        oldest position that received a valid vote in this session (SC.11). This
+        recalculates the canonical path.
+    8.  Updating the session's status to `committed`.
+
+    The `ratings_dir`, `forking_path_dir`, and `canonical_path_file` options are
+    primarily used by the `transaction_manager` and subsequent `run_temporal_cascade`
+    functions, not directly for parsing verdicts in this command's immediate scope.
     """
     session_data = session_manager.get_session(session_id)
     if not session_data:
