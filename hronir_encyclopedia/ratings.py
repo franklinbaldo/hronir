@@ -64,9 +64,16 @@ def record_vote(
         "loser": loser,
     }
     if csv_path.exists():
-        df = pd.read_csv(csv_path)
-        df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
-    else:
+        # Check if file is empty or new
+        if csv_path.stat().st_size == 0:
+            df = pd.DataFrame([row])
+        else:
+            try:
+                df = pd.read_csv(csv_path)
+                df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+            except pd.errors.EmptyDataError: # Should be caught by size check, but as fallback
+                df = pd.DataFrame([row])
+    else: # File does not exist
         df = pd.DataFrame([row])
     df.to_csv(csv_path, index=False)
 
@@ -281,3 +288,81 @@ def determine_next_duel(
             "fork_B": duel_fork_B_uuid,
         }
     }
+
+
+def check_fork_qualification(
+    fork_uuid: str,
+    ratings_df: pd.DataFrame, # DataFrame from get_ranking for the specific position and predecessor
+    all_forks_in_position_df: pd.DataFrame # DataFrame of all forks in that same position (e.g. from storage)
+) -> bool:
+    """
+    Checks if a fork meets the criteria to be marked as 'QUALIFIED'.
+
+    A fork can become qualified through two primary mechanisms:
+    1.  **Elo Threshold:** If the fork's Elo rating reaches or exceeds a defined
+        threshold (e.g., 1550).
+    2.  **Minimum Wins:** If the fork accumulates a minimum number of wins. This
+        minimum is calculated based on the total number of unique competing forks (`N`)
+        at the same position and lineage: `ceil(log2(N))`. If N=0 or N=1, specific
+        rules apply (effectively 0 wins needed for N=1, impossible for N=0 if the fork itself exists).
+
+    The function first checks the Elo threshold. If met, the fork is qualified.
+    If not, it then checks the minimum wins criteria.
+
+    Args:
+        fork_uuid (str): The UUID of the fork to be checked for qualification.
+        ratings_df (pd.DataFrame): A DataFrame containing the ranking information for
+            the fork's specific position and lineage. This DataFrame is typically the
+            output of `get_ranking()` and must include columns: 'fork_uuid',
+            'elo_rating', and 'wins'.
+        all_forks_in_position_df (pd.DataFrame): A DataFrame listing all unique forks
+            that are competing in the same position and lineage as the `fork_uuid`
+            being checked. This is used to determine `N` (the number of competitors)
+            for the minimum wins calculation. It must contain a 'fork_uuid' column.
+
+    Returns:
+        bool: True if the fork meets either the Elo threshold or the minimum wins
+              criteria, False otherwise. Returns False if the `fork_uuid` is not found
+              in `ratings_df` or if essential data is missing.
+    """
+    ELO_QUALIFICATION_THRESHOLD = 1550
+
+    if ratings_df.empty:
+        return False
+
+    fork_data = ratings_df[ratings_df["fork_uuid"] == fork_uuid]
+
+    if fork_data.empty:
+        return False # Fork não encontrado no DataFrame de rankings
+
+    elo_rating = fork_data.iloc[0]["elo_rating"]
+    wins = fork_data.iloc[0]["wins"]
+
+    # 1. Qualificação por Elo Mínimo
+    if elo_rating >= ELO_QUALIFICATION_THRESHOLD:
+        return True
+
+    # 2. Qualificação por Vitórias Mínimas
+    # N é o número de forks competindo na mesma posição.
+    # Se all_forks_in_position_df for None ou vazio, não podemos calcular N.
+    if all_forks_in_position_df is None or all_forks_in_position_df.empty:
+        # Se não há informação sobre outros forks, a qualificação por vitórias é ambígua.
+        # Poderia retornar False ou levantar um erro, dependendo da política.
+        # Por ora, se não há como calcular N, esta condição não pode ser satisfeita.
+        num_competitors = 0
+    else:
+        num_competitors = len(all_forks_in_position_df["fork_uuid"].unique())
+
+
+    if num_competitors <= 0: # Caso de N=0 (nenhum fork na posição, o que seria estranho se estamos checando um)
+                              # ou se all_forks_in_position_df não foi fornecido corretamente.
+        min_wins_threshold = float('inf') # Impossível de atingir
+    elif num_competitors == 1: # Se há apenas 1 fork, log2(1) = 0, ceil(0) = 0 vitórias.
+        min_wins_threshold = 0
+    else: # N > 1
+        min_wins_threshold = math.ceil(math.log2(num_competitors))
+
+    if wins >= min_wins_threshold:
+        return True
+
+    return False

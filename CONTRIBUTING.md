@@ -32,43 +32,41 @@ Thank you for your interest in helping expand this labyrinthine narrative. This 
 9. **Review** happens publicly; maintainers may request adjustments to tone or structure.
 10. Once approved, your chapter is merged and enters the Elo ranking system.
 
-### Helpful CLI commands
+### How to Influence the Narrative
 
-Remember to use `uv run` before `python -m hronir_encyclopedia.cli` if you are using the `uv` environment, as shown in the examples below.
+Your primary goal as a contributor is to create a high-quality hrönir whose fork becomes **`QUALIFIED`** in duels. Once qualified, you can use its `fork_uuid` to initiate a **Judgment Session** and influence the entire canon.
 
-Check the current Elo rankings for a chapter position:
-```bash
-uv run python -m hronir_encyclopedia.cli ranking --position 1
-```
+Remember to use `uv run` before `hronir_encyclopedia.cli` if you are using the `uv` environment.
 
-To participate in voting (after obtaining a `fork_uuid` as described in `docs/proof_of_work_voting.md`):
-
-1.  Discover the Duelo de Máxima Entropia for a position:
+1.  **Create and Store a High-Quality Hrönir:**
+    Write your chapter (e.g., `drafts/05_my_masterpiece.md`). Then store it, specifying its predecessor to create the fork.
     ```bash
-    uv run python -m hronir_encyclopedia.cli get-duel --position 1
+    uv run hronir_encyclopedia.cli store drafts/05_my_masterpiece.md --prev <previous_uuid>
+    # Note the fork_uuid from the output, or find it in forking_path/*.csv
     ```
-    This will output JSON indicating the `fork_A` (e.g., `"fork_uuid_A..."`) and `fork_B` (e.g., `"fork_uuid_B..."`) for the duel of forks.
-
-2.  Cast your vote for the presented duel of forks:
+2.  **Monitor Your Fork's Performance:**
+    Use `hronir ranking --position <your_fork_position>` to track its Elo rating and duel performance.
     ```bash
-    uv run python -m hronir_encyclopedia.cli vote \
-      --position 1 \
-      --voter-fork-uuid <your_pow_fork_uuid> \
-      --winner-fork-uuid <fork_A_uuid_from_get_duel> \
-      --loser-fork-uuid <fork_B_uuid_from_get_duel>
+    uv run hronir_encyclopedia.cli ranking --position 5
     ```
-
-Generate two new hrönir variants from a predecessor and record an initial assessment (this is mainly for automated agents but can be used manually; it does not bypass the `get-duel` requirement for general voting):
-```bash
-uv run python -m hronir_encyclopedia.cli synthesize \
-  --position 1 \
-  --prev <previous_uuid>
-```
-
-Validate and store your own new chapter variant:
-```bash
-uv run python -m hronir_encyclopedia.cli validate --chapter drafts/01_my_variant.md
-uv run python -m hronir_encyclopedia.cli store drafts/01_my_variant.md --prev <previous_uuid>
-```
+3.  **Check for Qualification:**
+    Use the `hronir metrics` command or inspect the `forking_path/<your_book_name>.csv` file. Look for your `fork_uuid` and check if its `status` has changed from `PENDING` to `QUALIFIED`.
+    ```bash
+    uv run hronir_encyclopedia.cli metrics
+    # Or check the CSV directly.
+    ```
+4.  **Start Your Judgment Session:**
+    Once your fork is `QUALIFIED`, use its `fork_uuid` to start a session.
+    ```bash
+    uv run hronir_encyclopedia.cli session start --fork-uuid <your_now_qualified_fork_uuid>
+    # This will output a session_id and a dossier of duels.
+    ```
+5.  **Deliberate and Commit Your Veredicts:**
+    Review the dossier. Then, submit your judgments using the `session_id`.
+    ```bash
+    uv run hronir_encyclopedia.cli session commit \
+      --session-id <id_from_start> \
+      --verdicts '{"4": "winning_fork_uuid_for_pos4", "1": "another_winning_fork_uuid_for_pos1"}'
+    ```
 
 Happy writing—may your version prove itself the inevitable one.
