@@ -92,15 +92,147 @@ def store(
             help="Path to chapter markdown file.", exists=True, dir_okay=False, readable=True
         ),
     ],
-    prev: Annotated[
-        str, typer.Option(help="UUID of the previous chapter.")
-    ] = None,  # Made optional as in original
 ):
     """
-    Stores a given chapter file into the hrönir library, associating it with a predecessor UUID if provided.
+    Stores a given chapter file into the hrönir library as a content node.
+    Narrative connections are managed separately via forking_path CSVs.
     """
-    uuid_str = storage.store_chapter(chapter, prev_uuid=prev)
+    uuid_str = storage.store_chapter(chapter)
     typer.echo(uuid_str)
+
+
+@app.command(help="Create a narrative connection (fork) between hrönirs.")
+def fork(
+    position: Annotated[int, typer.Option(help="Position in the narrative sequence")],
+    target: Annotated[str, typer.Option(help="Target hrönir UUID (destination content node)")],
+    source: Annotated[
+        str, typer.Option(help="Source hrönir UUID (empty string for position 0)")
+    ] = "",
+):
+    """
+    Creates a forking path entry connecting two hrönirs in the narrative graph.
+    This establishes a directed edge: source → target based purely on narrative merit.
+    """
+    from pathlib import Path
+
+    # Validate position
+    if position < 0:
+        typer.echo(f"Error: Position must be non-negative, got {position}")
+        raise typer.Exit(1)
+
+    # Validate source for position > 0
+    if position > 0 and not source:
+        typer.echo("Error: source is required for position > 0")
+        raise typer.Exit(1)
+
+    if position == 0 and source:
+        typer.echo("Warning: source ignored for position 0")
+        source = ""
+
+    # Validate hrönir UUIDs exist in library
+    library_dir = Path("the_library")
+    target_path = library_dir / target
+    if not target_path.exists():
+        typer.echo(f"Error: Target hrönir {target} not found in library")
+        raise typer.Exit(1)
+
+    if source:
+        source_path = library_dir / source
+        if not source_path.exists():
+            typer.echo(f"Error: Source hrönir {source} not found in library")
+            raise typer.Exit(1)
+
+    # Generate deterministic fork UUID
+    fork_uuid = storage.compute_forking_uuid(position, source, target)
+
+    # Create forking path entry
+    forking_path_dir = Path("forking_path")
+    forking_path_dir.mkdir(exist_ok=True)
+
+    # Use position-based CSV file naming
+    csv_file = forking_path_dir / f"position_{position:03d}.csv"
+
+    # Create CSV with headers if it doesn't exist
+    if not csv_file.exists():
+        csv_file.write_text("position,prev_uuid,uuid,fork_uuid,status\n")
+
+    # Check if fork already exists
+    import pandas as pd
+
+    try:
+        df = pd.read_csv(csv_file)
+        if not df.empty and ((df["fork_uuid"] == fork_uuid).any()):
+            typer.echo(f"Fork already exists: {fork_uuid}")
+            return
+    except (pd.errors.EmptyDataError, FileNotFoundError):
+        # File is empty or doesn't exist, create headers
+        csv_file.write_text("position,prev_uuid,uuid,fork_uuid,status\n")
+
+    # Append new fork entry (mapping to CSV column names: source→prev_uuid, target→uuid)
+    fork_entry = f"{position},{source},{target},{fork_uuid},PENDING\n"
+    with csv_file.open("a") as f:
+        f.write(fork_entry)
+
+    typer.echo(f"Created fork: {fork_uuid}")
+    typer.echo(f"  Position: {position}")
+    typer.echo(f"  Source: {source or '(none)'}")
+    typer.echo(f"  Target: {target}")
+    typer.echo("  Status: PENDING")
+
+
+@app.command(help="List existing forks at a position.")
+def list_forks(
+    position: Annotated[int, typer.Option(help="Position to list forks for")] = None,
+):
+    """
+    Lists all existing forks, optionally filtered by position.
+    Shows the narrative graph structure without creator attribution.
+    """
+    from pathlib import Path
+
+    import pandas as pd
+
+    forking_path_dir = Path("forking_path")
+    if not forking_path_dir.exists():
+        typer.echo("No forking path directory found.")
+        return
+
+    all_forks = []
+    csv_files = list(forking_path_dir.glob("*.csv"))
+
+    if not csv_files:
+        typer.echo("No fork files found.")
+        return
+
+    for csv_file in csv_files:
+        try:
+            df = pd.read_csv(csv_file)
+            if not df.empty:
+                all_forks.append(df)
+        except (pd.errors.EmptyDataError, FileNotFoundError):
+            continue
+
+    if not all_forks:
+        typer.echo("No forks found.")
+        return
+
+    combined_df = pd.concat(all_forks, ignore_index=True)
+
+    # Filter by position if specified
+    if position is not None:
+        combined_df = combined_df[combined_df["position"] == position]
+        if combined_df.empty:
+            typer.echo(f"No forks found at position {position}.")
+            return
+        typer.echo(f"Forks at position {position}:")
+    else:
+        typer.echo("All forks:")
+
+    # Display relevant columns only (no creator info)
+    display_cols = ["position", "prev_uuid", "uuid", "fork_uuid", "status"]
+    available_cols = [col for col in display_cols if col in combined_df.columns]
+
+    typer.echo(combined_df[available_cols].to_string(index=False))
 
 
 # Helper function to find successor hrönir_uuid for a given fork_uuid

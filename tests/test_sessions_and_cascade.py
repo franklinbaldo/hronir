@@ -86,7 +86,7 @@ def _create_hronir(hr_uuid: str, text_content: str, prev_uuid: str = None) -> st
 
     # storage.store_chapter will calculate the UUID from content and store it correctly
     # We are providing hr_uuid primarily for assertion and predictability in tests.
-    actual_uuid = storage.store_chapter(temp_file, previous_uuid=prev_uuid, base=LIBRARY_DIR)
+    actual_uuid = storage.store_chapter(temp_file, base=LIBRARY_DIR)
 
     # It's important that the text_content actually hashes to hr_uuid if we want to assert this.
     # The compute_uuid function is what store_chapter uses internally.

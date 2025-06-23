@@ -46,7 +46,7 @@ def _gemini_request(prompt: str) -> str:
 def generate_chapter(prompt: str, prev_uuid: str | None = None) -> str:
     """Generate a chapter with Gemini and store it."""
     text = _gemini_request(prompt)
-    return storage.store_chapter_text(text, previous_uuid=prev_uuid)
+    return storage.store_chapter_text(text)
 
 
 # append_fork has been moved to storage.py

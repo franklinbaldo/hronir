@@ -39,19 +39,30 @@ This document outlines the development roadmap for the **Hrönir Encyclopedia** 
 
 ---
 
-## 🚧 Active Development Areas
+## 🚧 Critical Missing Components (Discovered via Testing)
 
-### Phase 5 — Automation & Workflows 🔄
-- [x] **Daily Generation**: GitHub Actions for automated content creation
-- [ ] **Enhanced Scheduling**: Multiple generation strategies (morning/evening)
-- [ ] **Agent Diversification**: Multiple AI personalities for generation
-- [ ] **Performance Monitoring**: Generation success metrics
+### Phase 5 — Core CLI Gaps 🔥 **HIGH PRIORITY**
+- [x] **Fork Creation Command**: `hronir fork` with clean `--source` → `--target` parameters ✅ COMPLETED
+- [x] **Fork Listing Command**: `hronir list-forks` to show existing narrative structure ✅ COMPLETED
+- [ ] **Fork Status Command**: `hronir fork-status` to check individual fork state
+- [ ] **Quick Start Command**: `hronir init-test` to create sample narrative for testing
+- [ ] **System Status Command**: `hronir status` to show current canonical path and system state
 
-### Phase 6 — Protocol Enhancements 🔄
-- [ ] **Advanced Qualification**: Multi-criteria fork promotion logic
-- [ ] **Session Analytics**: Judgment session performance tracking
-- [ ] **Cascade Optimization**: Performance improvements for large narratives
-- [ ] **Mandate Economics**: Token-like mechanics for judgment rights
+### Phase 6 — Architectural Cleanup 🔧
+- [ ] **Remove Creator Attribution**: Eliminate `creator_id` from forking path structure (pure meritocracy)
+- [ ] **Fix CLI Parameter Mismatches**: `get_ranking()` function signature vs CLI usage
+- [ ] **Empty CSV Handling**: Graceful handling of empty CSV files in database loading
+- [ ] **Storage Parameter Cleanup**: Remove outdated `--prev` parameter from store command ✅ COMPLETED
+- [ ] **Anonymous Forking**: Ensure all fork creation is content-based, not author-based
+
+### Phase 7 — Documentation & UX 🎯
+- [ ] **Fix Documentation Confusion**: Remove all `--prev` parameter references from documentation
+- [ ] **Update Fork Examples**: Replace confusing hrönir/fork terminology with clear source → target examples
+- [ ] **Node/Edge Distinction**: Clarify hrönirs (nodes) vs forking_paths (edges) in docs
+- [ ] **Complete Workflow Guide**: "Store → Fork → Vote" tutorial with clean CLI examples
+- [ ] **Remove Creator Attribution**: Eliminate all references to creator/author tracking (pure meritocracy)
+- [ ] **CLI Reference**: Complete command reference with new `--source` `--target` parameters
+- [ ] **Architecture Overview**: Visual diagram of hybrid storage system
 
 ---
 
@@ -102,8 +113,9 @@ This document outlines the development roadmap for the **Hrönir Encyclopedia** 
 ## 🐛 Known Issues & Technical Debt
 
 ### Development Environment
+- [x] **Code Quality Standards**: Zero-tolerance linting with ruff and black ✅ COMPLETED
+- [x] **Documentation Accuracy**: Fixed CLI parameter inconsistencies ✅ COMPLETED  
 - [ ] **Pre-commit Resolution**: Fix `core.hooksPath` conflicts for clean setup
-- [ ] **Documentation**: Expand inline documentation and type hints
 - [ ] **Error Handling**: Improve robustness of file operations
 - [ ] **Logging**: Implement structured logging throughout the system
 
@@ -116,7 +128,7 @@ This document outlines the development roadmap for the **Hrönir Encyclopedia** 
 ### Code Quality
 - [ ] **Refactoring**: Simplify complex functions in `cli.py`
 - [ ] **Type Safety**: Complete type annotation coverage
-- [ ] **Test Coverage**: Expand edge case testing
+- [ ] **Test Coverage**: Expand edge case testing  
 - [ ] **Dependencies**: Regular security and compatibility updates
 
 ---

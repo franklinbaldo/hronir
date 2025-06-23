@@ -29,10 +29,12 @@ def uuid_to_path(uuid_str: str, base: Path) -> Path:
     return base / uuid_str
 
 
-def store_chapter(
-    chapter_file: Path, previous_uuid: str | None = None, base: Path | str = "the_library"
-) -> str:
-    """Store chapter_file content under UUID-based path and return UUID."""
+def store_chapter(chapter_file: Path, base: Path | str = "the_library") -> str:
+    """Store chapter_file content under UUID-based path and return UUID.
+
+    This function creates pure content nodes. Narrative connections between
+    hrönirs are managed separately via forking_path CSV files.
+    """
     base = Path(base)
     text = chapter_file.read_text()
     chapter_uuid = compute_uuid(text)
@@ -43,24 +45,22 @@ def store_chapter(
     (chapter_dir / f"index{ext}").write_text(text)
 
     meta = {"uuid": chapter_uuid}
-    if previous_uuid:
-        meta["previous_uuid"] = previous_uuid
     (chapter_dir / "metadata.json").write_text(json.dumps(meta, indent=2))
     return chapter_uuid
 
 
-def store_chapter_text(
-    text: str, previous_uuid: str | None = None, base: Path | str = "the_library"
-) -> str:
-    """Store raw chapter text and return its UUID."""
+def store_chapter_text(text: str, base: Path | str = "the_library") -> str:
+    """Store raw chapter text and return its UUID.
+
+    This function creates pure content nodes. Narrative connections between
+    hrönirs are managed separately via forking_path CSV files.
+    """
     base = Path(base)
     chapter_uuid = compute_uuid(text)
     chapter_dir = uuid_to_path(chapter_uuid, base)
     chapter_dir.mkdir(parents=True, exist_ok=True)
     (chapter_dir / "index.md").write_text(text)
     meta = {"uuid": chapter_uuid}
-    if previous_uuid:
-        meta["previous_uuid"] = previous_uuid
     (chapter_dir / "metadata.json").write_text(json.dumps(meta, indent=2))
     return chapter_uuid
 
