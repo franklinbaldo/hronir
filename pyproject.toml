@@ -3,17 +3,15 @@ name = "hronir-encyclopedia"
 version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
-    "click",
     "google-generativeai",
     "sqlalchemy>=2.0",
     "python-dotenv", # Adicionado para gerenciar secrets
-    "numpy", # Adicionado para extração semântica
-    # "pypandoc", # Removido pois não será usado
-    "typer[all]", # Adicionado para um CLI moderno
+    "numpy", # Adicionado para um CLI moderno
     "blake3", # Adicionado para hashing rápido
     "pydantic", # Validação de dados # Operações de grafo
     "networkx",
     "pandas>=2.3.0",
+    "typer>=0.16.0",
 ]
 
 [project.scripts]
@@ -42,6 +40,8 @@ package = true
 [dependency-groups]
 dev = [
     "black>=25.1.0",
+    "pre-commit>=4.2.0",
     "pytest>=8.4.1",
+    "repomix>=0.2.9",
     "ruff>=0.12.0",
 ]

@@ -285,9 +285,9 @@ def test_get_ranking_empty_forking_path_dir(temp_data_dir):
         forking_path_dir=forking_dir_empty,
         ratings_dir=ratings_dir,  # Updated
     )
-    assert (
-        ranking_df.empty
-    ), "Ranking deveria ser vazio se não há arquivos de forking_path para encontrar herdeiros."
+    assert ranking_df.empty, (
+        "Ranking deveria ser vazio se não há arquivos de forking_path para encontrar herdeiros."
+    )
 
 
 def test_get_ranking_empty_ratings_files(temp_data_dir):

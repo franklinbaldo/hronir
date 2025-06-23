@@ -5,14 +5,12 @@ repos:
   - id: ruff
     args: [--fix]
   - id: ruff-format
-- repo: https://github.com/psf/black
-  rev: 25.1.0
-  hooks:
-  - id: black
 - repo: local
   hooks:
-  - id: hronir-clean
-    name: Clean invalid hrönirs and votes
-    entry: python -m hronir_encyclopedia.cli clean --git
+  - id: repomix-pack
+    name: Pack codebase with repomix
+    entry: uv run repomix
+    args: [.]
     language: system
     pass_filenames: false
+    always_run: true

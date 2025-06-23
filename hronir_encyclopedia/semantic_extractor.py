@@ -48,7 +48,9 @@ def get_embeddings(
         # Então podemos passar a lista diretamente.
 
         result = client.models.embed_content(
-            model=EMBEDDING_MODEL, content=texts, task_type=task_type  # Passando a lista de textos
+            model=EMBEDDING_MODEL,
+            content=texts,
+            task_type=task_type,  # Passando a lista de textos
         )
         return result.get("embedding") if isinstance(result, dict) else result.embeddings
     except Exception as e:
@@ -115,7 +117,7 @@ if __name__ == "__main__":
     if individual_embeddings:
         print(f"Obtidos {len(individual_embeddings)} embeddings individuais.")
         for i, emb in enumerate(individual_embeddings):
-            print(f"  Embedding {i+1} (primeiras 5 dimensões de {len(emb)}): {emb[:5]}")
+            print(f"  Embedding {i + 1} (primeiras 5 dimensões de {len(emb)}): {emb[:5]}")
     else:
         print("Falha ao obter embeddings individuais.")
 

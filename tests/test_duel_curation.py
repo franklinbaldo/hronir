@@ -101,7 +101,6 @@ def mock_ratings_get_ranking(monkeypatch):
 
 
 class TestDetermineNextDuelPurelyEntropic:
-
     def test_max_entropy_duel_no_new_hronirs(self, tmp_path, mock_ratings_get_ranking):
         """
         Test: Should pick duel with max entropy (closest Elos for neighbors),

@@ -206,7 +206,6 @@ def get_ranking(
         try:
             df_votes = pd.read_csv(ratings_csv_path, dtype=str)  # Ler tudo como string inicialmente
             if not df_votes.empty and "winner" in df_votes.columns and "loser" in df_votes.columns:
-
                 # Mapear winner/loser hrönir_uuids para fork_uuids elegíveis
                 df_votes["winner_fork_uuid"] = df_votes["winner"].map(hronir_to_eligible_fork_map)
                 df_votes["loser_fork_uuid"] = df_votes["loser"].map(hronir_to_eligible_fork_map)

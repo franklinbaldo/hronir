@@ -91,14 +91,14 @@ def _create_hronir(hr_uuid: str, text_content: str, prev_uuid: str = None) -> st
     # It's important that the text_content actually hashes to hr_uuid if we want to assert this.
     # The compute_uuid function is what store_chapter uses internally.
     expected_uuid_from_content = storage.compute_uuid(text_content)
-    assert (
-        actual_uuid == expected_uuid_from_content
-    ), f"Actual UUID {actual_uuid} from content differs from expected {expected_uuid_from_content} (which should match provided hr_uuid if content is consistent)"
+    assert actual_uuid == expected_uuid_from_content, (
+        f"Actual UUID {actual_uuid} from content differs from expected {expected_uuid_from_content} (which should match provided hr_uuid if content is consistent)"
+    )
 
     # If the test provides an hr_uuid, it implies the text_content is expected to hash to this hr_uuid.
-    assert (
-        actual_uuid == hr_uuid
-    ), f"UUID from stored chapter ({actual_uuid}) does not match provided hr_uuid ({hr_uuid}). Ensure text_content correctly hashes to hr_uuid."
+    assert actual_uuid == hr_uuid, (
+        f"UUID from stored chapter ({actual_uuid}) does not match provided hr_uuid ({hr_uuid}). Ensure text_content correctly hashes to hr_uuid."
+    )
 
     temp_file.unlink()  # Clean up temp file
     return actual_uuid
@@ -122,9 +122,9 @@ def _create_fork_entry(
     # For tests, we might pre-calculate fork_uuid or let append_fork calculate it and assert.
     # Let's assume fork_uuid is pre-calculated to match the deterministic one for test predictability.
     calculated_fork_uuid = storage.compute_forking_uuid(position, prev_hr_uuid, current_hr_uuid)
-    assert (
-        calculated_fork_uuid == fork_uuid
-    ), f"Provided fork_uuid {fork_uuid} does not match calculated {calculated_fork_uuid}"
+    assert calculated_fork_uuid == fork_uuid, (
+        f"Provided fork_uuid {fork_uuid} does not match calculated {calculated_fork_uuid}"
+    )
 
     storage.append_fork(
         csv_file, position, prev_hr_uuid, current_hr_uuid, conn=None
@@ -259,7 +259,6 @@ def test_environment():
 
 
 class TestSessionWorkflow:
-
     def test_scenario_1_dossier_and_limited_verdict(self):
         # SC.8 (Unique Judgment Right), SC.9 (Static Dossier), SC.10 (System Curated Competitors)
 
@@ -640,9 +639,9 @@ class TestSessionWorkflow:
         # The cascade logic in run_temporal_cascade stops if a path breaks or no ranking.
         # The test setup doesn't create forks for P3 from the new P2 winner (h2c_from_1c).
         # So, the canonical path should end at P2.
-        assert (
-            "3" not in final_canonical_path
-        ), "Canonical path should end at P2 due to lack of subsequent forks for new lineage"
+        assert "3" not in final_canonical_path, (
+            "Canonical path should end at P2 due to lack of subsequent forks for new lineage"
+        )
 
     def test_scenario_3_dormant_vote_reactivation(self):
         """

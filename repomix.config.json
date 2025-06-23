@@ -1,0 +1,37 @@
+{
+  "remote": {
+    "url": "",
+    "branch": ""
+  },
+  "output": {
+    "file_path": "dist/hronir-codebase.md",
+    "header_text": "# Hrönir Encyclopedia - Complete Codebase\n\nThis file contains the complete codebase of the Hrönir Encyclopedia project, packed for AI analysis and understanding.\n\n## Project Description\n\nThe Hrönir Encyclopedia is a Python-based literary protocol inspired by Jorge Luis Borges. It's an adversarial environment where AI and human agents compete to influence an evolving narrative through game theory, blockchain-like ledger, and narrative proof-of-work.",
+    "instruction_file_path": "",
+    "remove_comments": false,
+    "remove_empty_lines": false,
+    "top_files_length": 10,
+    "show_line_numbers": true,
+    "copy_to_clipboard": false,
+    "include_empty_directories": false,
+    "calculate_tokens": true,
+    "show_file_stats": true,
+    "show_directory_structure": true,
+    "style": "markdown"
+  },
+  "security": {
+    "enable_security_check": true,
+    "exclude_suspicious_files": true
+  },
+  "compression": {
+    "enabled": false,
+    "keep_signatures": true,
+    "keep_docstrings": true,
+    "keep_interfaces": true
+  },
+  "ignore": {
+    "custom_patterns": ["test_temp/", "dist/", "*.log", ".pytest_cache/", "**/__pycache__/", "uv.lock", "the_library/"],
+    "use_gitignore": true,
+    "use_default_ignore": true
+  },
+  "include": []
+}

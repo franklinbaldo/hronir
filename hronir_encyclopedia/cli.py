@@ -297,9 +297,7 @@ def synthesize(
     Synthesizes two new hrönirs from a predecessor for a given position
     and records an initial 'vote' or assessment by the generating agent.
     """
-    typer.echo(
-        f"Synthesizing two new hrönirs from predecessor '{prev}' " f"at position {position}..."
-    )
+    typer.echo(f"Synthesizing two new hrönirs from predecessor '{prev}' at position {position}...")
     with database.open_database() as conn:
         voter_uuid = "00000000-agent-0000-0000-000000000000"  # Example agent UUID
         winner_uuid = gemini_util.auto_vote(position, prev, voter_uuid, conn=conn)
@@ -322,13 +320,18 @@ def ranking(
         canonical_path_file = Path("data/canonical_path.json")
         if canonical_path_file.exists():
             import json
+
             with open(canonical_path_file) as f:
                 canonical_data = json.load(f)
                 if str(position - 1) in canonical_data.get("path", {}):
-                    predecessor_hronir_uuid = canonical_data["path"][str(position - 1)]["hrönir_uuid"]
-    
+                    predecessor_hronir_uuid = canonical_data["path"][str(position - 1)][
+                        "hrönir_uuid"
+                    ]
+
     forking_path_dir = Path("forking_path")
-    ranking_data = ratings.get_ranking(position, predecessor_hronir_uuid, forking_path_dir, ratings_dir)
+    ranking_data = ratings.get_ranking(
+        position, predecessor_hronir_uuid, forking_path_dir, ratings_dir
+    )
     if ranking_data.empty:
         typer.echo(f"No ranking data found for position {position}.")
     else:
@@ -913,19 +916,13 @@ def session_commit(
     ],
     ratings_dir: Annotated[
         Path, typer.Option(help="Directory containing rating CSV files.")
-    ] = Path(
-        "ratings"
-    ),  # Retained for run_temporal_cascade
+    ] = Path("ratings"),  # Retained for run_temporal_cascade
     forking_path_dir: Annotated[
         Path, typer.Option(help="Directory containing forking path CSV files.")
-    ] = Path(
-        "forking_path"
-    ),  # Retained for _get_successor_hronir_for_fork and cascade
+    ] = Path("forking_path"),  # Retained for _get_successor_hronir_for_fork and cascade
     canonical_path_file: Annotated[
         Path, typer.Option(help="Path to the canonical path JSON file.")
-    ] = Path(
-        "data/canonical_path.json"
-    ),  # Retained for run_temporal_cascade
+    ] = Path("data/canonical_path.json"),  # Retained for run_temporal_cascade
     max_cascade_positions: Annotated[
         int, typer.Option(help="Maximum number of positions for temporal cascade calculation.")
     ] = 100,
@@ -1006,9 +1003,9 @@ def session_commit(
     dossier_duels = session_data.get("dossier", {}).get("duels", {})
 
     valid_votes_to_record = []
-    processed_verdicts: dict[str, str] = (
-        {}
-    )  # For transaction record: position_str -> winning_fork_uuid
+    processed_verdicts: dict[
+        str, str
+    ] = {}  # For transaction record: position_str -> winning_fork_uuid
     oldest_voted_position = float("inf")
 
     for pos_str, winning_fork_uuid_verdict in verdicts.items():
@@ -1290,9 +1287,7 @@ def metrics_command(
             typer.echo(f'hronir_fork_status_total{{status="{status_val.lower()}"}} {count}')
         raise typer.Exit(code=1)
 
-    all_fork_uuids_processed = (
-        set()
-    )  # To count unique fork_uuids across potentially overlapping CSVs (though ideally they don't overlap by fork_uuid)
+    all_fork_uuids_processed = set()  # To count unique fork_uuids across potentially overlapping CSVs (though ideally they don't overlap by fork_uuid)
 
     for csv_file in forking_path_dir.glob("*.csv"):
         if csv_file.stat().st_size == 0:

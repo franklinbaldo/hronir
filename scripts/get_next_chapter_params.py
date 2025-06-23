@@ -86,7 +86,7 @@ def main():
                             f"Caminho canônico não contém Posição 0. Próxima posição: {next_pos}. Predecessor UUID: '{prev_hrönir_uuid}'."
                         )
                     else:
-                        print(f"Fim do caminho canônico encontrado na Posição {current_pos -1}.")
+                        print(f"Fim do caminho canônico encontrado na Posição {current_pos - 1}.")
                         print(
                             f"Hrönir predecessor para a próxima geração (Posição {next_pos}): {prev_hrönir_uuid}"
                         )

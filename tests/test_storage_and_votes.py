@@ -35,7 +35,6 @@ def test_record_vote_multiple_entries(tmp_path):
 
 
 def test_auto_vote_records_votes(tmp_path):
-
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine)
     Session = sessionmaker(bind=engine)

@@ -380,16 +380,16 @@ def test_system_dynamics_cascade(setup_test_environment):
     with open(env["canonical_path_file"]) as f:
         updated_canonical_data = json.load(f)
 
-    assert (
-        "0" in updated_canonical_data["path"]
-    ), "Position 0 should be in the updated canonical path."
+    assert "0" in updated_canonical_data["path"], (
+        "Position 0 should be in the updated canonical path."
+    )
     canonical_pos0_entry = updated_canonical_data["path"]["0"]
-    assert (
-        canonical_pos0_entry["fork_uuid"] == env["fork_B_uuid"]
-    ), f"Fork B ({env['fork_B_uuid']}) should now be canonical for Position 0."
-    assert (
-        canonical_pos0_entry["hrönir_uuid"] == env["hronir_B_suc"]
-    ), f"Successor hrönir for canonical Fork B ({env['hronir_B_suc']}) should be recorded."
+    assert canonical_pos0_entry["fork_uuid"] == env["fork_B_uuid"], (
+        f"Fork B ({env['fork_B_uuid']}) should now be canonical for Position 0."
+    )
+    assert canonical_pos0_entry["hrönir_uuid"] == env["hronir_B_suc"], (
+        f"Successor hrönir for canonical Fork B ({env['hronir_B_suc']}) should be recorded."
+    )
 
     # --- Asserção 2: O Eco ---
     # Chamar `cli.get_duel` para a Posição 1.
@@ -464,9 +464,9 @@ def test_system_dynamics_cascade(setup_test_environment):
         ],
         catch_exceptions=False,
     )
-    assert (
-        result_get_duel_pos1.exit_code == 0
-    ), f"get-duel for pos 1 failed. Output: {result_get_duel_pos1.stdout}"
+    assert result_get_duel_pos1.exit_code == 0, (
+        f"get-duel for pos 1 failed. Output: {result_get_duel_pos1.stdout}"
+    )
 
     duel_info_pos1 = json.loads(result_get_duel_pos1.stdout)
     assert duel_info_pos1["position"] == 1, "Duel info should be for position 1."
@@ -478,9 +478,9 @@ def test_system_dynamics_cascade(setup_test_environment):
     }
     expected_duel_forks = {env["fork_E_uuid"], env["fork_F_uuid"]}
 
-    assert (
-        returned_duel_forks == expected_duel_forks
-    ), f"Duel for Position 1 should be between Fork E and Fork F. Got: {returned_duel_forks}, Expected: {expected_duel_forks}"
+    assert returned_duel_forks == expected_duel_forks, (
+        f"Duel for Position 1 should be between Fork E and Fork F. Got: {returned_duel_forks}, Expected: {expected_duel_forks}"
+    )
 
     # Cleanup (optional, as tmp_path handles it, but good for illustration if not using tmp_path)
     # shutil.rmtree(tmp_path) # Pytest's tmp_path fixture handles cleanup automatically

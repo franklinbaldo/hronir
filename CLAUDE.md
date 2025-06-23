@@ -61,6 +61,23 @@ uv run pytest tests/test_specific_file.py
 
 # Clean invalid entries
 uv run hronir clean --git
+
+# Generate AI-friendly codebase summary
+uv run repomix .
+```
+
+### Repomix Integration
+
+The project uses repomix to generate AI-friendly codebase summaries:
+
+```bash
+# Generate codebase summary (outputs to dist/hronir-codebase.md)
+uv run repomix .
+
+# Configuration in repomix.config.json
+# - Ignores: uv.lock, the_library/, test_temp/, dist/
+# - Output: dist/hronir-codebase.md with header and stats
+# - Runs automatically in pre-commit hooks
 ```
 
 ### ⚠️ Code Quality Requirements
