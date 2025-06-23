@@ -3,3 +3,8 @@ pytest
 sqlalchemy
 typer
 typing_extensions
+pydantic
+networkx
+google-generativeai
+python-dotenv
+blake3

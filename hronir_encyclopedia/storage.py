@@ -4,7 +4,9 @@ import uuid
 from pathlib import Path
 import pandas as pd # Moved to top
 from sqlalchemy.engine import Engine
-from typing import Any # Import Any
+from sqlalchemy.orm import Session
+from typing import Any, Optional
+from .models import ForkDB
 
 UUID_NAMESPACE = uuid.NAMESPACE_URL
 
@@ -81,10 +83,14 @@ def forking_path_exists(
     fork_uuid: str,
     fork_dir: Path | str = "forking_path",
     conn: Engine | None = None,
+    session: Session | None = None,
 ) -> bool:
     """Return True if fork_uuid appears in any forking path table or CSV."""
     import pandas as pd
     # print(f"DEBUG: storage.forking_path_exists searching for fork_uuid: {fork_uuid} in dir: {fork_dir}") # DEBUG REMOVED
+
+    if session is not None:
+        return session.get(ForkDB, fork_uuid) is not None
 
     if conn is not None:
         # print(f"DEBUG: storage.forking_path_exists using DB conn") # DEBUG REMOVED
@@ -295,6 +301,7 @@ def append_fork(
     prev_uuid: str,
     uuid_str: str, # Renamed 'uuid' to 'uuid_str' to avoid conflict with uuid module
     conn: Engine | None = None,
+    session: Session | None = None,
 ) -> str:
     """
     Appends a new fork entry to a CSV file or a database table.
@@ -303,6 +310,18 @@ def append_fork(
     csv_file.parent.mkdir(parents=True, exist_ok=True)
     # compute_forking_uuid is already in storage.py
     fork_uuid = compute_forking_uuid(position, prev_uuid, uuid_str)
+
+    if session is not None:
+        fork = ForkDB(
+            fork_uuid=fork_uuid,
+            position=position,
+            prev_uuid=prev_uuid or None,
+            uuid=uuid_str,
+            status="PENDING",
+        )
+        session.add(fork)
+        session.commit()
+        return fork_uuid
 
     if conn is not None:
         table_name = csv_file.stem # Use stem for table name consistency
@@ -531,6 +550,7 @@ def update_fork_status(
     mandate_id: Optional[str] = None,
     fork_dir_base: Path = Path("forking_path"),
     conn: Engine | None = None,
+    session: Session | None = None,
 ) -> bool:
     """
     Updates the status and optionally the mandate_id of a specific fork_uuid
@@ -547,26 +567,25 @@ def update_fork_status(
     Returns:
         True if the fork was found and updated, False otherwise.
     """
+    if session is not None:
+        fork = session.get(ForkDB, fork_uuid_to_update)
+        if not fork:
+            return False
+        fork.status = new_status
+        if mandate_id is not None:
+            fork.mandate_id = mandate_id
+        session.commit()
+        return True
+
     if conn is not None:
-        # Database logic:
-        # This is more complex as we need to know which table the fork_uuid belongs to.
-        # Assuming fork_uuid is globally unique and we'd have to scan tables or have a master table.
-        # For now, this part is a placeholder for a more robust DB strategy.
-        # A simplified approach might be to try updating common table names if known.
-        # This example assumes a single table 'forks_master' for simplicity of illustration,
-        # which is NOT how the current CSV structure works (CSVs are per-creator/path).
-        # A real DB implementation would need a way to map fork_uuid to its table.
-        # Or, if all forks are in one table, then:
-        # with conn.begin() as c:
-        #     # Ensure mandate_id column exists (this is DB specific, e.g., SQLite)
-        #     # c.execute(text(f"ALTER TABLE your_forks_table ADD COLUMN mandate_id TEXT")) # One-time or check
-        #     result = c.execute(
-        #         text(f"UPDATE your_forks_table SET status = :status, mandate_id = :mandate_id WHERE fork_uuid = :fork_uuid"),
-        #         {"status": new_status, "mandate_id": mandate_id, "fork_uuid": fork_uuid_to_update}
-        #     )
-        #     return result.rowcount > 0
-        # print(f"DB update for fork status not fully implemented yet.") # Placeholder
-        return False # DB part needs more specific design based on schema
+        # Database logic using raw engine (legacy)
+        table_name = "forks"
+        with conn.begin() as con:
+            res = con.exec_driver_sql(
+                f"UPDATE {table_name} SET status=?, mandate_id=? WHERE fork_uuid=?",
+                (new_status, mandate_id, fork_uuid_to_update),
+            )
+            return res.rowcount > 0
 
     # CSV file logic:
     fork_info = get_fork_file_and_data(fork_uuid_to_update, fork_dir_base)

@@ -11,7 +11,9 @@ dependencies = [
     "numpy", # Adicionado para extração semântica
     # "pypandoc", # Removido pois não será usado
     "typer[all]", # Adicionado para um CLI moderno
-    "blake3" # Adicionado para hashing rápido
+    "blake3", # Adicionado para hashing rápido
+    "pydantic", # Validação de dados
+    "networkx" # Operações de grafo
 ]
 
 [project.scripts]

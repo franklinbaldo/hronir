@@ -4,6 +4,9 @@ import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
+from sqlalchemy.orm import Session
+from .models import TransactionDB
+
 TRANSACTIONS_DIR = Path("data/transactions")
 HEAD_FILE = TRANSACTIONS_DIR / "HEAD"
 UUID_NAMESPACE = uuid.NAMESPACE_URL # Using the same namespace as storage.py for consistency
@@ -131,7 +134,7 @@ def record_transaction(
     session_id: str,
     initiating_fork_uuid: str, # Fork whose mandate is being used
     session_verdicts: List[Dict[str, Any]], # [{"position": int, "winner_hrönir_uuid": str, "loser_hrönir_uuid": str}]
-    # Removed conn: Engine | None = None, as DB logic is not primary for this phase
+    session: Session | None = None,
 ) -> Dict[str, Any]:
     """
     Orchestrates the processing of a judgment session's commit.
@@ -203,7 +206,7 @@ def record_transaction(
             winner=winner_hrönir_uuid, # winner is a hrönir (chapter) UUID
             loser=loser_hrönir_uuid,   # loser is a hrönir (chapter) UUID
             base=RATINGS_DIR,
-            # conn=conn # DB not used for now
+            session=session,
         )
         processed_verdicts_for_log.append(vote_action)
 
@@ -267,7 +270,7 @@ def record_transaction(
                         new_status="QUALIFIED",
                         mandate_id=mandate_id_str,
                         fork_dir_base=FORKING_PATH_DIR,
-                        # conn=conn # DB not used
+                        session=session,
                     )
                     if update_success:
                         promotions_granted.append({
@@ -280,7 +283,8 @@ def record_transaction(
 
 
     # --- Prepare data for the transaction block (Task 2.2 will handle actual saving) ---
-    timestamp = datetime.datetime.utcnow().isoformat() + "Z"
+    timestamp_dt = datetime.datetime.utcnow()
+    timestamp = timestamp_dt.isoformat() + "Z"
 
     # Content for computing this transaction's UUID
     # Note: 'promotions_granted' is part of the content that determines the tx_uuid
@@ -328,6 +332,16 @@ def record_transaction(
         # This is problematic: transaction is saved, but HEAD is not updated.
         # May require a rollback or recovery mechanism in a production system.
         raise # Re-raise
+
+    if session is not None:
+        tx_obj = TransactionDB(
+            uuid=current_transaction_uuid,
+            timestamp=timestamp_dt,
+            prev_uuid=last_tx_hash or None,
+            content=transaction_block_to_save,
+        )
+        session.add(tx_obj)
+        session.commit()
 
     # Return data that might be useful to the caller, including the new transaction_uuid
     # and the oldest_voted_position for triggering the temporal cascade.

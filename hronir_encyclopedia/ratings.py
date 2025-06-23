@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pandas as pd
 from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session
+from .models import VoteDB
 
 import math # Adicionado para math.log2
 # from itertools import combinations # Não é mais explicitamente necessário para a estratégia de vizinhos
@@ -29,8 +31,15 @@ def record_vote(
     loser: str,
     base: Path | str = "ratings",
     conn: Engine | None = None,
+    session: Session | None = None,
 ) -> None:
     """Append a vote to the ratings table."""
+    if session is not None:
+        vote = VoteDB(position=position, voter=voter, winner=winner, loser=loser)
+        session.add(vote)
+        session.commit()
+        return
+
     if conn is not None:
         # print(f"DEBUG_RATINGS: record_vote for position {position} using DB connection: {conn}") # REMOVED DEBUG
         table = f"position_{position:03d}"

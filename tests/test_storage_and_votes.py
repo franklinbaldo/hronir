@@ -6,7 +6,11 @@ from pathlib import Path
 import pandas as pd
 import pytest # Added for pytest.raises
 
-from hronir_encyclopedia import database, gemini_util, ratings, storage
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from hronir_encyclopedia import ratings, storage
+from hronir_encyclopedia.models import Base, VoteDB
 
 
 def test_store_chapter_text(tmp_path):
@@ -20,39 +24,35 @@ def test_store_chapter_text(tmp_path):
 
 
 def test_record_vote_multiple_entries(tmp_path):
-    base = tmp_path / "ratings"
-    fork_dir = tmp_path / "forking_path"
-    with database.open_database(ratings_dir=base, fork_dir=fork_dir) as conn:
-        for i in range(10):
-            ratings.record_vote(1, f"voter{i}", f"winner{i}", f"loser{i}", conn=conn)
-    df = pd.read_csv(base / "position_001.csv")
-    assert len(df) == 10
-    assert set(df["voter"]) == {f"voter{i}" for i in range(10)}
-    assert df["uuid"].is_unique
+    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    session = Session()
+    for i in range(10):
+        ratings.record_vote(1, f"voter{i}", f"winner{i}", f"loser{i}", session=session)
+    votes = session.query(VoteDB).all()
+    assert len(votes) == 10
+    assert {v.voter for v in votes} == {f"voter{i}" for i in range(10)}
 
 
-def test_auto_vote_records_votes(monkeypatch, tmp_path):
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("GEMINI_API_KEY", "dummy")
-    counter = {"i": 0}
+def test_auto_vote_records_votes(tmp_path):
 
-    def fake_request(prompt: str) -> str:
-        counter["i"] += 1
-        return f"chapter {counter['i']}"
+    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    session = Session()
 
-    monkeypatch.setattr(gemini_util, "_gemini_request", fake_request)
+    for _ in range(10):
+        ratings.record_vote(
+            position=1,
+            voter=str(uuid.uuid4()),
+            winner="w",
+            loser="l",
+            session=session,
+        )
 
-    with database.open_database() as conn:
-        for _ in range(10):
-            gemini_util.auto_vote(
-                position=1,
-                prev_uuid="00000000-0000-0000-0000-000000000000",
-                voter=str(uuid.uuid4()),
-                conn=conn,
-            )
-
-    df = pd.read_csv(Path("ratings/position_001.csv"))
-    assert len(df) == 10
+    votes = session.query(VoteDB).all()
+    assert len(votes) == 10
 
 
 def test_clean_functions(tmp_path):
