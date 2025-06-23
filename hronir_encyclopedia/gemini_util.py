@@ -53,17 +53,30 @@ def generate_chapter(prompt: str, prev_uuid: str | None = None) -> str:
 
 
 def auto_vote(
-    position: int, prev_uuid: str, voter: str, conn=None
-) -> str:  # Removed Engine type hint as it's not used directly here
-    """Generate winner and loser chapters and record a vote."""
+    position: int, prev_uuid: str, voter: str # conn parameter removed
+) -> str:
+    """Generate winner and loser chapters, create forks, and record a vote using global DataManager."""
     winner_uuid = generate_chapter(f"Winner for position {position}", prev_uuid)
     loser_uuid = generate_chapter(f"Loser for position {position}", prev_uuid)
 
-    fork_csv = Path("forking_path/auto.csv")  # This path is specific to this auto_vote logic
+    # The concept of a specific 'fork_csv' for auto_vote is removed.
+    # Forks are now added to the central in-memory DB.
+    # storage.append_fork now uses the global DataManager session.
+    # It also handles calculating the fork_uuid internally.
+    storage.append_fork(
+        position=position,
+        prev_uuid=prev_uuid,
+        uuid_str=winner_uuid
+        # status="AUTO_GENERATED" # Could add a specific status if desired
+    )
+    storage.append_fork(
+        position=position,
+        prev_uuid=prev_uuid,
+        uuid_str=loser_uuid
+        # status="AUTO_GENERATED"
+    )
 
-    # Call append_fork from storage module
-    storage.append_fork(fork_csv, position, prev_uuid, winner_uuid, conn=conn)
-    storage.append_fork(fork_csv, position, prev_uuid, loser_uuid, conn=conn)
-
-    ratings.record_vote(position, voter, winner_uuid, loser_uuid, conn=conn)
+    # ratings.record_vote will also need to be refactored to use the global DataManager.
+    # For now, remove conn, assuming ratings.record_vote will be updated.
+    ratings.record_vote(position, voter, winner_uuid, loser_uuid)
     return winner_uuid

@@ -387,13 +387,16 @@ def get_duel(
         )
         raise typer.Exit(code=1)
 
-    # `determine_next_duel` agora lida com forks
-    duel_info = ratings.determine_next_duel(
-        position=position,
-        predecessor_hronir_uuid=predecessor_hronir_uuid,
-        forking_path_dir=forking_path_dir,
-        ratings_dir=ratings_dir,
-    )
+    # Call the new determine_next_duel_entropy function
+    db_session = storage.get_db_session()
+    try:
+        duel_info = ratings.determine_next_duel_entropy(
+            position=position,
+            predecessor_hronir_uuid=predecessor_hronir_uuid,
+            session=db_session
+        )
+    finally:
+        db_session.close()
 
     if duel_info:
         # O formato de duel_info já é:
@@ -497,12 +500,18 @@ def clean(
 # def submit_cmd():
 #     typer.echo("Submit command is in development.")
 
+@app.callback()
+def main_callback(ctx: typer.Context):
+    """Initializes DataManager before any command."""
+    try:
+        storage.data_manager.initialize_and_load()
+    except Exception as e:
+        typer.secho(f"Fatal: DataManager initialization failed: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
 
 def main(argv: list[str] | None = None):
-    # If argv is None, Typer's app() will use sys.argv by default (which is what we want for CLI execution).
-    # If argv is provided (e.g., from a test), app() will use that specific list of arguments.
+    """CLI entry point."""
     app(args=argv)
-
 
 # New session management commands
 session_app = typer.Typer(help="Manage Hrönir judgment sessions.", no_args_is_help=True)

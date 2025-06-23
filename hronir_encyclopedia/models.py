@@ -8,6 +8,7 @@ from sqlalchemy import (
     Integer,
     String,
     create_engine,
+    UniqueConstraint, # Added for UniqueConstraint
 )
 from sqlalchemy.orm import declarative_base, sessionmaker
 
@@ -44,9 +45,13 @@ class VoteDB(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     position = Column(Integer, index=True)
-    voter = Column(String)
+    voter = Column(String, index=True) # Added index for voter
     winner = Column(String)
     loser = Column(String)
+
+    __table_args__ = (
+        UniqueConstraint('position', 'voter', 'winner', 'loser', name='uq_vote_components'),
+    )
 
 
 class Vote(BaseModel):
