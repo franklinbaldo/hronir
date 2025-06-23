@@ -30,49 +30,41 @@ Thank you for your interest in helping expand this labyrinthine narrative. This 
 9. **Review** happens publicly; maintainers may request adjustments to tone or structure.
 10. Once approved, your chapter is merged and enters the Elo ranking system.
 
-### Helpful CLI commands
+### How to Influence the Narrative
 
-Remember to use `uv run` before `python -m hronir_encyclopedia.cli` if you are using the `uv` environment, as shown in the examples below.
+Your primary goal as a contributor is to create a high-quality hrönir whose fork becomes **`QUALIFIED`** in duels. Once qualified, you can use its `fork_uuid` to initiate a **Judgment Session** and influence the entire canon.
 
-Check the current Elo rankings for forks at a chapter position:
-```bash
-uv run python -m hronir_encyclopedia.cli ranking --position 1
-```
+Remember to use `uv run` before `hronir_encyclopedia.cli` if you are using the `uv` environment.
 
-To participate in the "Tribunal of the Future" (after creating a new hrönir and its `fork_uuid` at position `N`):
-
-1.  **Start a Judgment Session:**
-    Use your new `fork_uuid` (from position `N`) to start a session. This provides a `session_id` and a dossier of duels for prior positions.
+1.  **Create and Store a High-Quality Hrönir:**
+    Write your chapter (e.g., `drafts/05_my_masterpiece.md`). Then store it, specifying its predecessor to create the fork.
     ```bash
-    # Example: Your new fork at position N=3 is fork_N_uuid
-    uv run python -m hronir_encyclopedia.cli session start \
-      --position 3 \
-      --fork-uuid <your_fork_N_uuid>
+    uv run hronir_encyclopedia.cli store drafts/05_my_masterpiece.md --prev <previous_uuid>
+    # Note the fork_uuid from the output, or find it in forking_path/*.csv
     ```
-
-2.  **Deliberate and Form Veredicts (Offline):**
-    Review the dossier. Decide which duels to vote on and select winners.
-
-3.  **Commit Your Veredicts:**
-    Submit your veredicts using the `session_id`.
+2.  **Monitor Your Fork's Performance:**
+    Use `hronir ranking --position <your_fork_position>` to track its Elo rating and duel performance.
     ```bash
-    # Example: Committing veredicts for positions 2 and 0
-    uv run python -m hronir_encyclopedia.cli session commit \
-      --session-id <your_session_id> \
-      --verdicts '{"2": "winning_fork_for_pos2", "0": "winning_fork_for_pos0"}'
+    uv run hronir_encyclopedia.cli ranking --position 5
     ```
-    Refer to `README.md` for more details on the session workflow.
-
-Validate and store your own new chapter variant (this is how you get a `fork_uuid` to start a session):
-```bash
-# First, validate the content (optional, but good practice)
-uv run python -m hronir_encyclopedia.cli validate --chapter drafts/01_my_variant.md
-
-# Then, store it to get a hrönir UUID.
-# You also need to ensure a forking_path entry is created for this hrönir,
-# which will define its `fork_uuid`. The `store` command may be enhanced in the future
-# to streamline `fork_uuid` creation/reporting.
-uv run python -m hronir_encyclopedia.cli store drafts/01_my_variant.md --prev <uuid_of_predecessor_hronir>
-```
+3.  **Check for Qualification:**
+    Use the `hronir metrics` command or inspect the `forking_path/<your_book_name>.csv` file. Look for your `fork_uuid` and check if its `status` has changed from `PENDING` to `QUALIFIED`.
+    ```bash
+    uv run hronir_encyclopedia.cli metrics
+    # Or check the CSV directly.
+    ```
+4.  **Start Your Judgment Session:**
+    Once your fork is `QUALIFIED`, use its `fork_uuid` to start a session.
+    ```bash
+    uv run hronir_encyclopedia.cli session start --fork-uuid <your_now_qualified_fork_uuid>
+    # This will output a session_id and a dossier of duels.
+    ```
+5.  **Deliberate and Commit Your Veredicts:**
+    Review the dossier. Then, submit your judgments using the `session_id`.
+    ```bash
+    uv run hronir_encyclopedia.cli session commit \
+      --session-id <id_from_start> \
+      --verdicts '{"4": "winning_fork_uuid_for_pos4", "1": "another_winning_fork_uuid_for_pos1"}'
+    ```
 
 Happy writing—may your version prove itself the inevitable one.

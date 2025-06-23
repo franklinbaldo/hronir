@@ -134,20 +134,51 @@ def record_transaction(
     # Removed conn: Engine | None = None, as DB logic is not primary for this phase
 ) -> Dict[str, Any]:
     """
-    Processes votes from a session, checks for fork qualifications, and prepares transaction data.
-    This function orchestrates votes and promotions but DOES NOT write the transaction block itself.
-    It returns the necessary data for the transaction block creation.
+    Orchestrates the processing of a judgment session's commit.
+
+    This function is the central point for handling the consequences of a `session commit`.
+    Its responsibilities include:
+    1.  Recording all votes cast in the session via `ratings.record_vote`.
+    2.  Checking if any of the hrönirs involved in the voted-upon duels
+        have corresponding forks that now meet the criteria for `QUALIFIED` status.
+        This involves using `ratings.check_fork_qualification`.
+    3.  If a fork becomes `QUALIFIED`, its status is updated in its respective
+        `forking_path/*.csv` file via `storage.update_fork_status`, and a unique
+        `mandate_id` (derived from the fork_uuid and the hash of the *previous*
+        transaction block) is generated and stored with it.
+    4.  Preparing all necessary data for a new transaction block, including
+        timestamp, session details, processed verdicts, any promotions granted,
+        and the hash of the previous transaction block.
+    5.  Computing a deterministic UUIDv5 for this new transaction block based on its content.
+    6.  Saving the transaction block as a JSON file in `data/transactions/`.
+    7.  Updating the `data/transactions/HEAD` file to point to this new transaction_uuid.
+    8.  Returning key information about the transaction, including its UUID and the
+        oldest position number that received a vote (critical for triggering the
+        Temporal Cascade).
+
+    Args:
+        session_id (str): The unique identifier of the judgment session being committed.
+        initiating_fork_uuid (str): The `fork_uuid` of the fork that was used to
+            initiate this session (i.e., the fork whose mandate is being exercised).
+            This fork_uuid acts as the "voter" for all votes cast in this session.
+        session_verdicts (List[Dict[str, Any]]): A list of verdict dictionaries.
+            Each dictionary represents a single judgment made in the session and
+            must conform to the structure:
+            `{"position": int, "winner_hrönir_uuid": str, "loser_hrönir_uuid": str}`.
+            - "position": The numerical position of the duel being judged.
+            - "winner_hrönir_uuid": The `hrönir_uuid` of the chapter chosen as the winner.
+            - "loser_hrönir_uuid": The `hrönir_uuid` of the chapter chosen as the loser.
 
     Returns:
-        A dictionary containing:
-        - "transaction_uuid": str (computed UUID for this transaction)
-        - "promotions_granted": List of {"fork_uuid": str, "mandate_id": str}
-        - "oldest_voted_position": int (min position number affected by votes)
-        - "timestamp": str (ISO 8601 UTC)
-        - "previous_transaction_uuid": Optional[str] (UUID of the preceding transaction)
-        - "session_id": str
-        - "initiating_fork_uuid": str
-        - "verdicts_processed": List[Dict[str,Any]] (the input session_verdicts, for record keeping)
+        Dict[str, Any]: A dictionary containing key results of the transaction processing:
+        - "transaction_uuid" (str): The UUID of the newly created transaction block.
+        - "promotions_granted" (List[Dict[str, str]]): A list of forks that were
+          promoted to `QUALIFIED` status during this transaction. Each item is a dict:
+          `{"fork_uuid": str, "mandate_id": str, "qualified_in_tx_with_prev_hash": str}`.
+        - "oldest_voted_position" (int): The lowest numerical position for which a
+          verdict was processed in this session. Returns -1 if no votes processed.
+          This value is used by the CLI to determine the starting point for the
+          Temporal Cascade.
     """
     _ensure_transactions_dir()
 
