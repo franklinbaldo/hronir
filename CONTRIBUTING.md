@@ -32,6 +32,20 @@ Thank you for your interest in helping expand this labyrinthine narrative. This 
 9. **Review** happens publicly; maintainers may request adjustments to tone or structure.
 10. Once approved, your chapter is merged and enters the Elo ranking system.
 
+### Migration and Tests
+
+If the library structure or database schema changes, run the migration script before opening a pull request:
+
+```bash
+python scripts/migrate_library_structure.py
+```
+
+After migration, run the tests and update them if needed:
+
+```bash
+pytest
+```
+
 ### How to Influence the Narrative
 
 Your primary goal as a contributor is to create a high-quality hrönir whose fork becomes **`QUALIFIED`** in duels. Once qualified, you can use its `fork_uuid` to initiate a **Judgment Session** and influence the entire canon.

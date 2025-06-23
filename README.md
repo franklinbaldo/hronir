@@ -61,7 +61,15 @@ graph TD
    cp .env.example .env  # and add your GEMINI_API_KEY to .env
    ```
 
-Dependencies are managed with `uv` using `pyproject.toml` and `uv.lock`. Core libraries include [**click**](https://palletsprojects.com/p/click/) for the CLI, [**pandas**](https://pandas.pydata.org/) for data manipulation, and [**networkx**](https://networkx.org/) for graph validation.
+Dependencies are managed with `uv` using `pyproject.toml` and `uv.lock`. Core libraries include [**click**](https://palletsprojects.com/p/click/) for the CLI and [**pandas**](https://pandas.pydata.org/) for data manipulation. New packages such as [**Pydantic**](https://docs.pydantic.dev/), [**SQLAlchemy**](https://www.sqlalchemy.org/) and [**NetworkX**](https://networkx.org/) are installed automatically when you run `uv sync`.
+
+The CLI loads rating and forking path CSVs into a lightweight SQLite database via SQLAlchemy. This temporary database provides transactional updates and easier queries while the canonical CSV files remain on disk.
+
+For an overview of how these libraries work together see [docs/new_libs_plan.md](docs/new_libs_plan.md).
+### Key Libraries
+- **Pydantic** – validates and serializes the protocol's data models.
+- **SQLAlchemy** – powers the SQLite database used for transactional updates.
+- **NetworkX** – enables graph-based analysis of fork relationships.
 
 ---
 
