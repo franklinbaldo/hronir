@@ -386,10 +386,321 @@ class TestSessionWorkflow:
         assert result_start_again.exit_code == 1, "Reusing fork_uuid for session start should fail"
         assert "already been used" in output_start_again.lower()
 
+    def test_scenario_2_full_temporal_cascade(self):
+        """
+        Tests SC.11 (Temporal Cascade) thoroughly.
+        - Setup: Multiple positions (0, 1, 2) with established canonical path.
+                 Each position has at least two forks.
+        - Action: A session commit changes the winner at Position 0.
+        - Assertion:
+            - Canonical path is recalculated correctly for Position 0.
+            - Canonical path for Position 1 is updated based on the new Position 0 winner.
+            - Canonical path for Position 2 is updated based on the new Position 1 winner.
+            - All changes are reflected in canonical_path.json.
+        """
+        # --- Setup ---
+        # Position 0: h0a (canonical), h0b
+        h0a_uuid = storage.compute_uuid("Hrönir 0A")
+        _create_hronir(h0a_uuid, "Hrönir 0A")
+        f0a_uuid = _get_fork_uuid(0, "", h0a_uuid)
+        _create_fork_entry(0, "", h0a_uuid, f0a_uuid)
 
-    # Scenario 2 and 3 will be added later for brevity in this step
-    # def test_scenario_2_cascade_and_history_rewrite(self): ...
-    # def test_scenario_3_ledger_and_dormant_vote_reactivation(self): ...
+        h0b_uuid = storage.compute_uuid("Hrönir 0B")
+        _create_hronir(h0b_uuid, "Hrönir 0B")
+        f0b_uuid = _get_fork_uuid(0, "", h0b_uuid)
+        _create_fork_entry(0, "", h0b_uuid, f0b_uuid)
+
+        # Position 1:
+        # Children of h0a: h1a_from_0a (canonical), h1b_from_0a
+        h1a_from_0a_uuid = storage.compute_uuid("Hrönir 1A from 0A")
+        _create_hronir(h1a_from_0a_uuid, "Hrönir 1A from 0A", prev_uuid=h0a_uuid)
+        f1a_from_0a_uuid = _get_fork_uuid(1, h0a_uuid, h1a_from_0a_uuid)
+        _create_fork_entry(1, h0a_uuid, h1a_from_0a_uuid, f1a_from_0a_uuid)
+
+        h1b_from_0a_uuid = storage.compute_uuid("Hrönir 1B from 0A")
+        _create_hronir(h1b_from_0a_uuid, "Hrönir 1B from 0A", prev_uuid=h0a_uuid)
+        f1b_from_0a_uuid = _get_fork_uuid(1, h0a_uuid, h1b_from_0a_uuid)
+        _create_fork_entry(1, h0a_uuid, h1b_from_0a_uuid, f1b_from_0a_uuid)
+
+        # Children of h0b: h1c_from_0b, h1d_from_0b
+        h1c_from_0b_uuid = storage.compute_uuid("Hrönir 1C from 0B")
+        _create_hronir(h1c_from_0b_uuid, "Hrönir 1C from 0B", prev_uuid=h0b_uuid)
+        f1c_from_0b_uuid = _get_fork_uuid(1, h0b_uuid, h1c_from_0b_uuid)
+        _create_fork_entry(1, h0b_uuid, h1c_from_0b_uuid, f1c_from_0b_uuid)
+
+        h1d_from_0b_uuid = storage.compute_uuid("Hrönir 1D from 0B")
+        _create_hronir(h1d_from_0b_uuid, "Hrönir 1D from 0B", prev_uuid=h0b_uuid)
+        f1d_from_0b_uuid = _get_fork_uuid(1, h0b_uuid, h1d_from_0b_uuid)
+        _create_fork_entry(1, h0b_uuid, h1d_from_0b_uuid, f1d_from_0b_uuid)
+
+
+        # Position 2:
+        # Children of h1a_from_0a: h2a_from_1a (canonical), h2b_from_1a
+        h2a_from_1a_uuid = storage.compute_uuid("Hrönir 2A from 1A")
+        _create_hronir(h2a_from_1a_uuid, "Hrönir 2A from 1A", prev_uuid=h1a_from_0a_uuid)
+        f2a_from_1a_uuid = _get_fork_uuid(2, h1a_from_0a_uuid, h2a_from_1a_uuid)
+        _create_fork_entry(2, h1a_from_0a_uuid, h2a_from_1a_uuid, f2a_from_1a_uuid)
+
+        h2b_from_1a_uuid = storage.compute_uuid("Hrönir 2B from 1A")
+        _create_hronir(h2b_from_1a_uuid, "Hrönir 2B from 1A", prev_uuid=h1a_from_0a_uuid)
+        f2b_from_1a_uuid = _get_fork_uuid(2, h1a_from_0a_uuid, h2b_from_1a_uuid)
+        _create_fork_entry(2, h1a_from_0a_uuid, h2b_from_1a_uuid, f2b_from_1a_uuid)
+
+        # Children of h1c_from_0b: h2c_from_1c, h2d_from_1c
+        h2c_from_1c_uuid = storage.compute_uuid("Hrönir 2C from 1C")
+        _create_hronir(h2c_from_1c_uuid, "Hrönir 2C from 1C", prev_uuid=h1c_from_0b_uuid)
+        f2c_from_1c_uuid = _get_fork_uuid(2, h1c_from_0b_uuid, h2c_from_1c_uuid)
+        _create_fork_entry(2, h1c_from_0b_uuid, h2c_from_1c_uuid, f2c_from_1c_uuid)
+
+        h2d_from_1c_uuid = storage.compute_uuid("Hrönir 2D from 1C")
+        _create_hronir(h2d_from_1c_uuid, "Hrönir 2D from 1C", prev_uuid=h1c_from_0b_uuid)
+        f2d_from_1c_uuid = _get_fork_uuid(2, h1c_from_0b_uuid, h2d_from_1c_uuid)
+        _create_fork_entry(2, h1c_from_0b_uuid, h2d_from_1c_uuid, f2d_from_1c_uuid)
+
+
+        # Initial Canonical Path: 0:f0a -> 1:f1a_from_0a -> 2:f2a_from_1a
+        _init_canonical_path({
+            "0": {"fork_uuid": f0a_uuid, "hrönir_uuid": h0a_uuid},
+            "1": {"fork_uuid": f1a_from_0a_uuid, "hrönir_uuid": h1a_from_0a_uuid},
+            "2": {"fork_uuid": f2a_from_1a_uuid, "hrönir_uuid": h2a_from_1a_uuid}
+        })
+
+        # Initial votes to establish Elo ratings.
+        # We want f0b to win over f0a after the session commit.
+        # We want f1c_from_0b to win over f1d_from_0b (children of h0b).
+        # We want f2c_from_1c to win over f2d_from_1c (children of h1c_from_0b).
+
+        # Let's make f0a initially stronger than f0b
+        _create_vote_entry(0, "voter_init1", h0a_uuid, h0b_uuid)
+        _create_vote_entry(0, "voter_init2", h0a_uuid, h0b_uuid)
+
+        # Let's make f1a_from_0a stronger than f1b_from_0a
+        _create_vote_entry(1, "voter_init3", h1a_from_0a_uuid, h1b_from_0a_uuid) # Assuming voter is valid fork
+
+        # Let's make f2a_from_1a stronger than h2b_from_1a
+        _create_vote_entry(2, "voter_init4", h2a_from_1a_uuid, h2b_from_1a_uuid)
+
+
+        # For the new path (after f0b wins):
+        # Make f1c_from_0b (child of h0b) stronger than f1d_from_0b
+        _create_vote_entry(1, "voter_init5", h1c_from_0b_uuid, h1d_from_0b_uuid)
+        _create_vote_entry(1, "voter_init6", h1c_from_0b_uuid, h1d_from_0b_uuid)
+
+
+        # Make f2c_from_1c (child of h1c_from_0b) stronger than f2d_from_1c
+        _create_vote_entry(2, "voter_init7", h2c_from_1c_uuid, h2d_from_1c_uuid)
+        _create_vote_entry(2, "voter_init8", h2c_from_1c_uuid, h2d_from_1c_uuid)
+
+
+        # Mandate fork for session (Position 3, child of current canonical h2a_from_1a)
+        h3_judge_uuid = storage.compute_uuid("Hrönir 3 Judge")
+        _create_hronir(h3_judge_uuid, "Hrönir 3 Judge", prev_uuid=h2a_from_1a_uuid)
+        f3_judge_fork_uuid = _get_fork_uuid(3, h2a_from_1a_uuid, h3_judge_uuid)
+        _create_fork_entry(3, h2a_from_1a_uuid, h3_judge_uuid, f3_judge_fork_uuid)
+
+        # --- Action: Session Start and Commit ---
+        # Start Session
+        result_start, output_start = _run_cli_command([
+            "session", "start", "--position", "3", "--fork-uuid", f3_judge_fork_uuid,
+            "--ratings-dir", str(RATINGS_DIR.resolve()),
+            "--forking-path-dir", str(FORKING_PATH_DIR.resolve()),
+            "--canonical-path-file", str(CANONICAL_PATH_FILE_fixture.resolve()),
+        ])
+        assert result_start.exit_code == 0, f"Session start failed: {output_start}"
+        session_id = json.loads(output_start)["session_id"]
+        dossier = json.loads(output_start)["dossier"]
+
+        # Assert duel for pos 0 in dossier is between f0a and f0b
+        assert "0" in dossier["duels"], "Dossier for position 0 missing"
+        pos0_duel_forks_in_dossier = {dossier["duels"]["0"]["fork_A"], dossier["duels"]["0"]["fork_B"]}
+        assert pos0_duel_forks_in_dossier == {f0a_uuid, f0b_uuid}, "Dossier duel for Pos 0 is not f0a vs f0b"
+
+
+        # Commit: Vote for f0b to win at Position 0. This should trigger the cascade.
+        # Give enough votes to f0b to overcome f0a's initial Elo advantage.
+        verdicts = { "0": f0b_uuid } # f0b wins over f0a
+        # We need 3 votes for f0b to win if f0a had 2 wins. (Elo dependent)
+        # Let's assume for simplicity the session commit itself makes f0b win.
+        # We can add more votes directly to ratings file before session commit if needed for Elo logic.
+        # For now, the session commit will add one vote for f0b.
+        # To ensure f0b wins, let's add some direct votes to f0b before the session.
+        _create_vote_entry(0, "voter_cascade_prep1", h0b_uuid, h0a_uuid)
+        _create_vote_entry(0, "voter_cascade_prep2", h0b_uuid, h0a_uuid)
+        _create_vote_entry(0, "voter_cascade_prep3", h0b_uuid, h0a_uuid) # Now f0b has 3 wins, f0a has 2. f0b should win.
+
+
+        result_commit, output_commit = _run_cli_command([
+            "session", "commit", "--session-id", session_id, "--verdicts", json.dumps(verdicts),
+            "--ratings-dir", str(RATINGS_DIR.resolve()),
+            "--forking-path-dir", str(FORKING_PATH_DIR.resolve()),
+            "--canonical-path-file", str(CANONICAL_PATH_FILE_fixture.resolve()),
+        ])
+        assert result_commit.exit_code == 0, f"Session commit failed: {output_commit}"
+
+        # --- Assertions ---
+        final_canonical_path = _get_canonical_path()
+
+        # Position 0: Should now be f0b
+        assert final_canonical_path["0"]["fork_uuid"] == f0b_uuid
+        assert final_canonical_path["0"]["hrönir_uuid"] == h0b_uuid
+
+        # Position 1: Should be child of h0b (f1c_from_0b because we made it stronger)
+        assert final_canonical_path["1"]["fork_uuid"] == f1c_from_0b_uuid
+        assert final_canonical_path["1"]["hrönir_uuid"] == h1c_from_0b_uuid
+
+        # Position 2: Should be child of h1c_from_0b (f2c_from_1c because we made it stronger)
+        assert final_canonical_path["2"]["fork_uuid"] == f2c_from_1c_uuid
+        assert final_canonical_path["2"]["hrönir_uuid"] == h2c_from_1c_uuid
+
+        # Position 3 should not exist yet, or if it does, it should be based on the new P2 winner
+        # The cascade logic in run_temporal_cascade stops if a path breaks or no ranking.
+        # The test setup doesn't create forks for P3 from the new P2 winner (h2c_from_1c).
+        # So, the canonical path should end at P2.
+        assert "3" not in final_canonical_path, "Canonical path should end at P2 due to lack of subsequent forks for new lineage"
+
+
+    def test_scenario_3_dormant_vote_reactivation(self):
+        """
+        Tests SC.12 (Dormant Veredicts) - though SC.12 was removed, the underlying principle of
+        old votes influencing future Elo calculations if their lineage becomes canonical is key.
+        - Setup:
+            - Path A: 0:h0A -> 1:h1A (canonical initially)
+            - Path B: 0:h0B -> 1:h1B
+            - A "dormant" vote exists for a duel between children of h1B (e.g., h2X vs h2Y, where h2X wins).
+              This vote is dormant because h1B is not canonical.
+        - Action: A session commit makes h0B canonical, then h1B canonical.
+        - Assertion:
+            - When calculating Elo for children of h1B (now that h1B is canonical),
+              the previously dormant vote for h2X vs h2Y is correctly included and influences
+              the ranking, potentially making h2X canonical at position 2.
+        """
+        # --- Setup ---
+        # Position 0
+        h0a_uuid = storage.compute_uuid("Hrönir 0A") # Initially canonical
+        _create_hronir(h0a_uuid, "Hrönir 0A")
+        f0a_uuid = _get_fork_uuid(0, "", h0a_uuid)
+        _create_fork_entry(0, "", h0a_uuid, f0a_uuid)
+
+        h0b_uuid = storage.compute_uuid("Hrönir 0B") # Will become canonical
+        _create_hronir(h0b_uuid, "Hrönir 0B")
+        f0b_uuid = _get_fork_uuid(0, "", h0b_uuid)
+        _create_fork_entry(0, "", h0b_uuid, f0b_uuid)
+
+        # Position 1
+        # Children of h0a
+        h1a_from_0a_uuid = storage.compute_uuid("Hrönir 1A from 0A") # Initially canonical
+        _create_hronir(h1a_from_0a_uuid, "Hrönir 1A from 0A", prev_uuid=h0a_uuid)
+        f1a_from_0a_uuid = _get_fork_uuid(1, h0a_uuid, h1a_from_0a_uuid)
+        _create_fork_entry(1, h0a_uuid, h1a_from_0a_uuid, f1a_from_0a_uuid)
+
+        # Children of h0b
+        h1b_from_0b_uuid = storage.compute_uuid("Hrönir 1B from 0B") # Will become canonical
+        _create_hronir(h1b_from_0b_uuid, "Hrönir 1B from 0B", prev_uuid=h0b_uuid)
+        f1b_from_0b_uuid = _get_fork_uuid(1, h0b_uuid, h1b_from_0b_uuid)
+        _create_fork_entry(1, h0b_uuid, h1b_from_0b_uuid, f1b_from_0b_uuid)
+
+        h1c_from_0b_uuid = storage.compute_uuid("Hrönir 1C from 0B") # Another child of h0b
+        _create_hronir(h1c_from_0b_uuid, "Hrönir 1C from 0B", prev_uuid=h0b_uuid)
+        f1c_from_0b_uuid = _get_fork_uuid(1, h0b_uuid, h1c_from_0b_uuid)
+        _create_fork_entry(1, h0b_uuid, h1c_from_0b_uuid, f1c_from_0b_uuid)
+
+
+        # Position 2
+        # Children of h1a_from_0a (initial canonical path)
+        h2a_from_1a_uuid = storage.compute_uuid("Hrönir 2A from 1A") # Initially canonical
+        _create_hronir(h2a_from_1a_uuid, "Hrönir 2A from 1A", prev_uuid=h1a_from_0a_uuid)
+        f2a_from_1a_uuid = _get_fork_uuid(2, h1a_from_0a_uuid, h2a_from_1a_uuid)
+        _create_fork_entry(2, h1a_from_0a_uuid, h2a_from_1a_uuid, f2a_from_1a_uuid)
+
+        # Children of h1b_from_0b (this is where the dormant vote will be)
+        h2x_from_1b_uuid = storage.compute_uuid("Hrönir 2X from 1B") # Target of dormant vote
+        _create_hronir(h2x_from_1b_uuid, "Hrönir 2X from 1B", prev_uuid=h1b_from_0b_uuid)
+        f2x_from_1b_uuid = _get_fork_uuid(2, h1b_from_0b_uuid, h2x_from_1b_uuid)
+        _create_fork_entry(2, h1b_from_0b_uuid, h2x_from_1b_uuid, f2x_from_1b_uuid)
+
+        h2y_from_1b_uuid = storage.compute_uuid("Hrönir 2Y from 1B")
+        _create_hronir(h2y_from_1b_uuid, "Hrönir 2Y from 1B", prev_uuid=h1b_from_0b_uuid)
+        f2y_from_1b_uuid = _get_fork_uuid(2, h1b_from_0b_uuid, h2y_from_1b_uuid)
+        _create_fork_entry(2, h1b_from_0b_uuid, h2y_from_1b_uuid, f2y_from_1b_uuid)
+
+        # Initial Canonical Path: 0:f0a -> 1:f1a_from_0a -> 2:f2a_from_1a
+        _init_canonical_path({
+            "0": {"fork_uuid": f0a_uuid, "hrönir_uuid": h0a_uuid},
+            "1": {"fork_uuid": f1a_from_0a_uuid, "hrönir_uuid": h1a_from_0a_uuid},
+            "2": {"fork_uuid": f2a_from_1a_uuid, "hrönir_uuid": h2a_from_1a_uuid}
+        })
+
+        # Place the "dormant" vote for position 2, for children of h1b_from_0b.
+        # This vote is for h2x_from_1b_uuid winning over h2y_from_1b_uuid.
+        # The voter is some arbitrary fork_uuid that had a mandate for this position (or a session).
+        # For simplicity, we use a dummy voter fork.
+        dormant_voter_fork_uuid = "dormant-voter-fork-uuid-for-pos2"
+        _create_vote_entry(2, dormant_voter_fork_uuid, h2x_from_1b_uuid, h2y_from_1b_uuid)
+        # This vote is "dormant" because the canonical path does not go through h1b_from_0b.
+        # ratings.get_ranking for (pos=2, predecessor=h1b_from_0b_uuid) SHOULD see this vote.
+
+        # Votes to make the initial path (f0a -> f1a_from_0a -> f2a_from_1a) have some Elo.
+        _create_vote_entry(0, "voter_init_a", h0a_uuid, h0b_uuid) # f0a wins
+        _create_vote_entry(1, "voter_init_b", h1a_from_0a_uuid, storage.compute_uuid("dummy_1_child_of_0a")) # f1a_from_0a wins
+        _create_vote_entry(2, "voter_init_c", h2a_from_1a_uuid, storage.compute_uuid("dummy_2_child_of_1a")) # f2a_from_1a wins
+
+
+        # Votes to make f0b win over f0a during session commit.
+        _create_vote_entry(0, "cascade_voter1", h0b_uuid, h0a_uuid)
+        _create_vote_entry(0, "cascade_voter2", h0b_uuid, h0a_uuid) # f0b now has 2 wins, f0a has 1.
+
+        # Votes to make f1b_from_0b win over f1c_from_0b (children of h0b)
+        # This ensures that when h0b becomes canonical, f1b_from_0b becomes its canonical child.
+        _create_vote_entry(1, "cascade_voter3", h1b_from_0b_uuid, h1c_from_0b_uuid)
+        _create_vote_entry(1, "cascade_voter4", h1b_from_0b_uuid, h1c_from_0b_uuid)
+
+
+        # Mandate fork for session (Position 3, child of current canonical h2a_from_1a_uuid)
+        h3_judge_uuid = storage.compute_uuid("Hrönir 3 Judge for Dormant Test")
+        _create_hronir(h3_judge_uuid, "Hrönir 3 Judge for Dormant Test", prev_uuid=h2a_from_1a_uuid)
+        f3_judge_fork_uuid = _get_fork_uuid(3, h2a_from_1a_uuid, h3_judge_uuid)
+        _create_fork_entry(3, h2a_from_1a_uuid, h3_judge_uuid, f3_judge_fork_uuid)
+
+        # --- Action: Session Start and Commit to change canonical path to h0b -> h1b_from_0b ---
+        result_start, output_start = _run_cli_command([
+            "session", "start", "--position", "3", "--fork-uuid", f3_judge_fork_uuid,
+            "--ratings-dir", str(RATINGS_DIR.resolve()),
+            "--forking-path-dir", str(FORKING_PATH_DIR.resolve()),
+            "--canonical-path-file", str(CANONICAL_PATH_FILE_fixture.resolve()),
+        ])
+        assert result_start.exit_code == 0, f"Session start failed: {output_start}"
+        session_id = json.loads(output_start)["session_id"]
+
+        # Commit: Vote for f0b to win at Position 0.
+        # This will trigger cascade. h0b becomes canonical.
+        # Then, for position 1, children of h0b are considered. f1b_from_0b should win.
+        # Then, for position 2, children of h1b_from_0b are considered.
+        # The dormant vote for h2x_from_1b_uuid should now make it the winner over h2y_from_1b_uuid.
+        verdicts = { "0": f0b_uuid } # f0b wins over f0a
+
+        result_commit, output_commit = _run_cli_command([
+            "session", "commit", "--session-id", session_id, "--verdicts", json.dumps(verdicts),
+            "--ratings-dir", str(RATINGS_DIR.resolve()),
+            "--forking-path-dir", str(FORKING_PATH_DIR.resolve()),
+            "--canonical-path-file", str(CANONICAL_PATH_FILE_fixture.resolve()),
+        ])
+        assert result_commit.exit_code == 0, f"Session commit failed: {output_commit}"
+
+        # --- Assertions ---
+        final_canonical_path = _get_canonical_path()
+
+        # Position 0: Should be f0b
+        assert final_canonical_path["0"]["fork_uuid"] == f0b_uuid
+        assert final_canonical_path["0"]["hrönir_uuid"] == h0b_uuid
+
+        # Position 1: Should be f1b_from_0b (child of h0b)
+        assert final_canonical_path["1"]["fork_uuid"] == f1b_from_0b_uuid
+        assert final_canonical_path["1"]["hrönir_uuid"] == h1b_from_0b_uuid
+
+        # Position 2: Should be f2x_from_1b (child of h1b_from_0b), due to the reactivated dormant vote.
+        # This relies on ratings.get_ranking correctly using votes for the (pos=2, predecessor=h1b_from_0b_uuid) pair.
+        assert final_canonical_path["2"]["fork_uuid"] == f2x_from_1b_uuid
+        assert final_canonical_path["2"]["hrönir_uuid"] == h2x_from_1b_uuid
 
 # To run these tests:
 # Ensure pytest is installed.

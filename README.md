@@ -133,30 +133,31 @@ Chapter 0: The Mirror of Enigmas (seed)
 
 ## 🧩 The Mechanics of Narrative Possibility Space
 
-Each new chapter (`n`) is created through:
+Each new chapter (`n`):
 
-1. **Semantic extraction**: Previous chapters (0 to n-1) are analyzed via semantic embeddings to extract themes, concepts, and stylistic markers.
-2. **Prompt synthesis**: A unified prompt is formulated, combining these extracted narrative elements into a coherent instruction for the LLM.
-3. **LLM Generation**: The model generates a chapter that logically and creatively integrates the accumulated narrative history, maintaining a consistent Borgesian tone and theme.
+- Is synthesized by considering the entire narrative space of all previously generated chapters (`0` through `n-1`).
+- Employs a sophisticated language model (LLM), guided by a carefully crafted **synthesis prompt** that encapsulates themes, motifs, characters, and ideas accumulated thus far.
+- Can exist in multiple variants (e.g., `2_a`, `2_b`, `2_c`), each exploring different interpretations of the collective narrative space.
 
-This process ensures each new chapter reflects not only isolated events but also echoes, reflections, and metaphorical nuances that have organically developed throughout the entire narrative journey.
+The narrative expands exponentially, creating a network of infinite possibilities. Each act of creation (generating a new hrönir and its associated `fork_uuid`) grants the author a mandate to participate in a **Judgment Session**, potentially influencing the canonical interpretation of all preceding history.
 
 ---
 
-## ⚔️ Selecting the True Chapter
+## ⚔️ Selecting the True Narrative Path (Canonical Forks)
 
-- Variants within the same chapter position compete through **paired reader evaluations** (literary duels).
-- Results of these duels are recorded using an **Elo-based literary ranking system**, establishing a probabilistic hierarchy among competing versions.
-- Over time, a dominant version emerges for each chapter position—the "canonical Hrönir"—acknowledged by readers as the authentic narrative branch through their collective experience.
-- Winning chapters are copied into the `book/` folder, and each selection constrains the possibilities for subsequent chapters via updated forking paths.
+- Forks (transitions between hrönirs) at the same position and lineage compete through **Judgment Sessions**.
+- Veredicts from these sessions are recorded as votes, updating Elo ratings for the involved forks.
+- An Elo-based ranking system establishes a probabilistic hierarchy among competing forks.
+- The **Temporal Cascade**, triggered by `session commit`, recalculates the `data/canonical_path.json`. This path represents the sequence of forks deemed most "inevitable" by collective judgment.
+- The "canonical hrönirs" are those that lie along this canonical path of forks.
 
-Example Elo ranking for Chapter 2 variants:
+Example Elo ranking for forks at Position 2 (assuming a specific predecessor from Position 1):
 
-| Chapter 2 | Elo  | Wins | Losses |
-|-----------|------|------|--------|
-| `2_c`     | 1580 | 14   | 4      |
-| `2_a`     | 1512 | 10   | 8      |
-| `2_b`     | 1465 | 7    | 11     |
+| Fork UUID (leading to Hrönir) | Elo  | Wins | Losses |
+|-------------------------------|------|------|--------|
+| `fork_uuid_2c_xyz...`         | 1580 | 14   | 4      |
+| `fork_uuid_2a_abc...`         | 1512 | 10   | 8      |
+| `fork_uuid_2b_pqr...`         | 1465 | 7    | 11     |
 
 ---
 
@@ -242,6 +243,8 @@ uv run python -m hronir_encyclopedia.cli store drafts/my_chapter.md --prev <uuid
 uv run python -m hronir_encyclopedia.cli ranking --position 1
 
 # Validate a human-contributed chapter (basic check)
+# Note: Validation is primarily for the textual content. The hrönir's place in the
+# narrative structure is defined by its forking path entry.
 uv run python -m hronir_encyclopedia.cli validate --chapter drafts/my_chapter.md
 
 # Audit and repair stored hrönirs, forking paths, and votes
@@ -249,49 +252,29 @@ uv run python -m hronir_encyclopedia.cli audit
 
 # Remove invalid hrönirs, forking paths, or votes
 uv run python -m hronir_encyclopedia.cli clean --git
-```
-
-### Legacy/Informational Commands
-The following commands relate to older mechanisms or provide specific information:
-
-```bash
-# Synthesize (generate chapters and cast an initial vote - may be outdated by session model)
-# uv run python -m hronir_encyclopedia.cli synthesize \
-#  --position 1 \
-#  --prev <uuid_do_hronir_predecessor_canonico_da_posicao_0>
 
 # Get the current "Duel of Maximum Entropy" for a position (used internally by `session start`)
+# This can be useful to understand what duel a new session might present for a given position.
 uv run python -m hronir_encyclopedia.cli get-duel --position 1
 
-# Submit a direct vote for a specific duel (legacy, prefer session commit)
-# This was part of the older PoW and Entropic Dueling system.
-# The `voter-fork-uuid` here is the PoW from creating a new fork.
-# uv run python -m hronir_encyclopedia.cli vote \
-#  --position 1 \
-#  --voter-fork-uuid <seu_fork_uuid_de_prova_de_trabalho> \
-#  --winner-fork-uuid <fork_uuid_A_do_get_duel> \
-#  --loser-fork-uuid <fork_uuid_B_do_get_duel>
-
-# Consolidate book (manual trigger for canonical path recalculation)
-# Note: Under the "Tribunal of the Future" protocol, the primary way the canonical
-# path is updated is via the Temporal Cascade triggered by `session commit`.
-# This command might be used for recovery, debugging, or initial setup.
+# Consolidate book (trigger Temporal Cascade from position 0)
+# Under the "Tribunal of the Future" protocol, the canonical path is primarily updated
+# by the Temporal Cascade triggered by `session commit` (starting from the oldest voted position).
+# The `consolidate-book` command now serves as a manual way to trigger this cascade
+# from the very beginning (position 0), useful for initialization, full recalculations, or recovery.
 uv run python -m hronir_encyclopedia.cli consolidate-book
 ```
 
-The `store` command is crucial for generating new `hrönir` and, through associated forking path entries, the `fork_uuid` necessary to initiate a Judgment Session. The direct `vote` command is now largely superseded by the `session commit` mechanism, which provides a more comprehensive way to influence the narrative.
+The `store` command is crucial for generating new `hrönir` and, through associated forking path entries, the `fork_uuid` necessary to initiate a Judgment Session. Direct voting via a `vote` command is deprecated; all judgments are now channeled through the `session commit` mechanism.
 
 ## 🔏 Proof-of-Work (Mandate for Judgment)
 
-Previously, Proof-of-Work (creating a new `fork_uuid` by storing a hrönir and linking it in a forking path) granted the right to cast a single vote in a specific, system-curated duel via `get-duel` and `vote`.
+Creating a new `fork_uuid` (by storing a hrönir at Position `N` and ensuring its corresponding entry in a forking path CSV) serves as your Proof-of-Work.
 
-Under the "Tribunal of the Future" (Protocol v2):
-*   Creating a new `fork_uuid` (at Position `N`) still serves as your Proof-of-Work.
-*   However, this `fork_uuid` now acts as a **mandate** to initiate a `session start --position N --fork-uuid <your_fork_N_uuid>`.
-*   This session gives you the right to cast veredicts on *any subset* of duels from prior positions (`N-1` down to `0`) as presented in the session's static dossier.
-*   The `get-duel` command still shows the current maximum entropy duel for a position, which is what `session start` uses internally to build the dossier. The old direct `vote` command is less central to the new workflow.
+This `fork_uuid` acts as a **mandate** to initiate a `session start --position N --fork-uuid <your_fork_N_uuid>`.
+This session grants you the right to cast veredicts on *any subset* of duels from prior positions (`N-1` down to `0`), as presented in the session's static dossier. Each duel in the dossier is the one of maximum entropy for its position at the time the session was started.
 
-This new system elevates the impact of each contribution, allowing a single act of creation to potentially influence the entire preceding narrative history through a structured judgment process.
+This system elevates the impact of each contribution, allowing a single act of creation to potentially influence the entire preceding narrative history through a structured and auditable judgment process. The `get-duel` command can still be used to see what the current maximum entropy duel for a specific position is, which is what `session start` uses internally to build the dossier.
 
 ## Development Setup
 
