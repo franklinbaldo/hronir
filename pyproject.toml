@@ -4,7 +4,6 @@ version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
     "click",
-    "pandas",
     "google-generativeai",
     "sqlalchemy>=2.0",
     "python-dotenv", # Adicionado para gerenciar secrets
@@ -12,8 +11,9 @@ dependencies = [
     # "pypandoc", # Removido pois não será usado
     "typer[all]", # Adicionado para um CLI moderno
     "blake3", # Adicionado para hashing rápido
-    "pydantic", # Validação de dados
-    "networkx" # Operações de grafo
+    "pydantic", # Validação de dados # Operações de grafo
+    "networkx",
+    "pandas>=2.3.0",
 ]
 
 [project.scripts]
@@ -37,3 +37,8 @@ packages = ["hronir_encyclopedia"]
 
 [tool.uv]
 package = true
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+]

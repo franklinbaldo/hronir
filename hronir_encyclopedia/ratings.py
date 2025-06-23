@@ -1,12 +1,11 @@
 import uuid
 from pathlib import Path
+import math # Adicionado para math.log2
 
 import pandas as pd
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 from .models import VoteDB
-
-import math # Adicionado para math.log2
 # from itertools import combinations # Não é mais explicitamente necessário para a estratégia de vizinhos
 
 
