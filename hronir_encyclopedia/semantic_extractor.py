@@ -1,5 +1,4 @@
 import os
-from typing import List, Optional
 
 import google.generativeai as genai
 import numpy as np
@@ -9,7 +8,10 @@ import numpy as np
 # Vamos usar o mais recente ou recomendado, gemini-embedding-exp-03-07 por agora.
 EMBEDDING_MODEL = "gemini-embedding-exp-03-07"
 
-def get_embeddings(texts: List[str], task_type: str = "SEMANTIC_SIMILARITY") -> Optional[List[List[float]]]:
+
+def get_embeddings(
+    texts: list[str], task_type: str = "SEMANTIC_SIMILARITY"
+) -> list[list[float]] | None:
     """
     Gera embeddings para uma lista de textos usando a API Gemini.
 
@@ -46,16 +48,15 @@ def get_embeddings(texts: List[str], task_type: str = "SEMANTIC_SIMILARITY") -> 
         # Então podemos passar a lista diretamente.
 
         result = client.models.embed_content(
-            model=EMBEDDING_MODEL,
-            content=texts, # Passando a lista de textos
-            task_type=task_type
+            model=EMBEDDING_MODEL, content=texts, task_type=task_type  # Passando a lista de textos
         )
         return result.get("embedding") if isinstance(result, dict) else result.embeddings
     except Exception as e:
         print(f"Erro ao gerar embeddings: {e}")
         return None
 
-def get_average_embedding(embeddings: List[List[float]]) -> Optional[List[float]]:
+
+def get_average_embedding(embeddings: list[list[float]]) -> list[float] | None:
     """
     Calcula a média de uma lista de vetores de embedding.
     """
@@ -66,10 +67,11 @@ def get_average_embedding(embeddings: List[List[float]]) -> Optional[List[float]
     avg_embedding = np.mean(embedding_array, axis=0)
     return avg_embedding.tolist()
 
+
 def get_narrative_space_embedding(
-    chapter_texts: List[str],
-    task_type: str = "RETRIEVAL_DOCUMENT" # Usar um tipo de tarefa para documentos
-) -> Optional[List[float]]:
+    chapter_texts: list[str],
+    task_type: str = "RETRIEVAL_DOCUMENT",  # Usar um tipo de tarefa para documentos
+) -> list[float] | None:
     """
     Gera um embedding único representando o espaço narrativo de uma lista de capítulos.
 
@@ -90,7 +92,8 @@ def get_narrative_space_embedding(
         return get_average_embedding(embeddings)
     return None
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # Exemplo de uso (requer GEMINI_API_KEY no ambiente)
     # Configurar a chave para teste local:
     # from dotenv import load_dotenv
@@ -102,7 +105,7 @@ if __name__ == '__main__':
     sample_texts = [
         "I owe the discovery of Uqbar to the conjunction of a mirror and an encyclopedia.",
         "The unsettling truth is that Tlön is a vast, intricate conspiracy of intellectuals.",
-        "Orbis Tertius is the name of the secret society that conceived Tlön."
+        "Orbis Tertius is the name of the secret society that conceived Tlön.",
     ]
 
     print(f"Testando com {len(sample_texts)} textos de exemplo:")
@@ -121,7 +124,9 @@ if __name__ == '__main__':
     # Teste 2: Obter embedding médio do espaço narrativo
     narrative_embedding = get_narrative_space_embedding(sample_texts)
     if narrative_embedding:
-        print(f"Embedding médio do espaço narrativo (primeiras 5 dimensões de {len(narrative_embedding)}):")
+        print(
+            f"Embedding médio do espaço narrativo (primeiras 5 dimensões de {len(narrative_embedding)}):"
+        )
         print(f"  {narrative_embedding[:5]}")
     else:
         print("Falha ao obter embedding do espaço narrativo.")
@@ -129,7 +134,9 @@ if __name__ == '__main__':
     # Teste com um único texto
     single_text_embedding = get_narrative_space_embedding([sample_texts[0]])
     if single_text_embedding:
-        print(f"\nEmbedding para um único texto (primeiras 5 dimensões de {len(single_text_embedding)}):")
+        print(
+            f"\nEmbedding para um único texto (primeiras 5 dimensões de {len(single_text_embedding)}):"
+        )
         print(f"  {single_text_embedding[:5]}")
 
     # Teste com lista vazia
@@ -149,4 +156,3 @@ if __name__ == '__main__':
     # print(f"  Obteve embeddings inesperadamente: {error_embeddings}")
     # if current_key:
     # os.environ["GEMINI_API_KEY"] = current_key # Restaurar chave
-```

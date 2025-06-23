@@ -1,14 +1,13 @@
 import datetime
-from typing import List, Optional, Dict
 
-from pydantic import BaseModel, Field, UUID5, field_validator
+from pydantic import UUID5, BaseModel, Field, field_validator
 from sqlalchemy import (
-    create_engine,
-    Column,
-    String,
-    Integer,
-    DateTime,
     JSON,
+    Column,
+    DateTime,
+    Integer,
+    String,
+    create_engine,
 )
 from sqlalchemy.orm import declarative_base, sessionmaker
 
@@ -75,10 +74,10 @@ class SuperBlockDB(Base):
 class Fork(BaseModel):
     fork_uuid: UUID5
     position: int
-    prev_uuid: Optional[UUID5] = None
+    prev_uuid: UUID5 | None = None
     uuid: UUID5
     status: str = "PENDING"
-    mandate_id: Optional[str] = None
+    mandate_id: str | None = None
 
     class Config:
         from_attributes = True
@@ -87,8 +86,8 @@ class Fork(BaseModel):
 class Transaction(BaseModel):
     uuid: UUID5
     timestamp: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
-    prev_uuid: Optional[UUID5] = None
-    content: Dict
+    prev_uuid: UUID5 | None = None
+    content: dict
 
     class Config:
         from_attributes = True
@@ -97,9 +96,9 @@ class Transaction(BaseModel):
 class SuperBlock(BaseModel):
     uuid: UUID5
     timestamp: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
-    parent_a_uuid: Optional[UUID5] = None
-    parent_b_uuid: Optional[UUID5] = None
-    merged_tx_uuids: List[UUID5] = []
+    parent_a_uuid: UUID5 | None = None
+    parent_b_uuid: UUID5 | None = None
+    merged_tx_uuids: list[UUID5] = []
 
     @field_validator("parent_b_uuid")
     def check_parents(cls, v, values):

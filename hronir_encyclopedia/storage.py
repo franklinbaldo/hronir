@@ -2,10 +2,12 @@ import json
 import shutil
 import uuid
 from pathlib import Path
-import pandas as pd # Moved to top
+from typing import Any
+
+import pandas as pd  # Moved to top
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
-from typing import Any, Optional
+
 from .models import ForkDB
 
 UUID_NAMESPACE = uuid.NAMESPACE_URL
@@ -87,6 +89,7 @@ def forking_path_exists(
 ) -> bool:
     """Return True if fork_uuid appears in any forking path table or CSV."""
     import pandas as pd
+
     # print(f"DEBUG: storage.forking_path_exists searching for fork_uuid: {fork_uuid} in dir: {fork_dir}") # DEBUG REMOVED
 
     if session is not None:
@@ -112,11 +115,11 @@ def forking_path_exists(
             return False
 
     fork_dir_obj = Path(fork_dir)
-    resolved_fork_dir = fork_dir_obj.resolve() # Resolve the path
+    resolved_fork_dir = fork_dir_obj.resolve()  # Resolve the path
     found_in_csv = False
     # print(f"DEBUG: storage.forking_path_exists iterating items in {resolved_fork_dir}") # DEBUG REMOVED
 
-    if resolved_fork_dir.is_dir(): # Check if directory exists before iterating
+    if resolved_fork_dir.is_dir():  # Check if directory exists before iterating
         for item_path in resolved_fork_dir.iterdir():
             # print(f"DEBUG: storage.forking_path_exists found item: {item_path}, is_file: {item_path.is_file()}, name: {item_path.name}") # DEBUG REMOVED
             if item_path.is_file() and item_path.name.endswith(".csv"):
@@ -124,22 +127,24 @@ def forking_path_exists(
                 # print(f"DEBUG: storage.forking_path_exists checking CSV: {csv_file_path}") # DEBUG REMOVED
                 try:
                     # Read only 'fork_uuid' column if possible, for efficiency, though pandas reads all by default.
-                    df = pd.read_csv(csv_file_path, usecols=["fork_uuid"], dtype={"fork_uuid": str}) # type: ignore
-                    if fork_uuid in df["fork_uuid"].values: # More direct check
+                    df = pd.read_csv(csv_file_path, usecols=["fork_uuid"], dtype={"fork_uuid": str})  # type: ignore
+                    if fork_uuid in df["fork_uuid"].values:  # More direct check
                         # print(f"DEBUG: storage.forking_path_exists FOUND fork_uuid {fork_uuid} in {csv_file_path}") # DEBUG REMOVED
                         found_in_csv = True
                         break
-                except ValueError: # Happens if 'fork_uuid' column is not in CSV or other read issues
+                except (
+                    ValueError
+                ):  # Happens if 'fork_uuid' column is not in CSV or other read issues
                     # print(f"DEBUG: storage.forking_path_exists ValueError (likely missing 'fork_uuid' col) in {csv_file_path}: {ve}") # DEBUG REMOVED
-                    pass # Ignore files that don't have fork_uuid or are malformed for this check
+                    pass  # Ignore files that don't have fork_uuid or are malformed for this check
                 except Exception:
                     # print(f"DEBUG: storage.forking_path_exists error reading {csv_file_path}: {e}") # DEBUG REMOVED
-                    continue # Ignore other read errors for this specific check
-            if found_in_csv: # Break outer loop if found
+                    continue  # Ignore other read errors for this specific check
+            if found_in_csv:  # Break outer loop if found
                 break
 
     # if not found_in_csv: # DEBUG REMOVED
-        # print(f"DEBUG: storage.forking_path_exists DID NOT FIND fork_uuid {fork_uuid} in any CSV in {resolved_fork_dir}") # DEBUG REMOVED
+    # print(f"DEBUG: storage.forking_path_exists DID NOT FIND fork_uuid {fork_uuid} in any CSV in {resolved_fork_dir}") # DEBUG REMOVED
     return found_in_csv
 
 
@@ -242,9 +247,9 @@ def purge_fake_hronirs(base: Path | str = "the_library") -> int:
     return removed
 
 
-from typing import Optional, Dict # Add Optional and Dict for type hinting
-
-def get_canonical_fork_info(position: int, canonical_path_file: Path = Path("data/canonical_path.json")) -> Optional[Dict[str, str]]:
+def get_canonical_fork_info(
+    position: int, canonical_path_file: Path = Path("data/canonical_path.json")
+) -> dict[str, str] | None:
     """
     Consulta o arquivo de caminho canônico (ex: data/canonical_path.json) para
     revelar o fork_uuid e o hrönir_uuid (sucessor) canônicos para a posição especificada.
@@ -265,9 +270,9 @@ def get_canonical_fork_info(position: int, canonical_path_file: Path = Path("dat
         return None
 
     try:
-        with open(canonical_path_file, "r") as f:
+        with open(canonical_path_file) as f:
             canonical_data = json.load(f)
-    except (json.JSONDecodeError, IOError):
+    except (OSError, json.JSONDecodeError):
         return None
 
     path_entries = canonical_data.get("path")
@@ -299,7 +304,7 @@ def append_fork(
     csv_file: Path,
     position: int,
     prev_uuid: str,
-    uuid_str: str, # Renamed 'uuid' to 'uuid_str' to avoid conflict with uuid module
+    uuid_str: str,  # Renamed 'uuid' to 'uuid_str' to avoid conflict with uuid module
     conn: Engine | None = None,
     session: Session | None = None,
 ) -> str:
@@ -324,7 +329,7 @@ def append_fork(
         return fork_uuid
 
     if conn is not None:
-        table_name = csv_file.stem # Use stem for table name consistency
+        table_name = csv_file.stem  # Use stem for table name consistency
         with conn.begin() as con:
             # Ensure table exists
             # TODO: Add robust schema migration if table exists with different schema
@@ -352,7 +357,7 @@ def append_fork(
                     """,
                     (position, prev_uuid, uuid_str, fork_uuid, "PENDING"),
                 )
-            except Exception as e: # Broad exception to catch cases where schema might be old
+            except Exception:  # Broad exception to catch cases where schema might be old
                 # This is a fallback, ideally schema migration should be handled.
                 # For now, try inserting without status if the above fails,
                 # assuming an older table schema. This is not ideal.
@@ -439,23 +444,26 @@ def purge_fake_forking_csv(csv_path: Path, base: Path | str = "the_library") -> 
         keep.append(row)
 
     if removed:
-        if keep: # Ensure 'keep' is not empty before creating DataFrame
+        if keep:  # Ensure 'keep' is not empty before creating DataFrame
             # Define columns to ensure 'status' is included, even if all rows
             # had it as NaN initially (though audit_forking_csv should prevent this for new files)
             final_cols = ["position", "prev_uuid", "uuid", "fork_uuid", "undiscovered", "status"]
             # Filter df_keep to only include columns that actually exist in it, plus 'status'
             df_kept = pd.DataFrame(keep)
             cols_to_use = [col for col in final_cols if col in df_kept.columns]
-            if "status" not in df_kept.columns and "status" in final_cols: # if status was somehow lost
-                 # This case should ideally not happen if audit_forking_csv ran correctly
-                 df_kept["status"] = "PENDING" # Add with default if missing
-                 if "status" not in cols_to_use: # Should not be needed but defensive
-                     cols_to_use.append("status")
-
+            if (
+                "status" not in df_kept.columns and "status" in final_cols
+            ):  # if status was somehow lost
+                # This case should ideally not happen if audit_forking_csv ran correctly
+                df_kept["status"] = "PENDING"  # Add with default if missing
+                if "status" not in cols_to_use:  # Should not be needed but defensive
+                    cols_to_use.append("status")
 
             pd.DataFrame(df_kept, columns=cols_to_use).to_csv(csv_path, index=False)
-        else: # All rows were removed
-            csv_path.write_text("position,prev_uuid,uuid,fork_uuid,undiscovered,status\n") # Write header for empty file
+        else:  # All rows were removed
+            csv_path.write_text(
+                "position,prev_uuid,uuid,fork_uuid,undiscovered,status\n"
+            )  # Write header for empty file
     return removed
 
 
@@ -507,7 +515,9 @@ def purge_fake_votes_csv(
     return removed
 
 
-def get_fork_file_and_data(fork_uuid_to_find: str, fork_dir_base: Path = Path("forking_path")) -> Optional[Dict[str, Any]]:
+def get_fork_file_and_data(
+    fork_uuid_to_find: str, fork_dir_base: Path = Path("forking_path")
+) -> dict[str, Any] | None:
     """
     Scans all forking_path/*.csv files to find a specific fork_uuid.
 
@@ -522,19 +532,19 @@ def get_fork_file_and_data(fork_uuid_to_find: str, fork_dir_base: Path = Path("f
         if csv_filepath.stat().st_size == 0:
             continue
         try:
-            df = pd.read_csv(csv_filepath, dtype=str) # Read all as string to be safe
+            df = pd.read_csv(csv_filepath, dtype=str)  # Read all as string to be safe
             fork_row_df = df[df["fork_uuid"] == fork_uuid_to_find]
             if not fork_row_df.empty:
                 # Convert row to dict, ensure all expected columns are present or defaulted
                 fork_data = fork_row_df.iloc[0].to_dict()
-                fork_data['csv_filepath'] = csv_filepath
+                fork_data["csv_filepath"] = csv_filepath
                 # Ensure numeric types if necessary for consumer, but for now keep as read
-                if 'position' in fork_data and fork_data['position'] is not None:
+                if "position" in fork_data and fork_data["position"] is not None:
                     try:
-                        fork_data['position'] = int(fork_data['position'])
+                        fork_data["position"] = int(fork_data["position"])
                     except ValueError:
                         # Handle or log error if position is not a valid int
-                        pass # Keep as string if conversion fails
+                        pass  # Keep as string if conversion fails
                 return fork_data
         except pd.errors.EmptyDataError:
             continue
@@ -547,7 +557,7 @@ def get_fork_file_and_data(fork_uuid_to_find: str, fork_dir_base: Path = Path("f
 def update_fork_status(
     fork_uuid_to_update: str,
     new_status: str,
-    mandate_id: Optional[str] = None,
+    mandate_id: str | None = None,
     fork_dir_base: Path = Path("forking_path"),
     conn: Engine | None = None,
     session: Session | None = None,
@@ -589,10 +599,10 @@ def update_fork_status(
 
     # CSV file logic:
     fork_info = get_fork_file_and_data(fork_uuid_to_update, fork_dir_base)
-    if not fork_info or 'csv_filepath' not in fork_info:
+    if not fork_info or "csv_filepath" not in fork_info:
         return False
 
-    csv_filepath = fork_info['csv_filepath']
+    csv_filepath = fork_info["csv_filepath"]
     try:
         df = pd.read_csv(csv_filepath)
         fork_index = df[df["fork_uuid"] == fork_uuid_to_update].index
@@ -602,7 +612,7 @@ def update_fork_status(
             df.loc[idx, "status"] = new_status
             if mandate_id is not None:
                 if "mandate_id" not in df.columns:
-                    df["mandate_id"] = pd.NA # Initialize column if it doesn't exist
+                    df["mandate_id"] = pd.NA  # Initialize column if it doesn't exist
                 df.loc[idx, "mandate_id"] = mandate_id
 
             df.to_csv(csv_filepath, index=False)

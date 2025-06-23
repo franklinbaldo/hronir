@@ -1,6 +1,7 @@
-import pandas as pd
-import networkx as nx
 from pathlib import Path
+
+import networkx as nx
+import pandas as pd
 
 ROOT_NODE = "__ROOT__"
 

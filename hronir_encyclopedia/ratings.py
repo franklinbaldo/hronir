@@ -1,26 +1,29 @@
+import math  # Adicionado para math.log2
 import uuid
 from pathlib import Path
-import math # Adicionado para math.log2
 
 import pandas as pd
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
+
 from .models import VoteDB
+
 # from itertools import combinations # Não é mais explicitamente necessário para a estratégia de vizinhos
 
 
 def _calculate_elo_probability(elo_a: float, elo_b: float) -> float:
     """Calcula a probabilidade de A vencer B."""
-    return 1 / (1 + 10**((elo_b - elo_a) / 400))
+    return 1 / (1 + 10 ** ((elo_b - elo_a) / 400))
+
 
 def _calculate_duel_entropy(elo_a: float, elo_b: float) -> float:
     """Calcula a entropia de Shannon para um duelo Elo."""
     p_a = _calculate_elo_probability(elo_a, elo_b)
-    if p_a == 0 or p_a == 1: # Evita math.log2(0)
-        return 0.0 # Retorna 0.0 para consistência de tipo float
+    if p_a == 0 or p_a == 1:  # Evita math.log2(0)
+        return 0.0  # Retorna 0.0 para consistência de tipo float
     p_b = 1 - p_a
     # A verificação de p_b == 0 é implicitamente coberta por p_a == 1.
-    return - (p_a * math.log2(p_a) + p_b * math.log2(p_b))
+    return -(p_a * math.log2(p_a) + p_b * math.log2(p_b))
 
 
 def record_vote(
@@ -59,7 +62,7 @@ def record_vote(
             )
         return
     # else: # conn is None
-        # print(f"DEBUG_RATINGS: record_vote for position {position} using CSV logic, base: {base}") # REMOVED DEBUG
+    # print(f"DEBUG_RATINGS: record_vote for position {position} using CSV logic, base: {base}") # REMOVED DEBUG
 
     base = Path(base)
     base.mkdir(exist_ok=True)
@@ -79,18 +82,18 @@ def record_vote(
             try:
                 df = pd.read_csv(csv_path)
                 df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
-            except pd.errors.EmptyDataError: # Should be caught by size check, but as fallback
+            except pd.errors.EmptyDataError:  # Should be caught by size check, but as fallback
                 df = pd.DataFrame([row])
-    else: # File does not exist
+    else:  # File does not exist
         df = pd.DataFrame([row])
     df.to_csv(csv_path, index=False)
 
 
 def get_ranking(
     position: int,
-    predecessor_hronir_uuid: str | None, # UUID do hrönir sucessor do fork canônico anterior
+    predecessor_hronir_uuid: str | None,  # UUID do hrönir sucessor do fork canônico anterior
     forking_path_dir: Path,
-    ratings_dir: Path
+    ratings_dir: Path,
 ) -> pd.DataFrame:
     """
     Calcula o ranking Elo para fork_uuid's de uma dada 'position', considerando
@@ -117,31 +120,40 @@ def get_ranking(
         if csv_file.stat().st_size == 0:
             continue
         try:
-            df_forks = pd.read_csv(csv_file, dtype={'position': 'Int64', 'prev_uuid': str, 'uuid': str, 'fork_uuid': str})
-            if df_forks.empty or not all(col in df_forks.columns for col in ["position", "prev_uuid", "uuid", "fork_uuid"]):
+            df_forks = pd.read_csv(
+                csv_file,
+                dtype={"position": "Int64", "prev_uuid": str, "uuid": str, "fork_uuid": str},
+            )
+            if df_forks.empty or not all(
+                col in df_forks.columns for col in ["position", "prev_uuid", "uuid", "fork_uuid"]
+            ):
                 continue
 
             # Garantir que a coluna position seja int para comparação
-            df_forks = df_forks[pd.to_numeric(df_forks["position"], errors='coerce') == position]
+            df_forks = df_forks[pd.to_numeric(df_forks["position"], errors="coerce") == position]
             if df_forks.empty:
                 continue
 
-            if predecessor_hronir_uuid is None: # Caso Posição 0
+            if predecessor_hronir_uuid is None:  # Caso Posição 0
                 if position == 0:
                     # `prev_uuid` deve ser nulo/vazio/NaN
-                    selected_forks = df_forks[df_forks["prev_uuid"].fillna('').isin(['', 'nan', 'None'])]
+                    selected_forks = df_forks[
+                        df_forks["prev_uuid"].fillna("").isin(["", "nan", "None"])
+                    ]
                 else:
                     # predecessor_hronir_uuid é None para posição != 0 é um estado inesperado.
-                    continue # ou return empty_df se for uma condição de erro global
-            else: # predecessor_hronir_uuid is not None
+                    continue  # ou return empty_df se for uma condição de erro global
+            else:  # predecessor_hronir_uuid is not None
                 selected_forks = df_forks[df_forks["prev_uuid"] == predecessor_hronir_uuid]
 
             for _, row in selected_forks.iterrows():
-                eligible_fork_infos_list.append({"fork_uuid": row["fork_uuid"], "hrönir_uuid": row["uuid"]})
+                eligible_fork_infos_list.append(
+                    {"fork_uuid": row["fork_uuid"], "hrönir_uuid": row["uuid"]}
+                )
 
         except pd.errors.EmptyDataError:
             continue
-        except Exception: # Trata outros erros de parsing ou de arquivo
+        except Exception:  # Trata outros erros de parsing ou de arquivo
             # Adicionar logging aqui seria útil
             continue
 
@@ -162,22 +174,27 @@ def get_ranking(
     # Então, o mapeamento de hrönir_uuid para fork_uuid dentro dos elegíveis deve ser 1:1.
 
     # eligible_fork_df para fácil lookup e inicialização de ranking
-    eligible_fork_df = pd.DataFrame(eligible_fork_infos_list).drop_duplicates(subset=['fork_uuid'])
-    if eligible_fork_df.empty: # Após drop_duplicates, se algo estranho acontecer
+    eligible_fork_df = pd.DataFrame(eligible_fork_infos_list).drop_duplicates(subset=["fork_uuid"])
+    if eligible_fork_df.empty:  # Após drop_duplicates, se algo estranho acontecer
         return empty_df
 
     # Mapeamento de hrönir_uuid (sucessor) para seu fork_uuid elegível
-    hronir_to_eligible_fork_map = pd.Series(eligible_fork_df.fork_uuid.values, index=eligible_fork_df.hrönir_uuid).to_dict()
+    hronir_to_eligible_fork_map = pd.Series(
+        eligible_fork_df.fork_uuid.values, index=eligible_fork_df.hrönir_uuid
+    ).to_dict()
 
     # 2. Preparar DataFrame de Ranking com Elo Base para todos os forks elegíveis
     ELO_BASE = 1500
     ranking_list = [
         {
             "fork_uuid": fork_info["fork_uuid"],
-            "hrönir_uuid": fork_info["hrönir_uuid"], # Este é o hrönir SUCESSOR do fork
-            "elo_rating": ELO_BASE, "games_played": 0, "wins": 0, "losses": 0
+            "hrönir_uuid": fork_info["hrönir_uuid"],  # Este é o hrönir SUCESSOR do fork
+            "elo_rating": ELO_BASE,
+            "games_played": 0,
+            "wins": 0,
+            "losses": 0,
         }
-        for fork_info in eligible_fork_df.to_dict('records')
+        for fork_info in eligible_fork_df.to_dict("records")
     ]
     # Usar fork_uuid como índice para fácil atualização
     current_ranking_df = pd.DataFrame(ranking_list).set_index("fork_uuid")
@@ -187,8 +204,8 @@ def get_ranking(
 
     if ratings_csv_path.exists() and ratings_csv_path.stat().st_size > 0:
         try:
-            df_votes = pd.read_csv(ratings_csv_path, dtype=str) # Ler tudo como string inicialmente
-            if not df_votes.empty and 'winner' in df_votes.columns and 'loser' in df_votes.columns:
+            df_votes = pd.read_csv(ratings_csv_path, dtype=str)  # Ler tudo como string inicialmente
+            if not df_votes.empty and "winner" in df_votes.columns and "loser" in df_votes.columns:
 
                 # Mapear winner/loser hrönir_uuids para fork_uuids elegíveis
                 df_votes["winner_fork_uuid"] = df_votes["winner"].map(hronir_to_eligible_fork_map)
@@ -198,7 +215,9 @@ def get_ranking(
                 valid_duel_votes = df_votes.dropna(subset=["winner_fork_uuid", "loser_fork_uuid"])
 
                 # Garantir que o winner_fork e loser_fork não sejam o mesmo
-                valid_duel_votes = valid_duel_votes[valid_duel_votes["winner_fork_uuid"] != valid_duel_votes["loser_fork_uuid"]]
+                valid_duel_votes = valid_duel_votes[
+                    valid_duel_votes["winner_fork_uuid"] != valid_duel_votes["loser_fork_uuid"]
+                ]
 
                 if not valid_duel_votes.empty:
                     K_FACTOR = 32
@@ -223,7 +242,9 @@ def get_ranking(
                         current_ranking_df.loc[winner_fork, "elo_rating"] = new_r_winner_fork
                         current_ranking_df.loc[loser_fork, "elo_rating"] = new_r_loser_fork
 
-                    current_ranking_df["elo_rating"] = current_ranking_df["elo_rating"].round().astype(int)
+                    current_ranking_df["elo_rating"] = (
+                        current_ranking_df["elo_rating"].round().astype(int)
+                    )
 
         except pd.errors.EmptyDataError:
             pass
@@ -234,18 +255,14 @@ def get_ranking(
     # Resetar índice para ter fork_uuid como coluna e ordenar
     final_df = current_ranking_df.reset_index()
     final_df = final_df.sort_values(
-        by=["elo_rating", "wins", "games_played"],
-        ascending=[False, False, True]
+        by=["elo_rating", "wins", "games_played"], ascending=[False, False, True]
     )
 
     return final_df[output_columns]
 
 
 def determine_next_duel(
-    position: int,
-    predecessor_hronir_uuid: str | None,
-    forking_path_dir: Path,
-    ratings_dir: Path
+    position: int, predecessor_hronir_uuid: str | None, forking_path_dir: Path, ratings_dir: Path
 ) -> dict | None:
     """
     Determina o próximo duelo para uma posição, considerando apenas os forks elegíveis
@@ -281,7 +298,9 @@ def determine_next_duel(
             duel_fork_A_uuid = ranking_df.loc[i, "fork_uuid"]
             duel_fork_B_uuid = ranking_df.loc[i + 1, "fork_uuid"]
 
-    if duel_fork_A_uuid is None or duel_fork_B_uuid is None : # Não encontrou nenhum par (deveria ser coberto por len < 2)
+    if (
+        duel_fork_A_uuid is None or duel_fork_B_uuid is None
+    ):  # Não encontrou nenhum par (deveria ser coberto por len < 2)
         return None
 
     # O critério de aceitação é: Retorna `{ "fork_A": "...", "fork_B": "..." }`
@@ -289,19 +308,19 @@ def determine_next_duel(
     # Vou seguir o formato com "duel_pair" para consistência com o plano.
     return {
         "position": position,
-        "strategy": "max_entropy_duel", # Estratégia é sempre esta
+        "strategy": "max_entropy_duel",  # Estratégia é sempre esta
         "entropy": max_entropy,
         "duel_pair": {
             "fork_A": duel_fork_A_uuid,
             "fork_B": duel_fork_B_uuid,
-        }
+        },
     }
 
 
 def check_fork_qualification(
     fork_uuid: str,
-    ratings_df: pd.DataFrame, # DataFrame from get_ranking for the specific position and predecessor
-    all_forks_in_position_df: pd.DataFrame # DataFrame of all forks in that same position (e.g. from storage)
+    ratings_df: pd.DataFrame,  # DataFrame from get_ranking for the specific position and predecessor
+    all_forks_in_position_df: pd.DataFrame,  # DataFrame of all forks in that same position (e.g. from storage)
 ) -> bool:
     """
     Checks if a fork meets the criteria to be marked as 'QUALIFIED'.
@@ -341,7 +360,7 @@ def check_fork_qualification(
     fork_data = ratings_df[ratings_df["fork_uuid"] == fork_uuid]
 
     if fork_data.empty:
-        return False # Fork não encontrado no DataFrame de rankings
+        return False  # Fork não encontrado no DataFrame de rankings
 
     elo_rating = fork_data.iloc[0]["elo_rating"]
     wins = fork_data.iloc[0]["wins"]
@@ -361,13 +380,14 @@ def check_fork_qualification(
     else:
         num_competitors = len(all_forks_in_position_df["fork_uuid"].unique())
 
-
-    if num_competitors <= 0: # Caso de N=0 (nenhum fork na posição, o que seria estranho se estamos checando um)
-                              # ou se all_forks_in_position_df não foi fornecido corretamente.
-        min_wins_threshold = float('inf') # Impossível de atingir
-    elif num_competitors == 1: # Se há apenas 1 fork, log2(1) = 0, ceil(0) = 0 vitórias.
+    if (
+        num_competitors <= 0
+    ):  # Caso de N=0 (nenhum fork na posição, o que seria estranho se estamos checando um)
+        # ou se all_forks_in_position_df não foi fornecido corretamente.
+        min_wins_threshold = float("inf")  # Impossível de atingir
+    elif num_competitors == 1:  # Se há apenas 1 fork, log2(1) = 0, ceil(0) = 0 vitórias.
         min_wins_threshold = 0
-    else: # N > 1
+    else:  # N > 1
         min_wins_threshold = math.ceil(math.log2(num_competitors))
 
     if wins >= min_wins_threshold:

@@ -2,12 +2,16 @@ import os
 from pathlib import Path
 
 import google.generativeai as genai
+
 # import pandas as pd # No longer needed here
 from dotenv import load_dotenv
 from google.generativeai import types
-# from sqlalchemy.engine import Engine # No longer needed here
 
-from . import ratings, storage # storage is still needed for store_chapter_text and append_fork (now imported from storage)
+# from sqlalchemy.engine import Engine # No longer needed here
+from . import (
+    ratings,
+    storage,
+)  # storage is still needed for store_chapter_text and append_fork (now imported from storage)
 
 # load_dotenv() must be called after all imports for E402,
 # but before any code that relies on the .env variables.
@@ -47,12 +51,15 @@ def generate_chapter(prompt: str, prev_uuid: str | None = None) -> str:
 
 # append_fork has been moved to storage.py
 
-def auto_vote(position: int, prev_uuid: str, voter: str, conn=None) -> str: # Removed Engine type hint as it's not used directly here
+
+def auto_vote(
+    position: int, prev_uuid: str, voter: str, conn=None
+) -> str:  # Removed Engine type hint as it's not used directly here
     """Generate winner and loser chapters and record a vote."""
     winner_uuid = generate_chapter(f"Winner for position {position}", prev_uuid)
     loser_uuid = generate_chapter(f"Loser for position {position}", prev_uuid)
 
-    fork_csv = Path("forking_path/auto.csv") # This path is specific to this auto_vote logic
+    fork_csv = Path("forking_path/auto.csv")  # This path is specific to this auto_vote logic
 
     # Call append_fork from storage module
     storage.append_fork(fork_csv, position, prev_uuid, winner_uuid, conn=conn)

@@ -1,6 +1,5 @@
-import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
 # Adiciona o diretório pai ao sys.path para permitir importações relativas
 # Útil se o script for executado diretamente e precisar importar de hronir_encyclopedia
@@ -9,7 +8,9 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 try:
     from hronir_encyclopedia import storage
 except ImportError:
-    print("Erro: Não foi possível importar 'hronir_encyclopedia.storage'. Certifique-se de que o PYTHONPATH está configurado ou execute o script de uma maneira que permita a importação (ex: como um módulo).")
+    print(
+        "Erro: Não foi possível importar 'hronir_encyclopedia.storage'. Certifique-se de que o PYTHONPATH está configurado ou execute o script de uma maneira que permita a importação (ex: como um módulo)."
+    )
     sys.exit(1)
 
 
@@ -18,14 +19,19 @@ except ImportError:
 # É usado como fallback se o canonical_path.json não existir ou estiver malformado.
 DEFAULT_HRONIR_CHAPTER_0_UUID = "dae9d8b4-3122-56e0-a665-5dfc10101a6b"
 
+
 def main():
     canonical_path_file = Path("data/canonical_path.json")
     next_pos = 0
-    prev_hrönir_uuid = DEFAULT_HRONIR_CHAPTER_0_UUID # UUID do hrönir predecessor para a próxima geração
+    prev_hrönir_uuid = (
+        DEFAULT_HRONIR_CHAPTER_0_UUID  # UUID do hrönir predecessor para a próxima geração
+    )
 
     if not canonical_path_file.exists():
         print(f"Arquivo de caminho canônico '{canonical_path_file}' não encontrado.")
-        print(f"Assumindo Posição 0 para a próxima geração, com predecessor padrão (para o capítulo inicial).")
+        print(
+            "Assumindo Posição 0 para a próxima geração, com predecessor padrão (para o capítulo inicial)."
+        )
         # Para a primeira geração (posição 0), não há predecessor real,
         # mas para consistência, podemos usar um UUID especial ou o UUID do capítulo inicial
         # se a lógica de geração sempre espera um prev_uuid.
@@ -51,20 +57,22 @@ def main():
         # Vamos assumir que se o arquivo não existe, a primeira posição a ser preenchida é 0.
         # E o predecessor para esta primeira posição é uma string vazia.
         next_pos = 0
-        prev_hrönir_uuid = "" # Para a Posição 0, o predecessor é vazio.
-        print(f"Próxima posição para geração: {next_pos}. Predecessor UUID: '{prev_hrönir_uuid}' (para Posição 0).")
+        prev_hrönir_uuid = ""  # Para a Posição 0, o predecessor é vazio.
+        print(
+            f"Próxima posição para geração: {next_pos}. Predecessor UUID: '{prev_hrönir_uuid}' (para Posição 0)."
+        )
 
     else:
         try:
             current_pos = 0
             found_end_of_path = False
-            while True: # Itera para encontrar a última posição canônica definida
+            while True:  # Itera para encontrar a última posição canônica definida
                 canonical_info = storage.get_canonical_fork_info(current_pos, canonical_path_file)
                 if canonical_info and "hrönir_uuid" in canonical_info:
                     # Encontrou um hrönir canônico para esta posição.
                     # Este hrönir_uuid é o predecessor para a *próxima* posição.
                     prev_hrönir_uuid = canonical_info["hrönir_uuid"]
-                    current_pos += 1 # Move para a próxima posição a ser verificada
+                    current_pos += 1  # Move para a próxima posição a ser verificada
                 else:
                     # Não há hrönir canônico para current_pos.
                     # Isso significa que current_pos é a próxima posição a ser gerada.
@@ -72,26 +80,28 @@ def main():
                     found_end_of_path = True
                     # prev_hrönir_uuid já foi definido na iteração anterior como o sucessor do fork canônico de (current_pos - 1)
                     # Se current_pos é 0 e não encontrou, prev_hrönir_uuid será o default (seed) ou vazio.
-                    if current_pos == 0: # Caso especial: Posição 0 não encontrada no arquivo
-                        prev_hrönir_uuid = "" # Predecessor para Posição 0 é vazio
-                        print(f"Caminho canônico não contém Posição 0. Próxima posição: {next_pos}. Predecessor UUID: '{prev_hrönir_uuid}'.")
+                    if current_pos == 0:  # Caso especial: Posição 0 não encontrada no arquivo
+                        prev_hrönir_uuid = ""  # Predecessor para Posição 0 é vazio
+                        print(
+                            f"Caminho canônico não contém Posição 0. Próxima posição: {next_pos}. Predecessor UUID: '{prev_hrönir_uuid}'."
+                        )
                     else:
                         print(f"Fim do caminho canônico encontrado na Posição {current_pos -1}.")
-                        print(f"Hrönir predecessor para a próxima geração (Posição {next_pos}): {prev_hrönir_uuid}")
+                        print(
+                            f"Hrönir predecessor para a próxima geração (Posição {next_pos}): {prev_hrönir_uuid}"
+                        )
                     break
 
-            if not found_end_of_path: # Segurança, não deve acontecer com o loop while True/break
-                 print("Não foi possível determinar o fim do caminho canônico. Usando defaults.")
-                 next_pos = 0
-                 prev_hrönir_uuid = ""
+            if not found_end_of_path:  # Segurança, não deve acontecer com o loop while True/break
+                print("Não foi possível determinar o fim do caminho canônico. Usando defaults.")
+                next_pos = 0
+                prev_hrönir_uuid = ""
 
-
-        except Exception as e: # Captura json.JSONDecodeError ou outros erros de leitura/lógica
+        except Exception as e:  # Captura json.JSONDecodeError ou outros erros de leitura/lógica
             print(f"Erro ao processar o arquivo de caminho canônico '{canonical_path_file}': {e}")
-            print(f"Assumindo Posição 0 para a próxima geração, com predecessor vazio.")
+            print("Assumindo Posição 0 para a próxima geração, com predecessor vazio.")
             next_pos = 0
             prev_hrönir_uuid = ""
-
 
     # Salvar em arquivos para o GitHub Actions ler
     Path(".next_pos").write_text(str(next_pos))

@@ -4,8 +4,7 @@ import uuid
 from pathlib import Path
 
 import pandas as pd
-import pytest # Added for pytest.raises
-
+import pytest  # Added for pytest.raises
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -168,11 +167,12 @@ def test_clean_git_prunes_from_branch(tmp_path, monkeypatch):
     deleted_file_path_str = str(bad_dir / "index.md")
     deleted_metadata_path_str = str(bad_dir / "metadata.json")
 
-    expected_deleted_lines = {
-        f"D  {deleted_file_path_str}",
-        f"D  {deleted_metadata_path_str}"
+    expected_deleted_lines = {f"D  {deleted_file_path_str}", f"D  {deleted_metadata_path_str}"}
+    actual_lines = {
+        line.strip()
+        for line in status_result.stdout.strip().split("\n")
+        if line.strip().startswith("D ")
     }
-    actual_lines = {line.strip() for line in status_result.stdout.strip().split('\n') if line.strip().startswith("D ")}
 
     # Check that only the two "bad" files are staged for deletion
     # and no other files are unexpectedly staged.

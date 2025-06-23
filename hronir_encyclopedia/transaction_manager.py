@@ -1,27 +1,31 @@
+import datetime
 import json
 import uuid
-import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Any
 
 from sqlalchemy.orm import Session
+
 from .models import TransactionDB
 
 TRANSACTIONS_DIR = Path("data/transactions")
 HEAD_FILE = TRANSACTIONS_DIR / "HEAD"
-UUID_NAMESPACE = uuid.NAMESPACE_URL # Using the same namespace as storage.py for consistency
+UUID_NAMESPACE = uuid.NAMESPACE_URL  # Using the same namespace as storage.py for consistency
+
 
 def _ensure_transactions_dir():
     TRANSACTIONS_DIR.mkdir(parents=True, exist_ok=True)
 
-def get_previous_transaction_uuid() -> Optional[str]:
+
+def get_previous_transaction_uuid() -> str | None:
     """Reads the UUID of the last transaction from the HEAD file."""
     _ensure_transactions_dir()
     if not HEAD_FILE.exists():
         return None
     return HEAD_FILE.read_text().strip()
 
-def _compute_transaction_uuid(content: Dict[str, Any]) -> str:
+
+def _compute_transaction_uuid(content: dict[str, Any]) -> str:
     """Computes a deterministic UUIDv5 for the transaction content."""
     # Serialize the content to a stable string format (sorted keys)
     # For the 'verdicts' dict, ensure it's also sorted for stability.
@@ -30,14 +34,14 @@ def _compute_transaction_uuid(content: Dict[str, Any]) -> str:
     if "verdicts" in content_copy and isinstance(content_copy["verdicts"], dict):
         content_copy["verdicts"] = dict(sorted(content_copy["verdicts"].items()))
 
-    serialized_content = json.dumps(content_copy, sort_keys=True, separators=(',', ':'))
+    serialized_content = json.dumps(content_copy, sort_keys=True, separators=(",", ":"))
     return str(uuid.uuid5(UUID_NAMESPACE, serialized_content))
 
 
-import pandas as pd
 import blake3
+import pandas as pd
 
-from hronir_encyclopedia import storage, ratings
+from hronir_encyclopedia import ratings, storage
 
 # Define default paths, these could be configurable
 FORKING_PATH_DIR = Path("forking_path")
@@ -46,10 +50,8 @@ CHAPTER_BASE_DIR = Path("the_library")
 
 
 def _get_fork_details_by_hrönir_uuid(
-    hrönir_uuid_to_find: str,
-    at_position: int,
-    fork_dir_base: Path = FORKING_PATH_DIR
-) -> Optional[Dict[str, Any]]:
+    hrönir_uuid_to_find: str, at_position: int, fork_dir_base: Path = FORKING_PATH_DIR
+) -> dict[str, Any] | None:
     """
     Finds the fork_uuid and other details for a given hrönir_uuid (chapter uuid)
     at a specific position by scanning forking_path CSVs.
@@ -62,34 +64,41 @@ def _get_fork_details_by_hrönir_uuid(
         if csv_filepath.stat().st_size == 0:
             continue
         try:
-            df = pd.read_csv(csv_filepath, dtype={'position': str, 'uuid': str, 'fork_uuid': str, 'prev_uuid': str, 'status': str})
+            df = pd.read_csv(
+                csv_filepath,
+                dtype={
+                    "position": str,
+                    "uuid": str,
+                    "fork_uuid": str,
+                    "prev_uuid": str,
+                    "status": str,
+                },
+            )
             # Ensure position is treated as int for comparison after reading as str
-            df['position'] = pd.to_numeric(df['position'], errors='coerce')
+            df["position"] = pd.to_numeric(df["position"], errors="coerce")
 
             # Filter by position and the hrönir_uuid (which is 'uuid' column)
             # Make sure to handle potential NaN from coerce if position column is bad
             fork_row_df = df[
-                (df["uuid"] == hrönir_uuid_to_find) &
-                (df["position"] == at_position) &
-                (df["position"].notna())
+                (df["uuid"] == hrönir_uuid_to_find)
+                & (df["position"] == at_position)
+                & (df["position"].notna())
             ]
 
             if not fork_row_df.empty:
                 fork_data = fork_row_df.iloc[0].to_dict()
-                fork_data['csv_filepath'] = csv_filepath # Store for potential direct access later
+                fork_data["csv_filepath"] = csv_filepath  # Store for potential direct access later
                 return fork_data
         except pd.errors.EmptyDataError:
             continue
-        except Exception as e:
+        except Exception:
             # print(f"Error reading or processing {csv_filepath}: {e}") # Optional logging
             continue
     return None
 
 
 def _get_all_forks_at_position(
-    position_num: int,
-    predecessor_uuid: Optional[str],
-    fork_dir_base: Path = FORKING_PATH_DIR
+    position_num: int, predecessor_uuid: str | None, fork_dir_base: Path = FORKING_PATH_DIR
 ) -> pd.DataFrame:
     """
     Loads all forks from all CSV files in fork_dir_base that are at the given position
@@ -103,28 +112,43 @@ def _get_all_forks_at_position(
         if csv_file.stat().st_size == 0:
             continue
         try:
-            df_forks = pd.read_csv(csv_file, dtype={'position': str, 'prev_uuid': str, 'uuid': str, 'fork_uuid': str, 'status': str})
-            df_forks['position'] = pd.to_numeric(df_forks['position'], errors='coerce')
+            df_forks = pd.read_csv(
+                csv_file,
+                dtype={
+                    "position": str,
+                    "prev_uuid": str,
+                    "uuid": str,
+                    "fork_uuid": str,
+                    "status": str,
+                },
+            )
+            df_forks["position"] = pd.to_numeric(df_forks["position"], errors="coerce")
 
             selected_forks_at_pos = df_forks[df_forks["position"] == position_num]
 
-            if predecessor_uuid is None: # Position 0 case
-                 if position_num == 0:
-                    selected_forks = selected_forks_at_pos[selected_forks_at_pos["prev_uuid"].fillna('').isin(['', 'nan', 'None'])]
-                 else: # Should not happen if predecessor_uuid is correctly passed for pos > 0
-                    selected_forks = pd.DataFrame() # Empty
-            else: # Position > 0, predecessor_uuid is specified
-                selected_forks = selected_forks_at_pos[selected_forks_at_pos["prev_uuid"] == predecessor_uuid]
+            if predecessor_uuid is None:  # Position 0 case
+                if position_num == 0:
+                    selected_forks = selected_forks_at_pos[
+                        selected_forks_at_pos["prev_uuid"].fillna("").isin(["", "nan", "None"])
+                    ]
+                else:  # Should not happen if predecessor_uuid is correctly passed for pos > 0
+                    selected_forks = pd.DataFrame()  # Empty
+            else:  # Position > 0, predecessor_uuid is specified
+                selected_forks = selected_forks_at_pos[
+                    selected_forks_at_pos["prev_uuid"] == predecessor_uuid
+                ]
 
             if not selected_forks.empty:
                 all_forks_list.append(selected_forks)
         except pd.errors.EmptyDataError:
             continue
-        except Exception: # Other read errors
+        except Exception:  # Other read errors
             continue
 
     if not all_forks_list:
-        return pd.DataFrame(columns=["fork_uuid", "uuid", "prev_uuid", "position", "status"]) # Ensure schema
+        return pd.DataFrame(
+            columns=["fork_uuid", "uuid", "prev_uuid", "position", "status"]
+        )  # Ensure schema
 
     combined_df = pd.concat(all_forks_list, ignore_index=True)
     return combined_df
@@ -133,11 +157,13 @@ def _get_all_forks_at_position(
 def record_transaction(
     session_id: str,
     initiating_fork_uuid: str,  # Fork whose mandate is being used
-    session_verdicts: List[Dict[str, Any]],  # [{"position": int, "winner_hrönir_uuid": str, "loser_hrönir_uuid": str}]
+    session_verdicts: list[
+        dict[str, Any]
+    ],  # [{"position": int, "winner_hrönir_uuid": str, "loser_hrönir_uuid": str}]
     forking_path_dir: Path | None = None,
     ratings_dir: Path | None = None,
     session: Session | None = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Orchestrates the processing of a judgment session's commit.
 
@@ -189,7 +215,7 @@ def record_transaction(
 
     # This is the hash of the transaction *before* this one.
     # Crucial for mandate_id generation if a fork qualifies in *this* transaction.
-    last_tx_hash = get_previous_transaction_uuid() or "" # Use empty string if no prev tx
+    last_tx_hash = get_previous_transaction_uuid() or ""  # Use empty string if no prev tx
 
     base_dir = TRANSACTIONS_DIR.parent.parent
     if forking_path_dir is None:
@@ -197,7 +223,7 @@ def record_transaction(
     if ratings_dir is None:
         ratings_dir = base_dir / "ratings"
 
-    promotions_granted: List[Dict[str, str]] = []
+    promotions_granted: list[dict[str, str]] = []
     oldest_voted_position = -1
 
     processed_verdicts_for_log = []
@@ -234,7 +260,9 @@ def record_transaction(
                 continue
 
             fork_to_check_uuid = fork_details["fork_uuid"]
-            current_fork_status = fork_details.get("status", "PENDING") # Default to PENDING if status missing
+            current_fork_status = fork_details.get(
+                "status", "PENDING"
+            )  # Default to PENDING if status missing
 
             if current_fork_status == "PENDING":
                 # Get ranking for the position of the fork being checked
@@ -244,7 +272,7 @@ def record_transaction(
                 # For now, we assume fork_details["prev_uuid"] is the correct one to use.
                 # A more robust way might be to get canonical path info.
                 predecessor_for_ranking = fork_details.get("prev_uuid")
-                if pd.isna(predecessor_for_ranking) or predecessor_for_ranking == 'nan':
+                if pd.isna(predecessor_for_ranking) or predecessor_for_ranking == "nan":
                     predecessor_for_ranking = None
 
                 current_pos_ratings_df = ratings.get_ranking(
@@ -265,12 +293,12 @@ def record_transaction(
                 is_qualified = ratings.check_fork_qualification(
                     fork_uuid=fork_to_check_uuid,
                     ratings_df=current_pos_ratings_df,
-                    all_forks_in_position_df=all_forks_in_same_segment_df
+                    all_forks_in_position_df=all_forks_in_same_segment_df,
                 )
 
                 if is_qualified:
                     mandate_id_str = blake3.blake3(
-                        (fork_to_check_uuid + last_tx_hash).encode('utf-8')
+                        (fork_to_check_uuid + last_tx_hash).encode("utf-8")
                     ).hexdigest()[:16]
 
                     update_success = storage.update_fork_status(
@@ -281,14 +309,15 @@ def record_transaction(
                         session=session,
                     )
                     if update_success:
-                        promotions_granted.append({
-                            "fork_uuid": fork_to_check_uuid,
-                            "mandate_id": mandate_id_str,
-                            "qualified_in_tx_with_prev_hash": last_tx_hash
-                        })
+                        promotions_granted.append(
+                            {
+                                "fork_uuid": fork_to_check_uuid,
+                                "mandate_id": mandate_id_str,
+                                "qualified_in_tx_with_prev_hash": last_tx_hash,
+                            }
+                        )
                     # else:
-                        # print(f"Warning: Failed to update status for qualified fork {fork_to_check_uuid}")
-
+                    # print(f"Warning: Failed to update status for qualified fork {fork_to_check_uuid}")
 
     # --- Prepare data for the transaction block (Task 2.2 will handle actual saving) ---
     timestamp_dt = datetime.datetime.utcnow()
@@ -299,10 +328,12 @@ def record_transaction(
     current_transaction_content_for_uuid = {
         "timestamp": timestamp,
         "session_id": session_id,
-        "initiating_fork_uuid": initiating_fork_uuid, # The one that started the session
-        "verdicts": processed_verdicts_for_log, # Actual votes cast
-        "promotions_granted": sorted(promotions_granted, key=lambda x: x['fork_uuid']), # Sort for deterministic UUID
-        "previous_transaction_uuid": last_tx_hash # This is the get_previous_transaction_uuid() result
+        "initiating_fork_uuid": initiating_fork_uuid,  # The one that started the session
+        "verdicts": processed_verdicts_for_log,  # Actual votes cast
+        "promotions_granted": sorted(
+            promotions_granted, key=lambda x: x["fork_uuid"]
+        ),  # Sort for deterministic UUID
+        "previous_transaction_uuid": last_tx_hash,  # This is the get_previous_transaction_uuid() result
     }
 
     current_transaction_uuid = _compute_transaction_uuid(current_transaction_content_for_uuid)
@@ -312,34 +343,34 @@ def record_transaction(
     # The content used for UUID generation (`current_transaction_content_for_uuid`)
     # does not include the `transaction_uuid` itself or `oldest_voted_position`.
     transaction_block_to_save = {
-        "transaction_uuid": current_transaction_uuid, # Self-reference
+        "transaction_uuid": current_transaction_uuid,  # Self-reference
         "timestamp": timestamp,
         "session_id": session_id,
-        "initiating_fork_uuid": initiating_fork_uuid, # This is the "voter_fork_uuid" for the session
-        "verdicts": processed_verdicts_for_log, # Renaming for clarity in the block
+        "initiating_fork_uuid": initiating_fork_uuid,  # This is the "voter_fork_uuid" for the session
+        "verdicts": processed_verdicts_for_log,  # Renaming for clarity in the block
         "promotions_granted": promotions_granted,
-        "previous_transaction_uuid": last_tx_hash
+        "previous_transaction_uuid": last_tx_hash,
     }
 
     # Save the transaction block to a file
     transaction_file = TRANSACTIONS_DIR / f"{current_transaction_uuid}.json"
     try:
         transaction_file.write_text(json.dumps(transaction_block_to_save, indent=2))
-    except IOError as e:
+    except OSError:
         # print(f"Error writing transaction file {transaction_file}: {e}") # Optional logging
         # Consider how to handle this error; e.g., raise an exception
         # For now, if writing fails, we probably shouldn't update HEAD.
         # This part of the function might need to become more robust to errors.
-        raise # Re-raise the exception for now
+        raise  # Re-raise the exception for now
 
     # Update HEAD to point to this new transaction
     try:
         HEAD_FILE.write_text(current_transaction_uuid)
-    except IOError as e:
+    except OSError:
         # print(f"Error writing HEAD file {HEAD_FILE}: {e}") # Optional logging
         # This is problematic: transaction is saved, but HEAD is not updated.
         # May require a rollback or recovery mechanism in a production system.
-        raise # Re-raise
+        raise  # Re-raise
 
     if session is not None:
         tx_obj = TransactionDB(
@@ -355,9 +386,10 @@ def record_transaction(
     # and the oldest_voted_position for triggering the temporal cascade.
     return {
         "transaction_uuid": current_transaction_uuid,
-        "promotions_granted": promotions_granted, # Could be useful for immediate feedback
+        "promotions_granted": promotions_granted,  # Could be useful for immediate feedback
         "oldest_voted_position": oldest_voted_position,
         # Other fields from transaction_block_to_save could be included if needed by CLI
     }
+
 
 # Removed the previous note as saving is now integrated.

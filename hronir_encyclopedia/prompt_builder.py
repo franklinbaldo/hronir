@@ -1,7 +1,7 @@
-from typing import List, Optional
 
 # Limite de palavras para o trecho do capítulo anterior a ser incluído no prompt
 PREDECESSOR_SNIPPET_WORD_LIMIT = 100
+
 
 def get_predecessor_snippet(text: str, word_limit: int) -> str:
     """
@@ -12,12 +12,13 @@ def get_predecessor_snippet(text: str, word_limit: int) -> str:
         return " ".join(words[-word_limit:])
     return text
 
+
 def build_synthesis_prompt(
     predecessor_text: str,
     predecessor_uuid: str,
-    predecessor_position: int, # Posição do capítulo predecessor
+    predecessor_position: int,  # Posição do capítulo predecessor
     next_position: int,
-    narrative_embedding: Optional[List[float]] = None, # Placeholder para uso futuro
+    narrative_embedding: list[float] | None = None,  # Placeholder para uso futuro
 ) -> str:
     """
     Constrói um prompt para o LLM sintetizar o próximo capítulo.
@@ -59,12 +60,17 @@ Comece diretamente com o texto do novo capítulo.
     #    (Ex: "A história até agora ressoa com os conceitos de X, Y, Z. Explore um deles ou introduza um novo que se relacione.")
     # 2. Validar a coerência do capítulo gerado em relação ao espaço narrativo.
 
-    if narrative_embedding: # Apenas para mostrar que foi recebido, não usado no prompt em si ainda.
-        print(f"[PromptBuilder] Embedding do espaço narrativo recebido (dimensões: {len(narrative_embedding)}), mas ainda não usado ativamente na construção do prompt de texto.")
+    if (
+        narrative_embedding
+    ):  # Apenas para mostrar que foi recebido, não usado no prompt em si ainda.
+        print(
+            f"[PromptBuilder] Embedding do espaço narrativo recebido (dimensões: {len(narrative_embedding)}), mas ainda não usado ativamente na construção do prompt de texto."
+        )
 
     return prompt
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # Exemplo de uso
     sample_predecessor_text = (
         "As páginas da enciclopédia falavam de um planeta chamado Tlön. "
@@ -81,14 +87,14 @@ if __name__ == '__main__':
     sample_next_pos = 1
 
     # Simular um embedding (não será usado no prompt desta versão)
-    sample_embedding = [0.1] * 768 # Dimensão típica de embeddings
+    sample_embedding = [0.1] * 768  # Dimensão típica de embeddings
 
     generated_prompt = build_synthesis_prompt(
         predecessor_text=sample_predecessor_text,
         predecessor_uuid=sample_uuid,
         predecessor_position=sample_pred_pos,
         next_position=sample_next_pos,
-        narrative_embedding=sample_embedding
+        narrative_embedding=sample_embedding,
     )
 
     print("\n--- PROMPT GERADO ---")
@@ -100,4 +106,3 @@ if __name__ == '__main__':
     short_text = "Uma frase curta."
     print(f"\n--- Snippet de texto curto ({PREDECESSOR_SNIPPET_WORD_LIMIT} palavras) ---")
     print(get_predecessor_snippet(short_text, PREDECESSOR_SNIPPET_WORD_LIMIT))
-```

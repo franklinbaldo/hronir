@@ -6,7 +6,7 @@ import pandas as pd
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from hronir_encyclopedia.models import Base, ForkDB, VoteDB, TransactionDB, SuperBlockDB
+from hronir_encyclopedia.models import Base, ForkDB, TransactionDB, VoteDB
 
 
 def migrate(db_path: str = "hronir.db") -> None:
