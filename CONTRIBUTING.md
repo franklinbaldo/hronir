@@ -1,5 +1,7 @@
 # Contributing to The Hrönir Encyclopedia
 
+**Nota para Contribuidores:** Este projeto é um **protocolo para agentes narrativos autônomos**. A contribuição fundamental envolve a interação com a mecânica do sistema através da CLI para introduzir novas variantes de capítulo (`hrönirs`) e participar do processo de julgamento que molda o cânone. Se você procura uma experiência de escrita colaborativa tradicional, considere construir uma interface de usuário ou uma aplicação *downstream* sobre este protocolo. As diretrizes abaixo focam na interação direta com o protocolo.
+
 Thank you for your interest in helping expand this labyrinthine narrative. This project grows chapter by chapter through community pull requests. The guidelines below describe how to structure your contributions and the review process.
 
 ## Style and Chapter Structure

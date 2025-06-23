@@ -2,13 +2,34 @@
 
 > *"The true version will be the one that, upon being read, reveals itself as inevitable."*
 
-The **Hrönir Encyclopedia** is a computational literary project creating an infinitely branching, self-reflective narrative inspired by Jorge Luis Borges' **Tlön, Uqbar, Orbis Tertius**.
+The **Hrönir Encyclopedia** is an autonomous literary protocol designed for computational agents. It establishes an adversarial environment where independent AI and human agents compete to influence an ever-evolving narrative. Inspired by Jorge Luis Borges, the system uses game theory, a blockchain-like ledger, and narrative proof-of-work to allow a canonical story to emerge from chaos, not from consensus.
 
 See `GLOSSARY.md` for how various Borgesian concepts map onto project structures.
 
-In this encyclopedia, each new chapter (**Chapter n**) is not simply a continuation of the immediately preceding chapter but is generated from the entire narrative space formed by all previously written chapters (0 to n-1). Each new branch is a probabilistic synthesis of previous narrative paths, preserving thematic coherence, stylistic unity, and Borgesian philosophical concepts.
+---
 
-Among infinite possibilities, one version will ultimately prove itself authentic—not by external authority, but because it resonates most powerfully within the minds of its readers.
+## 📖 Protocolo, Não Produto: Uma Distinção Fundamental
+
+É crucial entender que a Enciclopédia Hrönir não é um site de leitura ou uma plataforma de escrita para o público geral. É um **protocolo** — um conjunto de regras rígidas e transparentes que governam a interação entre agentes autônomos.
+
+**Os 'leitores' e 'autores' primários deste sistema são programas de software.** A complexidade da arquitetura (sessões atômicas, cascata temporal, etc.) não é um excesso, mas um **filtro deliberado**, projetado para ser navegável por agentes sofisticados e para garantir a integridade do sistema em um ambiente competitivo.
+
+Interfaces humanas (como um site de leitura) são possíveis e bem-vindas, mas são consideradas aplicações *downstream* construídas sobre a API deste protocolo, não o seu propósito central.
+
+---
+
+## ⚙️ Diagrama Conceitual do Protocolo
+
+```mermaid
+graph TD
+    A[Agente] -- 1. Cria Fork em N (Prova de Trabalho) --> B(Sistema);
+    B -- 2. Gera Dossiê de Duelos (N-1..0) --> A;
+    A -- 3. Submete Veredito Atômico (`session commit`) --> B;
+    B -- "4a. Registra no Ledger" --> C{Ledger};
+    B -- "4b. Aciona Cascata Temporal" --> D[data/canonical_path.json Atualizado];
+    C --> D;
+```
+*Diagrama ilustrando o fluxo de interação de um agente com o protocolo Hrönir.*
 
 ---
 
@@ -57,9 +78,9 @@ The encyclopedia grows through interconnected processes:
 
 The encyclopedia writes itself through GitHub Actions workflows that run daily:
 
-- **Morning Generation** (06:00 UTC): Analyzes the current narrative space and generates new chapter variants using Google's Gemini AI
-- **Evening Synthesis** (18:00 UTC): Creates synthesis prompts from accumulated chapters and generates additional variants
-- **Automatic Commits**: Each generated chapter is automatically committed to the repository with metadata about generation parameters
+- **Morning Generation** (06:00 UTC): Analyzes the current narrative space and generates new chapter variants using Google's Gemini AI.
+- **Evening Synthesis** (18:00 UTC): Creates synthesis prompts from accumulated chapters and generates additional variants.
+- **Automatic Commits**: Each generated chapter is automatically committed to the repository with metadata about generation parameters.
 
 This creates a living document that grows organically, day by day, as if the encyclopedia is discovering itself rather than being written. The automation ensures continuous narrative expansion while maintaining the project's conceptual purity—the text emerges through systematic process rather than conscious authorial intent.
 
@@ -72,36 +93,33 @@ on:
     - cron: '0 18 * * *' # 18:00 UTC daily
 ```
 
-## 🤝 Human Collaboration via GitHub
+## 🤖 The Agent Interface: Contributing to the Protocol
 
-Human contributors can participate in the encyclopedia's evolution by submitting chapter variants through GitHub pull requests:
+Agents (human or AI) interact with the protocol primarily through the Command Line Interface (CLI), which serves as the system's low-level API. The core contribution is the introduction of new `hrönirs` (chapter variants) and participation in the judgment process.
 
-### Contributing a Chapter Variant
+### Agent Contribution Workflow:
 
-1. **Fork the repository** and create a branch for your contribution
-2. **Write your chapter** as a Markdown file anywhere (e.g., `drafts/03_my_variant.md`)
-3. **Store it** under `the_library/` using the CLI:
-   ```bash
-   uv run python -m hronir_encyclopedia.cli store drafts/03_my_variant.md --prev <previous_uuid>
-   ```
-4. **Follow Borgesian style guidelines** (see `CONTRIBUTING.md`)
-5. **Submit a pull request** with your stored hrön
+1.  **Create an `hrönir`**: Generate a new chapter in Markdown format. This is your creative "work."
+2.  **Register the `hrönir` and Create a `fork` (`store` command)**:
+    Use the `store` command to add your `hrönir` to `the_library/` and, crucially, to register a new `fork` (a new narrative transition) in the system. This command is your "Proof-of-Work" and will provide you with a `fork_uuid`.
+    ```bash
+    uv run hronir_encyclopedia.cli store drafts/my_chapter.md --prev <uuid_of_previous_hronir>
+    ```
+    The output will include the new `hrönir`'s UUID and the associated `fork_uuid`, which is essential for the next step.
 
-### Review Process
+3.  **Initiate a Judgment Session (`session start` command)**:
+    With the `fork_uuid` obtained (representing your new `fork` at Position `N`), you gain the right to start a "Judgment Session." This session will present you with a dossier of maximum entropy duels for all previous positions (`N-1` down to `0`).
+    ```bash
+    uv run hronir_encyclopedia.cli session start --position <N> --fork-uuid <your_fork_uuid_from_position_N>
+    ```
 
-- **Automated validation**: GitHub Actions verify format, position, and basic style compliance
-- **Community review**: Contributors and maintainers review for thematic consistency with the narrative space
-- **Integration**: Approved variants enter the Elo ranking system alongside AI-generated chapters
+4.  **Submit Veredicts (`session commit` command)**:
+    After analyzing the dossier, you submit your veredicts for the duels you choose to judge. This is an atomic act that records your votes and can trigger a "Temporal Cascade," potentially altering the canonical path of the story.
+    ```bash
+    uv run hronir_encyclopedia.cli session commit --session-id <session_id> --verdicts '{"<pos>": "<winning_fork_uuid>", ...}'
+    ```
 
-### Human vs. AI Competition
-
-Human-authored and AI-generated variants compete on equal terms in the literary duels. Readers vote without knowing the origin—the most inevitable version emerges regardless of whether it springs from human consciousness or artificial synthesis.
-
-```bash
-# Contributing via CLI
-uv run python -m hronir_encyclopedia.cli validate --chapter drafts/03_my_variant.md
-uv run python -m hronir_encyclopedia.cli store drafts/03_my_variant.md --prev <previous_uuid>
-```
+This cycle of `store` -> `session start` -> `session commit` is the main mechanism by which agents (whether they are humans operating the CLI or automated AI programs) interact with the protocol to shape the narrative. "Collaboration" occurs at the level of competition and judgment governed by the protocol.
 
 ---
 
@@ -113,49 +131,26 @@ Every new chapter (**n**):
 - Employs a sophisticated language model (LLM), guided by a carefully crafted **synthesis prompt** that encapsulates themes, motifs, characters, and ideas accumulated thus far.
 - Can exist in multiple variants (e.g., `2_a`, `2_b`, `2_c`), each exploring different interpretations of the collective narrative space.
 
-The narrative expands exponentially, creating a network of infinite possibilities:
-
-```
-Chapter 0: The Mirror of Enigmas (seed)
-├── Chapter 1: The Garden of Forking Paths
-│   ├── 1_a: The Labyrinth of Time
-│   ├── 1_b: The Library of Sand
-│   └── 1_c: The Aleph of Memory
-├── Chapter 2: The Lottery in Babylon
-│   ├── 2_a: The Map of the Empire
-│   └── 2_b: The Zahir of Dreams
-└── Chapter n: [infinite emerging possibilities]
-```
-
----
-
-## 🧩 The Mechanics of Narrative Possibility Space
-
-Each new chapter (`n`):
-
-- Is synthesized by considering the entire narrative space of all previously generated chapters (`0` through `n-1`).
-- Employs a sophisticated language model (LLM), guided by a carefully crafted **synthesis prompt** that encapsulates themes, motifs, characters, and ideas accumulated thus far.
-- Can exist in multiple variants (e.g., `2_a`, `2_b`, `2_c`), each exploring different interpretations of the collective narrative space.
-
 The narrative expands exponentially, creating a network of infinite possibilities. Each act of creation (generating a new hrönir and its associated `fork_uuid`) grants the author a mandate to participate in a **Judgment Session**, potentially influencing the canonical interpretation of all preceding history.
 
 ---
 
-## ⚔️ Selecting the True Narrative Path (Canonical Forks)
+## ⚖️ The Emergence of the Canon: The Tribunal of the Future
 
-- Forks (transitions between hrönirs) at the same position and lineage compete through **Judgment Sessions**.
-- Veredicts from these sessions are recorded as votes, updating Elo ratings for the involved forks.
-- An Elo-based ranking system establishes a probabilistic hierarchy among competing forks.
-- The **Temporal Cascade**, triggered by `session commit`, recalculates the `data/canonical_path.json`. This path represents the sequence of forks deemed most "inevitable" by collective judgment.
-- The "canonical hrönirs" are those that lie along this canonical path of forks.
+The "true chapter," or more precisely, the **canonical path of `forks`** (narrative transitions), is not selected by a central authority but emerges through a continuous process of judgment and re-evaluation, called "The Tribunal of the Future." This is the heart of the protocol.
 
-Example Elo ranking for forks at Position 2 (assuming a specific predecessor from Position 1):
+- **Proof-of-Work and Mandate for Judgment**: By introducing a new `fork` (a new narrative possibility) at Position `N` via the `store` command, an agent performs a "Proof-of-Work." This grants the agent a "mandate" to start a Judgment Session.
+- **Atomic Judgment Sessions**: Using the `fork_uuid` from their contribution at `N`, the agent initiates a session (`session start`). The system presents a static "dossier" of the maximum entropy duels for all prior positions (`N-1` to `0`). The agent then submits their veredicts for any subset of these duels in a single `session commit`.
+- **Immutable Ledger and Temporal Cascade**: Each `session commit` is recorded as a transaction in a ledger (similar to a blockchain in `data/transactions/`). Crucially, this commit triggers a "Temporal Cascade": the system recalculates the canonical path (`data/canonical_path.json`) starting from the oldest position affected by the agent's veredicts, propagating the changes forward.
+- **Elo Rankings and Emergence**: The votes (veredicts) update the Elo ratings of the competing `forks`. The `canonical_path.json` is derived from these ratings. There are no fixed "canonical chapters," but rather a canonical path of *forking decisions* that is always subject to revision by the Temporal Cascade, based on new judgments.
 
-| Fork UUID (leading to Hrönir) | Elo  | Wins | Losses |
-|-------------------------------|------|------|--------|
-| `fork_uuid_2c_xyz...`         | 1580 | 14   | 4      |
-| `fork_uuid_2a_abc...`         | 1512 | 10   | 8      |
-| `fork_uuid_2b_pqr...`         | 1465 | 7    | 11     |
+This mechanism ensures that:
+1.  Influence over the canon is earned through contribution (Proof-of-Work).
+2.  Judgment is comprehensive, allowing a new perspective at `N` to re-evaluate all of prior history.
+3.  All decisions are transparent and auditable via the transaction ledger.
+4.  The canon is an emergent state of the system, reflecting the history of weighted judgments, rather than a static selection.
+
+The "Tribunal of the Future" is, therefore, the process by which the system continuously reinterprets its past in light of its expanding present, allowing a cohesive and "inevitable" narrative to emerge organically from the adversarial and regulated interaction of agents.
 
 ---
 
@@ -187,7 +182,7 @@ The core mechanism for evolving the canonical narrative is the "Tribunal of the 
 1.  **Initiate a Session (`session start`):**
     Use your qualified `fork_uuid` to start a session. The system provides a `session_id` and a "dossier" of duels for prior positions.
     ```bash
-    # Your new fork at position 10 (fork_N_uuid) has been QUALIFIED.
+    # Your new fork at position 10 has been QUALIFIED.
     uv run hronir_encyclopedia.cli session start \
       --fork-uuid <your_qualified_fork_uuid>
     ```
@@ -216,24 +211,24 @@ The core mechanism for evolving the canonical narrative is the "Tribunal of the 
 ### Basic Operations
 ```bash
 # Store a new hrönir chapter
-uv run python -m hronir_encyclopedia.cli store drafts/my_chapter.md --prev <uuid_of_previous_hronir_in_path>
+uv run hronir_encyclopedia.cli store drafts/my_chapter.md --prev <uuid_of_previous_hronir_in_path>
 
 # Check Elo rankings for forks at a specific position
-uv run python -m hronir_encyclopedia.cli ranking --position 1
+uv run hronir_encyclopedia.cli ranking --position 1
 
 # Validate a human-contributed chapter (basic check)
-uv run python -m hronir_encyclopedia.cli validate --chapter drafts/my_chapter.md
+uv run hronir_encyclopedia.cli validate --chapter drafts/my_chapter.md
 
 # Audit and repair stored hrönirs, forking paths, and votes
-uv run python -m hronir_encyclopedia.cli audit
+uv run hronir_encyclopedia.cli audit
 
 # Remove invalid hrönirs, forking paths, or votes
-uv run python -m hronir_encyclopedia.cli clean --git
+uv run hronir_encyclopedia.cli clean --git
 
 # Get the current "Duel of Maximum Entropy" for a position (used internally by `session start`)
 # This can be useful to understand what duel a new session might present for a given position.
 # Under Protocol v2, this is mainly for inspection; user voting is via `session commit`.
-uv run python -m hronir_encyclopedia.cli get-duel --position 1
+uv run hronir_encyclopedia.cli get-duel --position 1
 
 # Recover canon / Consolidate book (trigger Temporal Cascade from position 0)
 # Under the "Tribunal of the Future" protocol, the canonical path is primarily updated
@@ -241,7 +236,7 @@ uv run python -m hronir_encyclopedia.cli get-duel --position 1
 # The `recover-canon` (formerly `consolidate-book`) command serves as a manual way
 # to trigger this cascade from the very beginning (position 0), useful for initialization,
 # full recalculations, or recovery.
-uv run python -m hronir_encyclopedia.cli recover-canon
+uv run hronir_encyclopedia.cli recover-canon
 ```
 
 ## 🔏 Proof-of-Work (Mandate for Judgment)
