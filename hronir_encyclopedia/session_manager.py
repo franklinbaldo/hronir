@@ -86,9 +86,80 @@ def create_session(fork_n_uuid: str, position_n: int, forking_path_dir: Path, ra
     }
 
     session_file.write_text(json.dumps(session_data, indent=2))
-    mark_fork_as_consumed(fork_n_uuid, session_id)
+    mark_fork_as_consumed(fork_n_uuid, session_id) # fork_n_uuid is the qualified_fork_uuid
 
-    return {"session_id": session_id, "dossier": session_data["dossier"]}
+    # Add mandate_id to session_data before returning, if it's passed
+    # The function signature needs to be updated to accept mandate_id
+    # For now, let's assume create_session is called with mandate_id
+    # and it's added to session_data.
+    # This change will be done when modifying the function signature.
+
+    return {"session_id": session_id, "dossier": session_data["dossier"], "mandate_id_used": session_data.get("mandate_id")}
+
+
+def create_session(
+    fork_n_uuid: str,
+    position_n: int,
+    mandate_id: str, # Added mandate_id
+    forking_path_dir: Path,
+    ratings_dir: Path,
+    canonical_path_file: Path
+) -> Dict[str, Any]:
+    """
+    Creates a new session, generates a dossier, and stores session information.
+    Returns the session data including session_id and dossier.
+    """
+    session_id = str(uuid.uuid4())
+    SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+    session_file = SESSIONS_DIR / f"{session_id}.json"
+
+    dossier_duels: Dict[str, Dict[str, str]] = {}
+    # Iterate from N-1 down to 0
+    # Example: if position_n (fork's position) is 2, loop for p_idx = 1, then p_idx = 0.
+    # Duels for p_idx=1 need predecessor from p_idx=0.
+    # Duels for p_idx=0 need no predecessor (or predecessor is None).
+    for p_idx in range(position_n - 1, -1, -1):
+        predecessor_hronir_uuid_for_duel: Optional[str] = None
+        # Determine the predecessor for duels at p_idx.
+        # This predecessor is the canonical hrönir from position p_idx - 1.
+        if p_idx > 0:
+            # storage.get_canonical_fork_info expects the position of the canonical entry itself.
+            # So, for duels at p_idx, we need the canonical hrönir from p_idx - 1.
+            canonical_info_for_predecessor = storage.get_canonical_fork_info(p_idx - 1, canonical_path_file)
+            if not canonical_info_for_predecessor or "hrönir_uuid" not in canonical_info_for_predecessor:
+                # print(f"Warning: Cannot find canonical hrönir at position {p_idx - 1} to serve as predecessor for duels at {p_idx}. Skipping duels for {p_idx}.")
+                continue
+            predecessor_hronir_uuid_for_duel = canonical_info_for_predecessor["hrönir_uuid"]
+        # If p_idx is 0, predecessor_hronir_uuid_for_duel remains None, which is correct.
+
+        duel_info = ratings.determine_next_duel(
+            position=p_idx, # We are determining duels for this position p_idx
+            predecessor_hronir_uuid=predecessor_hronir_uuid_for_duel,
+            forking_path_dir=forking_path_dir,
+            ratings_dir=ratings_dir
+        )
+        if duel_info and "duel_pair" in duel_info and duel_info["duel_pair"].get("fork_A") and duel_info["duel_pair"].get("fork_B"):
+            dossier_duels[str(p_idx)] = {
+                "fork_A": duel_info["duel_pair"]["fork_A"],
+                "fork_B": duel_info["duel_pair"]["fork_B"],
+                "entropy": duel_info.get("entropy", 0.0)
+            }
+
+    session_data = {
+        "session_id": session_id,
+        "initiating_fork_uuid": fork_n_uuid,
+        "mandate_id": mandate_id, # Store the mandate_id
+        "position_n": position_n,
+        "dossier": {
+            "duels": dossier_duels
+        },
+        "status": "active"
+    }
+
+    session_file.write_text(json.dumps(session_data, indent=2))
+    mark_fork_as_consumed(fork_n_uuid, session_id) # Mark the fork itself as consumed for a session
+
+    return {"session_id": session_id, "dossier": session_data["dossier"], "mandate_id_used": mandate_id}
 
 
 def get_session(session_id: str) -> Optional[Dict[str, Any]]:

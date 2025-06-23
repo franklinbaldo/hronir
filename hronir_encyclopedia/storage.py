@@ -4,6 +4,7 @@ import uuid
 from pathlib import Path
 import pandas as pd # Moved to top
 from sqlalchemy.engine import Engine
+from typing import Any # Import Any
 
 UUID_NAMESPACE = uuid.NAMESPACE_URL
 
@@ -188,6 +189,10 @@ def audit_forking_csv(csv_path: Path, base: Path | str = "the_library") -> None:
         df["undiscovered"] = False
 
     changed = False
+    if "status" not in df.columns:
+        df["status"] = "PENDING"
+        changed = True
+
     for idx, row in df.iterrows():
         position = int(row["position"])
         prev_uuid = str(row["prev_uuid"])
@@ -307,27 +312,44 @@ def append_fork(
         table_name = csv_file.stem # Use stem for table name consistency
         with conn.begin() as con:
             # Ensure table exists
+            # TODO: Add robust schema migration if table exists with different schema
             con.exec_driver_sql(
                 f"""
                 CREATE TABLE IF NOT EXISTS `{table_name}` (
                     position INTEGER,
                     prev_uuid TEXT,
                     uuid TEXT,
-                    fork_uuid TEXT PRIMARY KEY  -- Added PRIMARY KEY for fork_uuid
+                    fork_uuid TEXT PRIMARY KEY,
+                    status TEXT DEFAULT 'PENDING'
                 )
                 """
             )
             # Insert data, handle potential conflicts if fork_uuid is primary key
-            # For SQLite, ON CONFLICT REPLACE or IGNORE can be used.
             # Using ON CONFLICT IGNORE to avoid error if the exact same fork is appended again.
-            con.exec_driver_sql(
-                f"""
-                INSERT INTO `{table_name}` (position, prev_uuid, uuid, fork_uuid)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT(fork_uuid) DO NOTHING
-                """,
-                (position, prev_uuid, uuid_str, fork_uuid),
-            )
+            # Note: This assumes 'status' column exists or has a default.
+            # A more robust solution might involve checking schema or using ALTER TABLE.
+            try:
+                con.exec_driver_sql(
+                    f"""
+                    INSERT INTO `{table_name}` (position, prev_uuid, uuid, fork_uuid, status)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(fork_uuid) DO NOTHING
+                    """,
+                    (position, prev_uuid, uuid_str, fork_uuid, "PENDING"),
+                )
+            except Exception as e: # Broad exception to catch cases where schema might be old
+                # This is a fallback, ideally schema migration should be handled.
+                # For now, try inserting without status if the above fails,
+                # assuming an older table schema. This is not ideal.
+                # print(f"Warning: Failed to insert with status, attempting without: {e}")
+                con.exec_driver_sql(
+                    f"""
+                    INSERT INTO `{table_name}` (position, prev_uuid, uuid, fork_uuid)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(fork_uuid) DO NOTHING
+                    """,
+                    (position, prev_uuid, uuid_str, fork_uuid),
+                )
         return fork_uuid
 
     # CSV handling
@@ -338,6 +360,7 @@ def append_fork(
                 "prev_uuid": prev_uuid,
                 "uuid": uuid_str,
                 "fork_uuid": fork_uuid,
+                "status": "PENDING",
             }
         ]
     )
@@ -392,10 +415,32 @@ def purge_fake_forking_csv(csv_path: Path, base: Path | str = "the_library") -> 
         if not (is_valid_uuid_v5(cur_uuid) and chapter_exists(cur_uuid, base)):
             removed += 1
             continue
+        # Ensure 'status' column is preserved if it exists, otherwise it might be dropped
+        # if 'keep' is reconstructed from rows that don't explicitly include it and then
+        # pd.DataFrame infers columns.
+        # However, if 'row' is a Series from the original df and includes 'status',
+        # it will be included in 'keep'.
+        # For safety, if we were creating dicts for 'keep', we'd add 'status': row.get('status', "PENDING")
         keep.append(row)
 
     if removed:
-        pd.DataFrame(keep).to_csv(csv_path, index=False)
+        if keep: # Ensure 'keep' is not empty before creating DataFrame
+            # Define columns to ensure 'status' is included, even if all rows
+            # had it as NaN initially (though audit_forking_csv should prevent this for new files)
+            final_cols = ["position", "prev_uuid", "uuid", "fork_uuid", "undiscovered", "status"]
+            # Filter df_keep to only include columns that actually exist in it, plus 'status'
+            df_kept = pd.DataFrame(keep)
+            cols_to_use = [col for col in final_cols if col in df_kept.columns]
+            if "status" not in df_kept.columns and "status" in final_cols: # if status was somehow lost
+                 # This case should ideally not happen if audit_forking_csv ran correctly
+                 df_kept["status"] = "PENDING" # Add with default if missing
+                 if "status" not in cols_to_use: # Should not be needed but defensive
+                     cols_to_use.append("status")
+
+
+            pd.DataFrame(df_kept, columns=cols_to_use).to_csv(csv_path, index=False)
+        else: # All rows were removed
+            csv_path.write_text("position,prev_uuid,uuid,fork_uuid,undiscovered,status\n") # Write header for empty file
     return removed
 
 
@@ -445,3 +490,109 @@ def purge_fake_votes_csv(
     if removed:
         pd.DataFrame(keep).to_csv(csv_path, index=False)
     return removed
+
+
+def get_fork_file_and_data(fork_uuid_to_find: str, fork_dir_base: Path = Path("forking_path")) -> Optional[Dict[str, Any]]:
+    """
+    Scans all forking_path/*.csv files to find a specific fork_uuid.
+
+    Returns:
+        A dictionary containing the fork's data row (as a dict) and 'csv_filepath' (Path object)
+        if found, otherwise None.
+    """
+    if not fork_dir_base.is_dir():
+        return None
+
+    for csv_filepath in fork_dir_base.glob("*.csv"):
+        if csv_filepath.stat().st_size == 0:
+            continue
+        try:
+            df = pd.read_csv(csv_filepath, dtype=str) # Read all as string to be safe
+            fork_row_df = df[df["fork_uuid"] == fork_uuid_to_find]
+            if not fork_row_df.empty:
+                # Convert row to dict, ensure all expected columns are present or defaulted
+                fork_data = fork_row_df.iloc[0].to_dict()
+                fork_data['csv_filepath'] = csv_filepath
+                # Ensure numeric types if necessary for consumer, but for now keep as read
+                if 'position' in fork_data and fork_data['position'] is not None:
+                    try:
+                        fork_data['position'] = int(fork_data['position'])
+                    except ValueError:
+                        # Handle or log error if position is not a valid int
+                        pass # Keep as string if conversion fails
+                return fork_data
+        except pd.errors.EmptyDataError:
+            continue
+        except Exception:
+            # Log error ideally
+            continue
+    return None
+
+
+def update_fork_status(
+    fork_uuid_to_update: str,
+    new_status: str,
+    mandate_id: Optional[str] = None,
+    fork_dir_base: Path = Path("forking_path"),
+    conn: Engine | None = None,
+) -> bool:
+    """
+    Updates the status and optionally the mandate_id of a specific fork_uuid
+    in its corresponding forking_path CSV file or database table.
+
+    Args:
+        fork_uuid_to_update: The UUID of the fork to update.
+        new_status: The new status string (e.g., "QUALIFIED", "SPENT").
+        mandate_id: Optional mandate_id to set. If provided, a 'mandate_id' column
+                    will be added to the CSV if it doesn't exist.
+        fork_dir_base: The base directory where forking_path CSVs are stored.
+        conn: Optional database engine. If provided, updates the DB table instead.
+
+    Returns:
+        True if the fork was found and updated, False otherwise.
+    """
+    if conn is not None:
+        # Database logic:
+        # This is more complex as we need to know which table the fork_uuid belongs to.
+        # Assuming fork_uuid is globally unique and we'd have to scan tables or have a master table.
+        # For now, this part is a placeholder for a more robust DB strategy.
+        # A simplified approach might be to try updating common table names if known.
+        # This example assumes a single table 'forks_master' for simplicity of illustration,
+        # which is NOT how the current CSV structure works (CSVs are per-creator/path).
+        # A real DB implementation would need a way to map fork_uuid to its table.
+        # Or, if all forks are in one table, then:
+        # with conn.begin() as c:
+        #     # Ensure mandate_id column exists (this is DB specific, e.g., SQLite)
+        #     # c.execute(text(f"ALTER TABLE your_forks_table ADD COLUMN mandate_id TEXT")) # One-time or check
+        #     result = c.execute(
+        #         text(f"UPDATE your_forks_table SET status = :status, mandate_id = :mandate_id WHERE fork_uuid = :fork_uuid"),
+        #         {"status": new_status, "mandate_id": mandate_id, "fork_uuid": fork_uuid_to_update}
+        #     )
+        #     return result.rowcount > 0
+        # print(f"DB update for fork status not fully implemented yet.") # Placeholder
+        return False # DB part needs more specific design based on schema
+
+    # CSV file logic:
+    fork_info = get_fork_file_and_data(fork_uuid_to_update, fork_dir_base)
+    if not fork_info or 'csv_filepath' not in fork_info:
+        return False
+
+    csv_filepath = fork_info['csv_filepath']
+    try:
+        df = pd.read_csv(csv_filepath)
+        fork_index = df[df["fork_uuid"] == fork_uuid_to_update].index
+
+        if not fork_index.empty:
+            idx = fork_index[0]
+            df.loc[idx, "status"] = new_status
+            if mandate_id is not None:
+                if "mandate_id" not in df.columns:
+                    df["mandate_id"] = pd.NA # Initialize column if it doesn't exist
+                df.loc[idx, "mandate_id"] = mandate_id
+
+            df.to_csv(csv_filepath, index=False)
+            return True
+    except Exception:
+        # Log error
+        return False
+    return False

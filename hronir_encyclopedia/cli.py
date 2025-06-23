@@ -20,27 +20,30 @@ app = typer.Typer(
 # Original functions are kept with minimal changes to their core logic,
 # only adapting their signatures to Typer's way of handling arguments.
 
-@app.command(help="Consolidate fork rankings and update the canonical path.")
-def consolidate_book(
+@app.command("recover-canon", help="Manual tool to recover/rebuild the canonical path from position 0. Not for normal operational flow.")
+def recover_canon(
     ratings_dir: Annotated[Path, typer.Option(help="Directory containing rating CSV files.")] = Path("ratings"),
     forking_path_dir: Annotated[Path, typer.Option(help="Directory containing forking path CSV files.")] = Path("forking_path"),
     canonical_path_file: Annotated[Path, typer.Option(help="Path to the canonical path JSON file.")] = Path("data/canonical_path.json"),
-    max_positions_to_consolidate: Annotated[int, typer.Option(help="Maximum number of positions to attempt to consolidate.")] = 100
+    max_positions_to_rebuild: Annotated[int, typer.Option(help="Maximum number of positions to attempt to rebuild.")] = 100
 ):
     """
-    Triggers a Temporal Cascade starting from position 0.
-    This is now a shortcut to the unified Temporal Cascade mechanism.
+    Manual Recovery Tool: Triggers a Temporal Cascade starting from position 0
+    to rebuild the canonical path. This is intended for maintenance, auditing,
+    or recovery scenarios, NOT as part of the standard content evolution workflow
+    which relies on session commits triggering cascades from specific points.
     """
-    typer.echo("Consolidate-book command now triggers a Temporal Cascade from position 0.")
+    typer.echo("WARNING: This is a manual recovery tool. For normal operation, canonical path updates via 'session commit'.")
+    typer.echo("Recover-canon command now triggers a Temporal Cascade from position 0.")
     run_temporal_cascade(
         start_position=0,
-        max_positions_to_consolidate=max_positions_to_consolidate,
+        max_positions_to_consolidate=max_positions_to_rebuild, # Renamed param for clarity
         canonical_path_file=canonical_path_file,
         forking_path_dir=forking_path_dir,
         ratings_dir=ratings_dir,
         typer_echo=typer.echo
     )
-    typer.echo("Consolidation via Temporal Cascade complete.")
+    typer.echo("Manual canon recovery via Temporal Cascade complete.")
 
 
 # Command `export` and `tree` removed as they depended on the old book structure.
@@ -358,18 +361,65 @@ def session_start(
         raise typer.Exit(code=0)
 
 
+    # Validate the fork_uuid's status and get mandate_id
+    fork_data = storage.get_fork_file_and_data(fork_uuid, fork_dir=forking_path_dir)
+
+    if not fork_data:
+        typer.echo(json.dumps({"error": f"Fork UUID {fork_uuid} details not found in any forking path CSV. Cannot start session."}, indent=2))
+        raise typer.Exit(code=1)
+
+    fork_status = fork_data.get("status")
+    if fork_status != "QUALIFIED":
+        typer.echo(json.dumps({
+            "error": f"Fork UUID {fork_uuid} does not have 'QUALIFIED' status. Current status: '{fork_status}'. Cannot start session.",
+            "fork_uuid": fork_uuid
+        }, indent=2))
+        raise typer.Exit(code=1)
+
+    mandate_id = fork_data.get("mandate_id")
+    if not mandate_id:
+        typer.echo(json.dumps({
+            "error": f"Fork UUID {fork_uuid} is 'QUALIFIED' but does not have an associated mandate_id. This indicates an inconsistency.",
+            "fork_uuid": fork_uuid
+        }, indent=2))
+        raise typer.Exit(code=1)
+
+    # Verify that the provided --position matches the fork's actual position
+    fork_actual_position = fork_data.get("position")
+    # fork_actual_position might be string if read directly, ensure comparison is fair
+    try:
+        if fork_actual_position is not None and int(fork_actual_position) != position:
+            typer.echo(json.dumps({
+                "error": f"Provided --position {position} does not match the fork's actual position {fork_actual_position}.",
+                "fork_uuid": fork_uuid
+            }, indent=2))
+            raise typer.Exit(code=1)
+    except ValueError:
+            typer.echo(json.dumps({
+                "error": f"Fork's actual position '{fork_actual_position}' is not a valid number.",
+                "fork_uuid": fork_uuid
+            }, indent=2))
+            raise typer.Exit(code=1)
+
+
+    # If N=0, there are no prior positions (N-1 to 0) to judge.
+    # The create_session logic in session_manager will handle empty dossier for N=0.
+    # The special handling for position == 0 in cli.py can be simplified as session_manager now handles it.
+
     # Create the session and get the dossier (SC.9)
     try:
         session_info = session_manager.create_session(
             fork_n_uuid=fork_uuid,
-            position_n=position,
+            position_n=position, # This is N, the position of the qualified fork
+            mandate_id=mandate_id, # Pass the validated mandate_id
             forking_path_dir=forking_path_dir,
-            ratings_dir=ratings_dir, # Pass ratings_dir here
+            ratings_dir=ratings_dir,
             canonical_path_file=canonical_path_file
         )
         typer.echo(json.dumps({
             "message": "Judgment session started successfully.",
             "session_id": session_info["session_id"],
+            "mandate_id_used": session_info.get("mandate_id_used"),
             "dossier": session_info["dossier"]
         }, indent=2))
     except Exception as e:
@@ -604,50 +654,73 @@ def session_commit(
         # Or, we could update session status to 'aborted' or similar. For now, leave active.
         raise typer.Exit(code=0)
 
-    # Record all valid votes (SC.10)
-    for vote_info in valid_votes_to_record:
-        try:
-            # Assuming ratings.record_vote uses ratings_dir internally or takes it as arg
-            # Current record_vote signature: position, voter, winner, loser, base="ratings", conn=None
-            ratings.record_vote(
-                position=vote_info["position"],
-                voter=vote_info["voter"],
-                winner=vote_info["winner_hronir"],
-                loser=vote_info["loser_hronir"],
-                base=ratings_dir # Pass ratings_dir
-            )
-            typer.echo(json.dumps({
-                "info": f"Vote recorded for position {vote_info['position']}: "
-                        f"Winner Hronir {vote_info['winner_hronir'][:8]}, "
-                        f"Loser Hronir {vote_info['loser_hronir'][:8]}"
-            }, indent=2))
-        except Exception as e:
-            typer.echo(json.dumps({"error": f"Failed to record vote for position {vote_info['position']}: {e}. Aborting commit."}, indent=2))
-            # If one vote fails, should we roll back or stop? For now, abort.
-            raise typer.Exit(code=1)
+    # The `valid_votes_to_record` list is now structured as:
+    # [{"position": int, "voter": str, "winner_hronir": str, "loser_hronir": str}]
+    # We need to transform this into the format expected by the new transaction_manager:
+    # session_verdicts: List[Dict[str, Any]] where each dict is
+    # {"position": int, "winner_hrönir_uuid": str, "loser_hrönir_uuid": str}
+    # The initiating_fork_uuid is passed separately to transaction_manager.
 
-    typer.echo(json.dumps({"message": f"All {len(valid_votes_to_record)} valid votes recorded."}, indent=2))
+    session_verdicts_for_tm: List[Dict[str, Any]] = []
+    for vote_detail in valid_votes_to_record:
+        session_verdicts_for_tm.append({
+            "position": vote_detail["position"],
+            "winner_hrönir_uuid": vote_detail["winner_hronir"],
+            "loser_hrönir_uuid": vote_detail["loser_hronir"]
+        })
 
-    # Create transaction in ledger (SYS.1)
+    # Calls to ratings.record_vote are now REMOVED from cli.py session_commit.
+    # transaction_manager.record_transaction is responsible for this.
+    typer.echo(json.dumps({"message": f"{len(session_verdicts_for_tm)} valid verdicts prepared for transaction processing."}, indent=2))
+
+    # Create transaction in ledger (SYS.1), which also records votes and handles promotions
+    transaction_result: Optional[Dict[str, Any]] = None
     try:
-        tx_uuid = transaction_manager.record_transaction(
+        transaction_result = transaction_manager.record_transaction(
             session_id=session_id,
-            initiating_fork_uuid=initiating_fork_uuid,
-            verdicts=processed_verdicts # Store the validated verdicts
+            initiating_fork_uuid=initiating_fork_uuid, # Fork whose mandate is used
+            session_verdicts=session_verdicts_for_tm
         )
-        typer.echo(json.dumps({"message": "Transaction recorded in ledger.", "transaction_uuid": tx_uuid}, indent=2))
+        typer.echo(json.dumps({
+            "message": "Transaction processing complete.",
+            "transaction_uuid": transaction_result["transaction_uuid"],
+            "promotions_granted": transaction_result.get("promotions_granted", [])
+        }, indent=2))
     except Exception as e:
-        typer.echo(json.dumps({"error": f"Failed to record transaction: {e}. Aborting commit."}, indent=2))
-        # This is critical. Votes might be recorded but not the TX.
-        # Manual intervention might be needed or a rollback mechanism.
+        typer.echo(json.dumps({"error": f"Failed to process transaction: {e}. Aborting commit."}, indent=2))
+        # Votes might not have been recorded, or only partially. State could be inconsistent.
+        # Session status should reflect this if possible.
+        session_manager.update_session_status(session_id, "commit_failed_tx_processing")
         raise typer.Exit(code=1)
 
+    # Update the status of the initiating_fork_uuid to "SPENT"
+    # The mandate_id was implicitly "spent" by starting the session and consuming the fork_uuid.
+    # Now we mark the fork itself as SPENT.
+    try:
+        update_spent_success = storage.update_fork_status(
+            fork_uuid_to_update=initiating_fork_uuid,
+            new_status="SPENT",
+            mandate_id=session_data.get("mandate_id"), # Pass mandate_id for completeness, though not strictly needed for 'SPENT'
+            fork_dir_base=forking_path_dir
+        )
+        if update_spent_success:
+            typer.echo(json.dumps({"message": f"Fork {initiating_fork_uuid} status updated to SPENT."}, indent=2))
+        else:
+            typer.echo(json.dumps({"warning": f"Could not update status to SPENT for fork {initiating_fork_uuid}. Manual check may be needed."}, indent=2))
+            # This is not ideal, but the transaction is committed.
+    except Exception as e:
+        typer.echo(json.dumps({"warning": f"Error updating status for fork {initiating_fork_uuid} to SPENT: {e}. Manual check may be needed."}, indent=2))
+
+
     # Trigger Temporal Cascade (SC.11)
-    if oldest_voted_position != float('inf'):
-        typer.echo(f"Oldest voted position: {oldest_voted_position}. Triggering Temporal Cascade.")
+    # Use oldest_voted_position from transaction_result
+    tm_oldest_voted_position = transaction_result.get("oldest_voted_position", float('inf'))
+
+    if tm_oldest_voted_position != float('inf') and tm_oldest_voted_position >=0 :
+        typer.echo(f"Oldest voted position from transaction: {tm_oldest_voted_position}. Triggering Temporal Cascade.")
         try:
             cascade_made_changes = run_temporal_cascade(
-                start_position=oldest_voted_position,
+                start_position=tm_oldest_voted_position,
                 max_positions_to_consolidate=max_cascade_positions,
                 canonical_path_file=canonical_path_file,
                 forking_path_dir=forking_path_dir,
@@ -673,6 +746,73 @@ def session_commit(
     # Update session status to 'committed'
     session_manager.update_session_status(session_id, "committed")
     typer.echo(json.dumps({"message": f"Session {session_id} committed successfully."}, indent=2))
+
+
+@app.command("metrics", help="Expose fork status metrics in Prometheus format (TDD 2.6).")
+def metrics_command(
+    forking_path_dir: Annotated[Path, typer.Option(help="Directory containing forking path CSV files.")] = Path("forking_path"),
+):
+    """
+    Scans all forking_path/*.csv files and prints the total number of forks
+    in each status (PENDING, QUALIFIED, SPENT) in Prometheus exposition format.
+    """
+    status_counts = {"PENDING": 0, "QUALIFIED": 0, "SPENT": 0, "UNKNOWN": 0} # Add UNKNOWN for robustness
+
+    if not forking_path_dir.is_dir():
+        typer.echo(f"# Metrics generation skipped: Directory not found: {forking_path_dir}", err=True)
+        # Output empty metrics if dir not found, or specific error metrics
+        for status_val, count in status_counts.items():
+            typer.echo(f'hronir_fork_status_total{{status="{status_val.lower()}"}} {count}')
+        raise typer.Exit(code=1)
+
+    all_fork_uuids_processed = set() # To count unique fork_uuids across potentially overlapping CSVs (though ideally they don't overlap by fork_uuid)
+
+    for csv_file in forking_path_dir.glob("*.csv"):
+        if csv_file.stat().st_size == 0:
+            continue
+        try:
+            # Ensure 'status' and 'fork_uuid' columns are read.
+            # storage.audit_forking_csv should ensure 'status' exists, defaulting to PENDING.
+            df = pd.read_csv(csv_file, usecols=['fork_uuid', 'status'], dtype={'fork_uuid': str, 'status': str})
+
+            if 'status' not in df.columns: # Should not happen if audit_forking_csv is effective
+                # typer.echo(f"# Warning: 'status' column missing in {csv_file}. Skipping this file for metrics.", err=True)
+                # Or count all as UNKNOWN or PENDING
+                status_counts["UNKNOWN"] += len(df) # Example: count them as unknown
+                continue
+
+            for index, row in df.iterrows():
+                fork_uuid = row['fork_uuid']
+                status = row['status']
+
+                if pd.isna(fork_uuid) or not fork_uuid.strip(): # Skip rows with no fork_uuid
+                    continue
+
+                # Only count unique fork_uuids once, even if they appear in multiple files (defensive)
+                if fork_uuid not in all_fork_uuids_processed:
+                    if pd.isna(status) or not status.strip(): # Handle NaN or empty status as UNKNOWN
+                        status_counts["UNKNOWN"] += 1
+                    elif status in status_counts:
+                        status_counts[status] += 1
+                    else:
+                        status_counts["UNKNOWN"] += 1 # Catch any other unexpected status values
+                    all_fork_uuids_processed.add(fork_uuid)
+
+        except pd.errors.EmptyDataError:
+            continue
+        except ValueError as ve: # e.g. if usecols specifies a col that's not there
+            typer.echo(f"# Warning: Could not process {csv_file} for metrics due to ValueError: {ve}. Skipping.", err=True)
+            continue
+        except Exception as e:
+            typer.echo(f"# Warning: Error processing {csv_file} for metrics: {e}. Skipping.", err=True)
+            continue
+
+    # Print metrics in Prometheus format
+    typer.echo("# HELP hronir_fork_status_total Total number of forks by status.")
+    typer.echo("# TYPE hronir_fork_status_total gauge")
+    for status_val, count in status_counts.items():
+        # Prometheus labels are typically lowercase.
+        typer.echo(f'hronir_fork_status_total{{status="{status_val.lower()}"}} {count}')
 
 
 if __name__ == "__main__":
