@@ -21,6 +21,7 @@ hronir = "hronir_encyclopedia.cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest", "pre-commit", "ruff", "black"]
+viz = ["matplotlib"]
 
 [tool.ruff]
 line-length = 100

@@ -61,7 +61,7 @@ graph TD
    cp .env.example .env  # and add your GEMINI_API_KEY to .env
    ```
 
-Dependencies are managed with `uv` using `pyproject.toml` and `uv.lock`. Core libraries include [**click**](https://palletsprojects.com/p/click/) for the CLI and [**pandas**](https://pandas.pydata.org/) for data manipulation.
+Dependencies are managed with `uv` using `pyproject.toml` and `uv.lock`. Core libraries include [**click**](https://palletsprojects.com/p/click/) for the CLI, [**pandas**](https://pandas.pydata.org/) for data manipulation, and [**networkx**](https://networkx.org/) for graph validation.
 
 ---
 

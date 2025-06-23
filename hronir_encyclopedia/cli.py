@@ -77,26 +77,13 @@ def store(
 # Helper function to find successor hrönir_uuid for a given fork_uuid
 # This could also live in storage.py if it's deemed generally useful
 def _get_successor_hronir_for_fork(fork_uuid_to_find: str, forking_path_dir: Path) -> str | None:
-    if not forking_path_dir.is_dir():
-        return None
-    for csv_file in forking_path_dir.glob("*.csv"):
-        if csv_file.stat().st_size > 0:
-            try:
-                # Ensure pandas (pd) is available; it's imported at the top of the file.
-                df_forks = pd.read_csv(csv_file, dtype=str) # Ler tudo como string
-                # Ensure required columns are present
-                if not all(col in df_forks.columns for col in ["fork_uuid", "uuid"]):
-                    continue
-                # Search for the fork_uuid
-                # Using .astype(str) again for fork_uuid just in case, though dtype=str should handle it.
-                match = df_forks[df_forks["fork_uuid"].astype(str) == fork_uuid_to_find]
-                if not match.empty:
-                    return match.iloc[0]["uuid"] # 'uuid' is the successor hrönir_uuid
-            except pd.errors.EmptyDataError:
-                continue
-            except Exception: # Broad exception for other parsing errors
-                # Consider logging this error
-                continue
+    """Return the hrönir UUID that a fork points to using the narrative graph."""
+    from . import graph_logic
+
+    graph = graph_logic.get_narrative_graph(forking_path_dir)
+    for _u, v, data in graph.edges(data=True):
+        if data.get("fork_uuid") == fork_uuid_to_find:
+            return v
     return None
 
 
@@ -126,6 +113,11 @@ def audit():
         typer.echo(f"Auditing forking path directory: {fork_dir}...")
         for csv_file in fork_dir.glob("*.csv"):
             storage.audit_forking_csv(csv_file)
+        from . import graph_logic
+        if graph_logic.is_narrative_consistent(fork_dir):
+            typer.echo("Narrative graph is consistent (no cycles detected).")
+        else:
+            typer.echo("WARNING: Narrative graph contains cycles!")
     else:
         typer.echo(f"Forking path directory {fork_dir} not found. Skipping audit.")
     typer.echo("Audit complete (Note: hrönir validation primarily via 'clean' command).")
@@ -483,6 +475,11 @@ def run_temporal_cascade(
     This is the core of SC.11.
     """
     typer_echo(f"Starting Temporal Cascade from position {start_position}...")
+
+    from . import graph_logic
+    if not graph_logic.is_narrative_consistent(forking_path_dir):
+        typer_echo("Error: narrative graph contains cycles. Abort cascade.", err=True)
+        return False
 
     try:
         canonical_path_data = (
