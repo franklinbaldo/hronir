@@ -342,7 +342,7 @@ def session_start(
     # We will fetch the fork's details to get its position N.
 
     # Validate the fork_uuid - it must exist in forking_path
-    fork_data = storage.get_fork_file_and_data(fork_uuid, fork_dir=forking_path_dir)
+    fork_data = storage.get_fork_file_and_data(fork_uuid, fork_dir_base=forking_path_dir)
 
     if not fork_data:
         typer.echo(json.dumps({"error": f"Fork UUID {fork_uuid} not found in any forking path CSV. Cannot start session."}, indent=2))
@@ -404,7 +404,7 @@ def session_start(
 
 
     # Validate the fork_uuid's status and get mandate_id
-    fork_data = storage.get_fork_file_and_data(fork_uuid, fork_dir=forking_path_dir)
+    fork_data = storage.get_fork_file_and_data(fork_uuid, fork_dir_base=forking_path_dir)
 
     if not fork_data:
         typer.echo(json.dumps({"error": f"Fork UUID {fork_uuid} details not found in any forking path CSV. Cannot start session."}, indent=2))

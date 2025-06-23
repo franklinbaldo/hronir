@@ -273,7 +273,7 @@ class TestSessionWorkflow:
         # 2. Run session start
         cmd_args_start = [
             "session", "start",
-            "--position", "2", # Position N of the new fork
+            # "--position", "2", # Position N of the new fork - REMOVED, derived from fork_uuid
             "--fork-uuid", f2_judge_fork_uuid,
             # Pass absolute paths to CLI options
             "--ratings-dir", str(RATINGS_DIR.resolve()),
@@ -501,7 +501,7 @@ class TestSessionWorkflow:
         # --- Action: Session Start and Commit ---
         # Start Session
         result_start, output_start = _run_cli_command([
-            "session", "start", "--position", "3", "--fork-uuid", f3_judge_fork_uuid,
+            "session", "start", "--fork-uuid", f3_judge_fork_uuid, # "--position", "3", REMOVED
             "--ratings-dir", str(RATINGS_DIR.resolve()),
             "--forking-path-dir", str(FORKING_PATH_DIR.resolve()),
             "--canonical-path-file", str(CANONICAL_PATH_FILE_fixture.resolve()),
@@ -663,7 +663,7 @@ class TestSessionWorkflow:
 
         # --- Action: Session Start and Commit to change canonical path to h0b -> h1b_from_0b ---
         result_start, output_start = _run_cli_command([
-            "session", "start", "--position", "3", "--fork-uuid", f3_judge_fork_uuid,
+            "session", "start", "--fork-uuid", f3_judge_fork_uuid, # "--position", "3", REMOVED
             "--ratings-dir", str(RATINGS_DIR.resolve()),
             "--forking-path-dir", str(FORKING_PATH_DIR.resolve()),
             "--canonical-path-file", str(CANONICAL_PATH_FILE_fixture.resolve()),

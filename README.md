@@ -159,7 +159,7 @@ The "Tribunal of the Future" is, therefore, the process by which the system cont
 Forking paths are stored in `forking_path/yu-tsun.csv`, named after the protagonist of *The Garden of Forking Paths*.
 
 ```
-the_library/                       # Hrönirs (textual content) stored by UUID
+the_library/                       # Hrönirs (textual content) stored by UUID. Each Hrönir is stored in a directory named after its UUID (e.g., the_library/<UUID>/index.md).
 data/
 ├── canonical_path.json          # The canonical path of forks (fork UUIDs)
 ├── sessions/                    # Active judgment session files (e.g., <session_id>.json)
