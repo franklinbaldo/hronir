@@ -132,8 +132,10 @@ def _get_all_forks_at_position(
 
 def record_transaction(
     session_id: str,
-    initiating_fork_uuid: str, # Fork whose mandate is being used
-    session_verdicts: List[Dict[str, Any]], # [{"position": int, "winner_hrönir_uuid": str, "loser_hrönir_uuid": str}]
+    initiating_fork_uuid: str,  # Fork whose mandate is being used
+    session_verdicts: List[Dict[str, Any]],  # [{"position": int, "winner_hrönir_uuid": str, "loser_hrönir_uuid": str}]
+    forking_path_dir: Path | None = None,
+    ratings_dir: Path | None = None,
     session: Session | None = None,
 ) -> Dict[str, Any]:
     """
@@ -189,6 +191,12 @@ def record_transaction(
     # Crucial for mandate_id generation if a fork qualifies in *this* transaction.
     last_tx_hash = get_previous_transaction_uuid() or "" # Use empty string if no prev tx
 
+    base_dir = TRANSACTIONS_DIR.parent.parent
+    if forking_path_dir is None:
+        forking_path_dir = base_dir / "forking_path"
+    if ratings_dir is None:
+        ratings_dir = base_dir / "ratings"
+
     promotions_granted: List[Dict[str, str]] = []
     oldest_voted_position = -1
 
@@ -203,9 +211,9 @@ def record_transaction(
         ratings.record_vote(
             position,
             voter=initiating_fork_uuid,
-            winner=winner_hrönir_uuid, # winner is a hrönir (chapter) UUID
-            loser=loser_hrönir_uuid,   # loser is a hrönir (chapter) UUID
-            base=RATINGS_DIR,
+            winner=winner_hrönir_uuid,  # winner is a hrönir (chapter) UUID
+            loser=loser_hrönir_uuid,  # loser is a hrönir (chapter) UUID
+            base=ratings_dir,
             session=session,
         )
         processed_verdicts_for_log.append(vote_action)
@@ -218,7 +226,7 @@ def record_transaction(
             fork_details = _get_fork_details_by_hrönir_uuid(
                 hrönir_uuid_to_find=hrönir_involved_uuid,
                 at_position=position,
-                fork_dir_base=FORKING_PATH_DIR
+                fork_dir_base=forking_path_dir,
             )
 
             if not fork_details:
@@ -241,17 +249,17 @@ def record_transaction(
 
                 current_pos_ratings_df = ratings.get_ranking(
                     position=position,
-                    predecessor_hronir_uuid=predecessor_for_ranking, # from the fork's own record
-                    forking_path_dir=FORKING_PATH_DIR,
-                    ratings_dir=RATINGS_DIR
+                    predecessor_hronir_uuid=predecessor_for_ranking,  # from the fork's own record
+                    forking_path_dir=forking_path_dir,
+                    ratings_dir=ratings_dir,
                 )
 
                 # Get all forks competing in the same position to calculate N
                 # This also needs the correct predecessor_uuid for context.
                 all_forks_in_same_segment_df = _get_all_forks_at_position(
                     position_num=position,
-                    predecessor_uuid=predecessor_for_ranking, # from the fork's own record
-                    fork_dir_base=FORKING_PATH_DIR
+                    predecessor_uuid=predecessor_for_ranking,  # from the fork's own record
+                    fork_dir_base=forking_path_dir,
                 )
 
                 is_qualified = ratings.check_fork_qualification(
@@ -269,7 +277,7 @@ def record_transaction(
                         fork_uuid_to_update=fork_to_check_uuid,
                         new_status="QUALIFIED",
                         mandate_id=mandate_id_str,
-                        fork_dir_base=FORKING_PATH_DIR,
+                        fork_dir_base=forking_path_dir,
                         session=session,
                     )
                     if update_success:
