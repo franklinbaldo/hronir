@@ -1,180 +1,41 @@
 # AGENTS Instructions
 
-## Test and linting
-- Install dependencies using `pip install -r requirements.txt` if needed.
-- Run `pytest` from the repository root after changes. Even if there are no tests, this must succeed.
+> **⚠️ IMPORTANT: This file redirects to CLAUDE.md for accurate, up-to-date information.**
 
-## Code style
-- Use standard Python style with 4-space indentation.
-- Keep implementations minimal and self-explanatory.
+## For AI Agents and Code Assistants
 
-## Documentation
-- Update the README when adding new CLI commands or significant features.
-# Agent Contributions and Generated Hrönirs
+**This repository uses CLAUDE.md as the primary source of development guidance.** The CLAUDE.md file contains comprehensive, accurate, and up-to-date information about:
 
-This document outlines the expectations for developers, contributors, and automated agents when generating hrönirs (chapters or chapter variants) or performing other automated actions as part of their work on The Hrönir Encyclopedia.
+- Development commands and workflows
+- Project architecture and key components  
+- Testing procedures and code style
+- CLI usage and Protocol v2 features
 
-## Section 1: Committing Generated Content
+**Please read CLAUDE.md instead of this file for all development tasks.**
 
-### Guiding Principle: Commit Your Creations
+## Quick Reference
 
-When an agent (human developer, tester, or automated script/AI) generates new hrönirs for any of the following purposes:
+```bash
+# Read the comprehensive development guide
+cat CLAUDE.md
 
-*   Testing core functionalities (e.g., `store`, `vote`, `audit` commands).
-*   Demonstrating a new feature or workflow.
-*   Fulfilling Proof-of-Work requirements for voting simulations.
-*   Exploring narrative possibilities as part of an analysis.
-*   Seeding the encyclopedia with initial or example content.
+# Key development commands
+uv sync --all-features    # Install dependencies
+uv run pytest           # Run tests
+uv run ruff check .      # Lint code
+uv run hronir           # Access CLI
+```
 
-**It is expected that these generated hrönirs, along with any associated updates to `forking_path/*.csv` files, should be committed to the repository.**
+## Why This Redirect?
 
-### Rationale for Committing Content
+The CLAUDE.md file is:
+- ✅ **Accurate**: Reflects the actual Protocol v2 implementation
+- ✅ **Complete**: Covers all CLI commands and architecture details
+- ✅ **Current**: Updated to match the sophisticated current codebase
+- ✅ **Structured**: Well-organized for AI agent consumption
 
-Committing these hrönirs offers several benefits:
-
-1.  **Transparency:** Makes the agent's actions and their impact on the system visible and reviewable.
-2.  **Reproducibility:** Allows others (and future automated tests) to reproduce the state of the system that was achieved or tested by the agent. This is crucial for debugging and verifying fixes or new features.
-3.  **Enrichment of Test Data:** Provides a growing corpus of test cases and example content that can be used for ongoing development and quality assurance.
-4.  **Living Examples:** Offers concrete examples of how the system is used and how different types of hrönirs or narrative structures are integrated.
-5.  **Preservation of Effort:** Ensures that useful examples, even if initially for testing, are not lost and can be built upon or referenced later.
-
-### How to Commit Content
-
-1.  **Use the `store` command:** Ensure all generated hrönirs are correctly processed using the `python -m hronir_encyclopedia.cli store <markdown_file> --prev <previous_hrönir_uuid>` command. This will place the hrönir into the `the_library/` directory structure and (usually) update the relevant `forking_path/*.csv` file.
-2.  **Identify changed files:** The `store` command will create new files under `the_library/` (specifically an `index.md` and `metadata.json` within a UUID-derived path) and may modify files in `forking_path/`.
-3.  **Stage and Commit:** Add these new/modified files to your Git commit. Use a descriptive commit message explaining the purpose of the generated hrönirs (e.g., Test: Add hrönirs for testing vote command PoW).
-
-## Section 2: Active Participation in Canon Evolution
-
-Beyond simply generating content for testing or examples, agents (especially automated ones designed for ongoing maintenance or evolution of the encyclopedia) are encouraged to actively participate in the core mechanics of the Hrönir Encyclopedia.
-Automated workflows can use the `synthesize` command to perform all three acts at once—generating hrönirs, writing the forking path entry, and casting the corresponding vote with the new `fork_uuid`.
-
-### Expanded Expectations for Active Agents:
-
-1.  **Cast Valid Votes:**
-    *   Agents should endeavor to cast as many valid votes as possible on competing hrönir variants.
-    *   Votes must adhere to the established Proof-of-Work (PoW) mechanism, which typically involves generating and submitting new hrönirs as part of the voting act. This ensures that voting itself contributes to the encyclopedia's growth.
-
-2.  **Update Voting Tables/Ratings:**
-    *   Ensure that all cast votes are correctly recorded in the relevant rating tables (e.g., `ratings/position_<n>.csv` files or the database if one is implemented).
-    *   This includes updating win/loss records and recalculating Elo ratings for the involved hrönirs.
-
-3.  **Calculate and Determine Canonical State:**
-    *   Periodically, or as triggered by significant voting activity, agents may be responsible for calculating the current overall state of the book.
-    *   This involves analyzing the Elo ratings across all positions to determine the winning or highest-ranked hrönir for each chapter position, thus identifying the current canonical narrative path(s).
-
-4.  **Update Canonical Version Representation:**
-    *   Once the canonical path(s) are determined, agents should update the definitive representation of the canonical encyclopedia.
-    *   This might involve:
-        *   Updating a specific file like `forking_path/canonical.csv`.
-        *   Generating a consolidated version of the canonical book in the `book/` folder (e.g., as a single Markdown file or a structured set of files representing the main path).
-        *   Updating any summary or index files that point to the canonical version.
-
-5.  **Submit Canonical Updates:**
-    *   Changes to the canonical version should be submitted through the project's established contribution workflow.
-    *   For significant updates, this would typically involve creating a Pull Request (PR) from a feature branch, allowing for review before merging into the main development line.
-    *   Smaller, routine updates by trusted automated agents might, under specific guidelines, be committed directly.
-
-By fulfilling these expanded expectations, agents become integral to the dynamic and evolving nature of The Hrönir Encyclopedia, helping to curate and solidify the narrative paths that emerge from collective interaction.
+This AGENTS.md file previously contained outdated command examples and incomplete information that could mislead AI assistants.
 
 ---
-By following these practices, all contributors help maintain a robust, transparent, well-documented, and actively evolving development environment for The Hrönir Encyclopedia.
 
-## Section 3: Interacting with the "Tribunal of the Future" Protocol (for AI Agents)
-
-Automated agents are key participants in the Hrönir Encyclopedia, especially in shaping the canonical narrative through the "Tribunal of the Future" mechanism. This section details the interaction flow.
-
-### Core Interaction Loop:
-
-The primary loop for an agent to influence the canon is:
-
-1.  **Generate Content (Proof-of-Work):**
-    *   Create a new hrönir (chapter variant) as a Markdown file.
-    *   Use the `store` command to register this hrönir and its associated `fork`. This action serves as your Proof-of-Work.
-        ```bash
-        uv run python -m hronir_encyclopedia.cli store your_chapter.md --prev <uuid_of_previous_hrönir>
-        ```
-    *   The output of this command will include the `hrönir_uuid` and, crucially, the `fork_uuid` for the newly created fork at a specific `position` (e.g., Position `N`). This `fork_uuid` and `position` are essential for the next step.
-
-2.  **Initiate a Judgment Session (`session start`):**
-    *   With the `fork_uuid` (from Position `N`) obtained from the `store` command, the agent has earned the right to initiate a Judgment Session.
-    *   Execute the `session start` command:
-        ```bash
-        uv run python -m hronir_encyclopedia.cli session start --position <N> --fork-uuid <your_fork_N_uuid>
-        ```
-    *   **Output (Dossier):** This command returns a JSON object representing the "dossier" for the session. This dossier contains:
-        *   `session_id`: A unique identifier for this judgment session.
-        *   `dossier`: An object where keys are position numbers (as strings, e.g., "N-1", "N-2", ..., "0") and values are objects describing the "duel of maximum entropy" for that position at the time the session was started. Each duel object typically contains:
-            *   `fork_A_uuid`: UUID of the first fork in the duel.
-            *   `fork_B_uuid`: UUID of the second fork in the duel.
-            *   (Potentially other metadata about the forks or duel).
-        *   Example Dossier Structure:
-            ```json
-            {
-              "session_id": "some_unique_session_id",
-              "dossier": {
-                "2": { // Position 2
-                  "fork_A_uuid": "uuid_for_fork_A_pos2",
-                  "fork_B_uuid": "uuid_for_fork_B_pos2",
-                  "elo_A": 1500, "elo_B": 1490
-                },
-                "1": { // Position 1
-                  "fork_A_uuid": "uuid_for_fork_A_pos1",
-                  "fork_B_uuid": "uuid_for_fork_B_pos1",
-                  "elo_A": 1550, "elo_B": 1560
-                },
-                "0": { // Position 0
-                  "fork_A_uuid": "uuid_for_fork_A_pos0",
-                  "fork_B_uuid": "uuid_for_fork_B_pos0",
-                  "elo_A": 1600, "elo_B": 1400
-                }
-              }
-            }
-            ```
-    *   The dossier is static for the duration of the session. The agent deliberates based on this snapshot.
-
-3.  **Deliberate and Form Veredicts (Agent Logic):**
-    *   The agent analyzes the dossier. For each position in the dossier, the agent can choose to cast a vote for `fork_A_uuid` or `fork_B_uuid`, or abstain from voting on that position's duel.
-    *   The agent's internal logic for choosing winners is the core of its strategy (see "Voting Strategies for AI Agents" below).
-
-4.  **Commit Veredicts (`session commit`):**
-    *   The agent submits its chosen veredicts in a single, atomic transaction using the `session_id`.
-    *   The veredicts must be formatted as a JSON object where keys are position numbers (as strings) and values are the `fork_uuid` of the chosen winner for that position.
-    *   Command:
-        ```bash
-        uv run python -m hronir_encyclopedia.cli session commit --session-id <your_session_id> --verdicts '<json_string_of_verdicts>'
-        # Alternatively, provide a path to a JSON file:
-        # uv run python -m hronir_encyclopedia.cli session commit --session-id <your_session_id> --verdicts /path/to/your/verdicts.json
-        ```
-    *   Example Veredicts JSON:
-        ```json
-        {
-          "2": "uuid_for_fork_A_pos2",  // Agent chose Fork A for position 2
-          "0": "uuid_for_fork_B_pos0"   // Agent chose Fork B for position 0
-          // Agent abstained from voting on position 1's duel in the dossier
-        }
-        ```
-    *   **Consequences of Commit:**
-        *   **Votes Recorded:** Veredicts are recorded, affecting Elo ratings of the involved forks.
-        *   **Transaction Logged:** The session commit is logged immutably in `data/transactions/`.
-        *   **Temporal Cascade:** This is the most significant consequence. The commit triggers a "Temporal Cascade," where the canonical path (`data/canonical_path.json`) is recalculated starting from the oldest position the agent voted on, propagating changes forward. This means an agent's judgment on an early chapter can reshape the canonical status of subsequent chapters.
-
-### Voting Strategies for AI Agents:
-
-The "Tribunal of the Future" is an adversarial environment. The strategy an agent employs to cast its votes in a `session commit` is critical to its influence. Here are some potential (and progressively more complex) strategies:
-
-*   **Random Choice:** For each duel in the dossier, randomly pick one of the forks or abstain. This is a baseline strategy.
-*   **Elo-Based Heuristics:**
-    *   **Favor Higher Elo:** Always vote for the fork with the currently higher Elo rating.
-    *   **Favor Lower Elo (Contrarian):** Intentionally vote for the underdog to challenge established paths.
-    *   **Smallest Gap:** Vote in duels where the Elo difference is smallest, to have maximum impact on close contests.
-*   **Narrative Coherence (Advanced):**
-    *   This requires the AI to "read" or analyze the content of hrönirs associated with the forks.
-    *   The agent could try to assess which fork leads to a more coherent, interesting, or thematically consistent continuation of the narrative *from the perspective of the path it is trying to make canonical*.
-    *   This might involve NLP techniques, semantic similarity analysis with a target narrative style, or even maintaining an internal "preferred narrative state."
-*   **Game Theory / Adversarial Strategies:**
-    *   If aware of other agents, an AI might try to predict their votes and vote strategically to either amplify or counteract them.
-    *   Consider the long-term impact of the Temporal Cascade: a vote at an early position might be more powerful than many votes at later positions.
-*   **Hybrid Strategies:** Combine elements of the above. For example, use an Elo-based heuristic for most positions but apply narrative coherence analysis for a few key positions the agent wants to strongly influence.
-
-The development of sophisticated voting strategies is a key area of research and experimentation within the Hrönir Encyclopedia protocol. The transparency of the ledger (`data/transactions/`) allows for the analysis of past agent behaviors and their effectiveness.
+**🔗 Please refer to CLAUDE.md for all development guidance and project information.**
