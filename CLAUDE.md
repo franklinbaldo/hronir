@@ -47,8 +47,11 @@ This ensures:
 # Run tests
 uv run pytest
 
-# Lint code
+# Lint code (check for issues)
 uv run ruff check .
+
+# Auto-fix linting issues
+uv run ruff check --fix .
 
 # Format code
 uv run black .
@@ -59,6 +62,29 @@ uv run pytest tests/test_specific_file.py
 # Clean invalid entries
 uv run hronir clean --git
 ```
+
+### ⚠️ Code Quality Requirements
+
+**MANDATORY**: Before committing any changes, ensure code quality is maintained:
+
+```bash
+# 1. Always run linting and formatting before committing
+uv run ruff check .        # Must pass with 0 issues
+uv run black .             # Auto-format all code
+
+# 2. Run tests to ensure functionality
+uv run pytest             # All tests must pass
+
+# 3. Only commit if everything passes
+# DO NOT commit code with linting issues or failing tests
+```
+
+**Code Quality Standards:**
+- **Zero tolerance** for linting issues - all `ruff check` errors must be fixed
+- Code must be formatted with `black` before committing
+- All tests must pass before committing
+- Use `uv run ruff check --fix .` to auto-fix common issues
+- Manual fixes required for complex linting issues (unused variables, etc.)
 
 ### CLI Usage
 ```bash

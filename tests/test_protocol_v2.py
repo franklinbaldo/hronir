@@ -132,7 +132,7 @@ class TestProtocolV2(unittest.TestCase):
         # Create one canonical fork at pos 0 to serve as predecessor for pos 1 forks
         # This isn't strictly necessary for testing session start with PENDING sybils,
         # but sets up a more realistic scenario if we were to simulate duels.
-        canonical_fork_pos0_uuid = self._create_fork_entry(
+        self._create_fork_entry(
             "canon_creator_pos0", 0, pos0_prev_hrönir_uuid, pos0_canonical_hrönir_uuid
         )
         # For this test, we don't qualify it, just need it to exist.
@@ -220,9 +220,7 @@ class TestProtocolV2(unittest.TestCase):
         # F_good at position 1
         fgood_fork_uuid = self._create_fork_entry(creator_fgood_id, 1, pos0_hrönir_A, fgood_hrönir)
         # Another fork at position 1 to vote against
-        fother_fork_uuid = self._create_fork_entry(
-            "creator_other_promo", 1, pos0_hrönir_A, fother_hrönir
-        )
+        self._create_fork_entry("creator_other_promo", 1, pos0_hrönir_A, fother_hrönir)
 
         # Ensure F_good starts as PENDING
         fgood_initial_data = storage.get_fork_file_and_data(fgood_fork_uuid, self.forking_path_dir)
@@ -497,7 +495,7 @@ class TestProtocolV2(unittest.TestCase):
         p1_fork_X_uuid = self._create_fork_entry(
             "creatorP1X_cascade", 1, p0_ch_A, p1_ch_X
         )  # Initial canon for P1
-        p1_fork_Y_uuid = self._create_fork_entry("creatorP1Y_cascade", 1, p0_ch_A, p1_ch_Y)
+        self._create_fork_entry("creatorP1Y_cascade", 1, p0_ch_A, p1_ch_Y)
 
         # Initial canonical path: P0 -> F0_A (p0_ch_A), P1 -> F1_X (p1_ch_X)
         initial_canon_data = {
@@ -605,9 +603,7 @@ class TestProtocolV2(unittest.TestCase):
         # So, the canonical path should end at position 0 if no forks exist from p0_ch_B at position 1.
         # Let's create one such fork to see if cascade picks it up.
         p1_ch_Z_from_B = _create_dummy_chapter(self.library_path, "p1_cascade_Z_from_B")
-        p1_fork_Z_from_B_uuid = self._create_fork_entry(
-            "creatorP1Z_cascade", 1, p0_ch_B, p1_ch_Z_from_B
-        )
+        self._create_fork_entry("creatorP1Z_cascade", 1, p0_ch_B, p1_ch_Z_from_B)
 
         # Re-run the commit and cascade logic by calling the commit again.
         # This is a bit of a hack for testing; ideally, the test setup has all forks from the start.

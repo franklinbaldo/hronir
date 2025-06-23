@@ -1,4 +1,3 @@
-
 # Limite de palavras para o trecho do capítulo anterior a ser incluído no prompt
 PREDECESSOR_SNIPPET_WORD_LIMIT = 100
 

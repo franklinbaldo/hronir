@@ -52,7 +52,7 @@ def setup_test_environment(tmp_path: Path) -> dict[str, Path]:
 
     # --- Create Hrönirs ---
     # Position 0
-    hronir_seed = create_mock_hronir(
+    create_mock_hronir(
         library_dir, "Seed content", "00000000-seed-0000-0000-000000000000"
     )  # Placeholder for actual seed if needed by forks
     hronir_A_content = "Content for Hrönir A, successor of Fork A"
@@ -230,18 +230,6 @@ def setup_test_environment(tmp_path: Path) -> dict[str, Path]:
             }
         ],
     )
-    ratings_pos1_children_B_data = [
-        # Make E slightly ahead of F
-        {
-            "voter": voter_pos1_B_children_fork_uuid,
-            "winner": hronir_E_suc,
-            "loser": hronir_F_suc,
-            "elo_winner_pre": 1500,
-            "elo_loser_pre": 1500,
-            "elo_winner_post": 1516,
-            "elo_loser_post": 1484,
-        }
-    ]
     # Append to position_1.csv or create new if logic handles multiple files per position
     # For simplicity with current ratings.py, ensure position_1.csv contains all relevant votes for pos 1
     # So, we should merge these if determine_next_duel reads only one file per position.

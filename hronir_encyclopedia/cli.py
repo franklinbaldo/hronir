@@ -360,11 +360,11 @@ def main(argv: list[str] | None = None):
 
 # New session management commands
 session_app = typer.Typer(help="Manage Hrönir judgment sessions.", no_args_is_help=True)
-app.add_typer(session_app, name="session")
 
-from . import (
-    session_manager,
-)  # Placed here to avoid circular import if session_manager needs cli parts
+# Import placed here to avoid circular imports
+from . import session_manager  # noqa: E402
+
+app.add_typer(session_app, name="session")
 
 
 @session_app.command("start", help="Initiate a Judgment Session using a QUALIFIED fork's mandate.")
@@ -749,8 +749,6 @@ def run_temporal_cascade(
 
     typer_echo(f"Temporal Cascade from position {start_position} complete.")
     return updated_any_position_in_cascade  # Return whether changes were made
-
-
 
 
 @session_app.command(

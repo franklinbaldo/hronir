@@ -148,7 +148,7 @@ def test_clean_git_prunes_from_branch(tmp_path, monkeypatch):
 
     with pytest.raises(SystemExit) as e:
         cli.main(["clean", "--git"])
-    assert e.type == SystemExit
+    assert e.type is SystemExit
     assert e.value.code == 0
 
     # After 'clean --git', the 'git rm' should have run.

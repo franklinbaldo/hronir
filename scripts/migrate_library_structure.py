@@ -48,7 +48,6 @@ def migrate():
 
             old_index_path = old_dir / "index.md"
             new_index_path = new_dir / "index.md"
-            old_meta_path = old_dir / "metadata.json"  # meta_path é o old_meta_path
             new_meta_path = new_dir / "metadata.json"
 
             if old_index_path.exists():

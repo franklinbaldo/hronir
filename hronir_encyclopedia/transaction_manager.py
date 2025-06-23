@@ -4,7 +4,11 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+import blake3
+import pandas as pd
 from sqlalchemy.orm import Session
+
+from hronir_encyclopedia import ratings, storage
 
 from .models import TransactionDB
 
@@ -37,11 +41,6 @@ def _compute_transaction_uuid(content: dict[str, Any]) -> str:
     serialized_content = json.dumps(content_copy, sort_keys=True, separators=(",", ":"))
     return str(uuid.uuid5(UUID_NAMESPACE, serialized_content))
 
-
-import blake3
-import pandas as pd
-
-from hronir_encyclopedia import ratings, storage
 
 # Define default paths, these could be configurable
 FORKING_PATH_DIR = Path("forking_path")
