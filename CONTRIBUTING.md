@@ -34,39 +34,45 @@ Thank you for your interest in helping expand this labyrinthine narrative. This 
 
 Remember to use `uv run` before `python -m hronir_encyclopedia.cli` if you are using the `uv` environment, as shown in the examples below.
 
-Check the current Elo rankings for a chapter position:
+Check the current Elo rankings for forks at a chapter position:
 ```bash
 uv run python -m hronir_encyclopedia.cli ranking --position 1
 ```
 
-To participate in voting (after obtaining a `fork_uuid` as described in `docs/proof_of_work_voting.md`):
+To participate in the "Tribunal of the Future" (after creating a new hrönir and its `fork_uuid` at position `N`):
 
-1.  Discover the Duelo de Máxima Entropia for a position:
+1.  **Start a Judgment Session:**
+    Use your new `fork_uuid` (from position `N`) to start a session. This provides a `session_id` and a dossier of duels for prior positions.
     ```bash
-    uv run python -m hronir_encyclopedia.cli get-duel --position 1
-    ```
-    This will output JSON indicating the `fork_A` (e.g., `"fork_uuid_A..."`) and `fork_B` (e.g., `"fork_uuid_B..."`) for the duel of forks.
-
-2.  Cast your vote for the presented duel of forks:
-    ```bash
-    uv run python -m hronir_encyclopedia.cli vote \
-      --position 1 \
-      --voter-fork-uuid <your_pow_fork_uuid> \
-      --winner-fork-uuid <fork_A_uuid_from_get_duel> \
-      --loser-fork-uuid <fork_B_uuid_from_get_duel>
+    # Example: Your new fork at position N=3 is fork_N_uuid
+    uv run python -m hronir_encyclopedia.cli session start \
+      --position 3 \
+      --fork-uuid <your_fork_N_uuid>
     ```
 
-Generate two new hrönir variants from a predecessor and record an initial assessment (this is mainly for automated agents but can be used manually; it does not bypass the `get-duel` requirement for general voting):
-```bash
-uv run python -m hronir_encyclopedia.cli synthesize \
-  --position 1 \
-  --prev <previous_uuid>
-```
+2.  **Deliberate and Form Veredicts (Offline):**
+    Review the dossier. Decide which duels to vote on and select winners.
 
-Validate and store your own new chapter variant:
+3.  **Commit Your Veredicts:**
+    Submit your veredicts using the `session_id`.
+    ```bash
+    # Example: Committing veredicts for positions 2 and 0
+    uv run python -m hronir_encyclopedia.cli session commit \
+      --session-id <your_session_id> \
+      --verdicts '{"2": "winning_fork_for_pos2", "0": "winning_fork_for_pos0"}'
+    ```
+    Refer to `README.md` for more details on the session workflow.
+
+Validate and store your own new chapter variant (this is how you get a `fork_uuid` to start a session):
 ```bash
+# First, validate the content (optional, but good practice)
 uv run python -m hronir_encyclopedia.cli validate --chapter drafts/01_my_variant.md
-uv run python -m hronir_encyclopedia.cli store drafts/01_my_variant.md --prev <previous_uuid>
+
+# Then, store it to get a hrönir UUID.
+# You also need to ensure a forking_path entry is created for this hrönir,
+# which will define its `fork_uuid`. The `store` command may be enhanced in the future
+# to streamline `fork_uuid` creation/reporting.
+uv run python -m hronir_encyclopedia.cli store drafts/01_my_variant.md --prev <uuid_of_predecessor_hronir>
 ```
 
 Happy writing—may your version prove itself the inevitable one.
