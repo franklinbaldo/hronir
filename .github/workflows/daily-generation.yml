@@ -20,7 +20,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12' # Ensure this matches .python-version if present
+          python-version: '3.10' # Matches .python-version file
 
       - name: Install dependencies
         run: |
@@ -42,7 +42,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           echo "Synthesizing for position ${{ steps.chapter_params.outputs.next_pos }} from predecessor ${{ steps.chapter_params.outputs.prev_uuid }}"
-          hronir_encyclopedia synthesize --position "${{ steps.chapter_params.outputs.next_pos }}" --prev "${{ steps.chapter_params.outputs.prev_uuid }}"
+          uv run hronir synthesize --position "${{ steps.chapter_params.outputs.next_pos }}" --prev "${{ steps.chapter_params.outputs.prev_uuid }}"
 
       - name: Configure Git
         run: |

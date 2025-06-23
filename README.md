@@ -53,7 +53,9 @@ graph TD
 
 4. **Create virtual environment and install dependencies:**
    ```bash
-   uv sync --all-features # Installs main and development dependencies
+   uv sync --all-groups # Installs main and all optional dependencies (dev, viz)
+   # Or for just development dependencies:
+   # uv sync --group dev
    ```
 
 5. **Set up environment variables:**
@@ -259,7 +261,7 @@ Under Protocol v2, Proof-of-Work has been elevated. Creating a new fork is just 
 
 Ensure you have development dependencies installed:
 ```bash
-uv sync --all-extras
+uv sync --group dev
 ```
 
 Then, install and enable the pre-commit hook to automatically clean invalid hrönirs and votes:

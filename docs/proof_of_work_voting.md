@@ -29,7 +29,7 @@ With your Proof-of-Work `fork_uuid` (let's call it `voter_fork_uuid`), you engag
 
 The system itself identifies the duel between two `forks` that will yield the most information for a given `position` (respecting the `Restrição de Linhagem Canônica`). You, the voter, are directed to this specific point of ambiguity.
 ```bash
-uv run python -m hronir_encyclopedia.cli get-duel --position <position_number>
+uv run hronir get-duel --position <position_number>
 ```
 This command will return a JSON object detailing the duel. The `strategy` field will **always** be `"max_entropy_duel"`:
 
@@ -53,11 +53,11 @@ This command will return a JSON object detailing the duel. The `strategy` field 
 
 After `get-duel` has presented the system-selected pair of `forks`, you cast your vote using your `voter_fork_uuid`:
 ```bash
-uv run python -m hronir_encyclopedia.cli vote \
-  --position <position_number> \
-  --voter-fork-uuid <your_pow_fork_uuid> \
-  --winner-fork-uuid <fork_A_uuid_from_get_duel> \
-  --loser-fork-uuid <fork_B_uuid_from_get_duel>
+# Note: The 'vote' command may be part of the session workflow
+# For Protocol v2, voting is done through judgment sessions:
+uv run hronir session start --fork-uuid <qualified_fork_uuid>
+# Then submit verdicts with:
+uv run hronir session commit --session-id <id> --verdicts '{"position": "winner_fork_uuid"}'
 ```
 **Crucially, your vote will only be accepted if the `winner-fork-uuid` and `loser-fork-uuid` precisely match the `fork_A` and `fork_B` provided by `get-duel` for that position.**
 
