@@ -14,7 +14,10 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 # --- Camada de Persistência (SQLAlchemy) ---
 Base = declarative_base()
-DATABASE_URL = "sqlite:///hronir.db"
+# By default we rely on an in-memory SQLite database so that no
+# persistent state is written to the repository.  Consumers are free to
+# create their own Engine if they want to work with a file on disk.
+DATABASE_URL = "sqlite:///:memory:"
 
 
 class ForkDB(Base):
@@ -115,9 +118,6 @@ engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-def create_db_and_tables() -> None:
-    """Inicializa o banco de dados criando tabelas se necessário."""
-    Base.metadata.create_all(bind=engine)
-
-# Execute a criação das tabelas na importação inicial
-create_db_and_tables()
+def create_db_and_tables(target_engine=engine) -> None:
+    """Create tables for the provided engine."""
+    Base.metadata.create_all(bind=target_engine)
