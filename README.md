@@ -48,12 +48,12 @@ graph TD
    (On Windows, you might need to download the binary from [astral.sh/uv](https://astral.sh/uv) or use WSL.)
 
 3. **Set up Python version (optional but recommended):**
-   If you don't have Python 3.12 (or the version specified in `.python-version`), `uv` can install it for you.
-   Ensure `.python-version` exists with your desired Python version (e.g., `3.12`).
+   If you don't have Python 3.10 (or the version specified in `.python-version`), `uv` can install it for you.
+   Ensure `.python-version` exists with your desired Python version (e.g., `3.10`).
 
 4. **Create virtual environment and install dependencies:**
    ```bash
-   uv sync --all-extras # Installs main and development dependencies
+   uv sync --all-features # Installs main and development dependencies
    ```
 
 5. **Set up environment variables:**
