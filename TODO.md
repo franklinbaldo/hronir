@@ -143,6 +143,20 @@ This document outlines the development roadmap for the **Hrönir Encyclopedia** 
 
 **Next Priority**: Web interface development and advanced agent systems.
 
+
+temp:
+     ☐ Investigar e corrigir mapeamento fork→hrönir no session commit
+     ☐ Implementar qualificação automática baseada em Elo ratings
+     ☐ Adicionar validação automática de integridade fork→hrönir
+     ☐ Criar comando 'hronir validate-forks' para debug
+     ☐ Melhorar mensagens de erro com mais contexto sobre predecessores
+     ☐ Adicionar testes automatizados para fluxo completo
+     ☐ Criar comando 'hronir tutorial' que executa fluxo completo
+     ☐ Melhorar README com exemplos práticos e reais
+     ☐ Adicionar logging detalhado para debug do sistema
+     ☐ Criar comando 'hronir dev-qualify FORK_UUID' para testes
+     ☐ Implementar modo debug que mostra mapeamentos internos
+     ☐ Criar visualização da árvore de forks
 ---
 
 ## 📊 Success Metrics
