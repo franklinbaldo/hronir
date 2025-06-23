@@ -21,12 +21,8 @@ def compute_uuid(text: str) -> str:
 
 
 def uuid_to_path(uuid_str: str, base: Path) -> Path:
-    """Return nested path for uuid_str under base using a hyphenless UUID."""
-    uuid_clean = uuid_str.replace("-", "")
-    path = base
-    for c in uuid_clean:
-        path /= c
-    return path
+    """Return a direct subdirectory path for the given UUID string under base."""
+    return base / uuid_str
 
 
 def store_chapter(

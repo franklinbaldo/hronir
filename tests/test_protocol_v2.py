@@ -153,14 +153,20 @@ class TestProtocolV2(unittest.TestCase):
                 [
                     "session", "start",
                     "--fork-uuid", fork_uuid,
-                    "--position", "1", # Position of the fork itself
+                    # "--position", "1", # Position of the fork itself - REMOVED
                     "--forking-path-dir", str(self.forking_path_dir),
                     "--ratings-dir", str(self.ratings_dir),
                     "--canonical-path-file", str(self.canonical_path_file)
                 ]
             )
             self.assertNotEqual(result.exit_code, 0, f"session start should fail for PENDING fork {fork_uuid}")
-            self.assertIn("does not have 'QUALIFIED' status", result.stdout, f"Output for PENDING fork {fork_uuid} should mention status error.")
+            try:
+                output_json = json.loads(result.stdout)
+                self.assertIn("error", output_json)
+                self.assertIn("does not have 'QUALIFIED' status", output_json["error"])
+                self.assertEqual(output_json.get("fork_uuid"), fork_uuid)
+            except json.JSONDecodeError:
+                self.fail(f"stdout was not valid JSON for PENDING fork {fork_uuid}: {result.stdout}")
 
         # Further assertions: if we simulated duels and they didn't qualify,
         # they should remain PENDING. This part is implicitly covered by the above,
@@ -334,7 +340,7 @@ class TestProtocolV2(unittest.TestCase):
             [
                 "session", "start",
                 "--fork-uuid", fork_to_spend_uuid,
-                "--position", "1", # Position of fork_to_spend_uuid
+                # "--position", "1", # Position of fork_to_spend_uuid - REMOVED
                 "--forking-path-dir", str(self.forking_path_dir),
                 "--ratings-dir", str(self.ratings_dir),
                 "--canonical-path-file", str(self.canonical_path_file),
@@ -385,7 +391,7 @@ class TestProtocolV2(unittest.TestCase):
             [
                 "session", "start",
                 "--fork-uuid", fork_to_spend_uuid,
-                "--position", "1",
+                # "--position", "1", # REMOVED
                 "--forking-path-dir", str(self.forking_path_dir),
                 "--ratings-dir", str(self.ratings_dir),
                 "--canonical-path-file", str(self.canonical_path_file)
@@ -456,7 +462,7 @@ class TestProtocolV2(unittest.TestCase):
 
         # 3. Start session with the qualified fork qf_uuid
         start_res = self.runner.invoke(cli.app, [
-            "session", "start", "--fork-uuid", qf_uuid, "--position", str(qualifying_fork_pos),
+            "session", "start", "--fork-uuid", qf_uuid, # "--position", str(qualifying_fork_pos), REMOVED
             "--forking-path-dir", str(self.forking_path_dir), "--ratings-dir", str(self.ratings_dir),
             "--canonical-path-file", str(self.canonical_path_file)
         ])
