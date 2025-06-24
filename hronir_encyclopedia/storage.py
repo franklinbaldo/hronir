@@ -158,6 +158,9 @@ class DataManager:
 
     def hrönir_exists(self, content_uuid: str) -> bool:
         """Check if a hrönir exists."""
+        # Ensure content_uuid is a string and not None or empty before creating Path object
+        if not content_uuid or not isinstance(content_uuid, str):
+            return False # Or raise an error, depending on desired strictness
         return self.get_hrönir_path(content_uuid).exists()
 
     def get_hrönir_content(self, content_uuid: str) -> str | None:
@@ -172,12 +175,41 @@ class DataManager:
     def validate_data_integrity(self) -> list[str]:
         """Validate data integrity and return list of issues."""
         issues = []
+        self.pandas_manager.initialize_if_needed() # Ensure data is loaded via pandas_manager
 
         # Check that all referenced hrönirs exist
-        paths = self.get_all_paths()
+        paths = self.get_all_paths() # This uses self.pandas_manager to get PathModels
         for path in paths:
-            if not self.hrönir_exists(str(path.uuid)):
-                issues.append(f"Path {path.path_uuid} references non-existent hrönir {path.uuid}")
+            # Check existence of the current hrönir (uuid)
+            if not self.hrönir_exists(str(path.uuid)): # self.hrönir_exists uses file system
+                issues.append(
+                    f"Path {path.path_uuid} (Pos: {path.position}, Prev: {path.prev_uuid}, Curr: {path.uuid}) "
+                    f"references non-existent current hrönir {path.uuid}."
+                )
+
+            # Check existence of the predecessor hrönir (prev_uuid), if applicable
+            if path.prev_uuid and not self.hrönir_exists(str(path.prev_uuid)):
+                issues.append(
+                    f"Path {path.path_uuid} (Pos: {path.position}, Prev: {path.prev_uuid}, Curr: {path.uuid}) "
+                    f"references non-existent predecessor hrönir {path.prev_uuid}."
+                )
+
+            # Validate deterministic path_uuid
+            # Ensure prev_uuid is handled as empty string if None for computation, matching compute_narrative_path_uuid
+            prev_uuid_for_computation = str(path.prev_uuid) if path.prev_uuid else ""
+
+            # Ensure path.position is an int and path.uuid is a str for computation
+            # path.position is already int from Pydantic model, path.uuid is UUID object
+            current_hrönir_uuid_str = str(path.uuid)
+
+            expected_path_uuid = compute_narrative_path_uuid(
+                path.position, prev_uuid_for_computation, current_hrönir_uuid_str
+            )
+            if str(path.path_uuid) != str(expected_path_uuid):
+                issues.append(
+                    f"Path {path.path_uuid} (Pos: {path.position}, Prev: {path.prev_uuid}, Curr: {path.uuid}) "
+                    f"has mismatched path_uuid. Expected: {expected_path_uuid}, Actual: {path.path_uuid}."
+                )
 
         return issues
 
