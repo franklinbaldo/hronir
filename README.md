@@ -227,6 +227,12 @@ uv run hronir store drafts/my_chapter.md --prev <uuid_of_previous_hronir_in_path
 # Check Elo rankings for forks at a specific position
 uv run hronir ranking 1
 
+# List existing forks (optional --position to filter)
+uv run hronir list-forks --position 1
+
+# Check status of a specific fork
+uv run hronir fork-status <fork_uuid>
+
 # Validate a human-contributed chapter (basic check)
 uv run hronir validate drafts/my_chapter.md
 
