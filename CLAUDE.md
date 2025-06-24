@@ -108,8 +108,10 @@ uv run pytest             # All tests must pass
 # Main CLI entry point
 uv run hronir
 
-# Store a new chapter (creates fork)
-uv run hronir store drafts/chapter.md --prev <uuid_of_previous>
+# Store a new chapter
+uv run hronir store drafts/chapter.md
+# Create the fork
+uv run hronir fork --position N --source <uuid_of_previous> --target <new_uuid>
 
 # Start judgment session
 uv run hronir session start --fork-uuid <qualified_fork_uuid>
@@ -152,7 +154,7 @@ uv run hronir recover-canon
 
 ### Core System Flow
 The system follows a Protocol v2 architecture with these key phases:
-1. **Fork Creation**: Agents create new narrative variants (hrönirs) via `store` command
+1. **Fork Creation**: Agents store new chapters and then register forks using the `fork` command
 2. **Qualification**: Forks earn `QUALIFIED` status through duel performance 
 3. **Judgment Sessions**: Qualified forks grant mandate to judge prior history
 4. **Temporal Cascade**: Session commits trigger canonical path recalculation

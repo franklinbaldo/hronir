@@ -111,12 +111,13 @@ Agents (human or AI) interact with the protocol primarily through the Command Li
 ### Agent Contribution Workflow:
 
 1.  **Create an `hrönir`**: Generate a new chapter in Markdown format. This is your creative "work."
-2.  **Register the `hrönir` and Create a `fork` (`store` command)**:
-    Use the `store` command to add your `hrönir` to `the_library/` and, crucially, to register a new `fork` (a new narrative transition) in the system. This command is your "Proof-of-Work" and will provide you with a `fork_uuid`.
+2.  **Register the `hrönir` and Create a `fork`**:
+    First store your chapter in `the_library/` using the `store` command. Then create a fork linking the new chapter to its predecessor.
     ```bash
-    uv run hronir store drafts/my_chapter.md --prev <uuid_of_previous_hronir>
+    uv run hronir store drafts/my_chapter.md
+    uv run hronir fork --position N --source <uuid_of_previous_hronir> --target <new_uuid>
     ```
-    The output will include the new `hrönir`'s UUID and the associated `fork_uuid`, which is essential for the next step.
+    The `store` command outputs `<new_uuid>`, which you pass to `fork`.
 
 3.  **Initiate a Judgment Session (`session start` command)**:
     With the `fork_uuid` obtained (representing your new `fork` at Position `N`), you gain the right to start a "Judgment Session." This session will present you with a dossier of maximum entropy duels for all previous positions (`N-1` down to `0`).
@@ -221,8 +222,9 @@ The core mechanism for evolving the canonical narrative is the "Tribunal of the 
 
 ### Basic Operations
 ```bash
-# Store a new hrönir chapter
-uv run hronir store drafts/my_chapter.md --prev <uuid_of_previous_hronir_in_path>
+# Store a new hrönir chapter and register the fork
+uv run hronir store drafts/my_chapter.md
+uv run hronir fork --position N --source <uuid_of_previous_hronir_in_path> --target <new_uuid>
 
 # Check Elo rankings for forks at a specific position
 uv run hronir ranking 1
@@ -346,13 +348,14 @@ If you're working on the codebase itself, see **[CLAUDE.md](CLAUDE.md)** for com
 To influence the canonical narrative:
 
 1. **Create High-Quality Hrönirs**: Write Markdown chapters following Borgesian themes
-2. **Use the Protocol**: Store chapters via `uv run hronir store` to create forks
+2. **Use the Protocol**: Store chapters via `uv run hronir store` and create forks with `uv run hronir fork`
 3. **Earn Qualification**: Your fork must prove itself through duel performance
 4. **Exercise Judgment**: Use qualified forks to start sessions and shape the canon
 
 ```bash
 # Example contribution workflow
-uv run hronir store my_chapter.md --prev <predecessor_uuid>
+uv run hronir store my_chapter.md
+uv run hronir fork --position N --source <predecessor_uuid> --target <new_uuid>
 # Wait for fork to become QUALIFIED through duels
 uv run hronir session start --fork-uuid <qualified_fork_uuid>
 uv run hronir session commit --session-id <id> --verdicts '{"pos": "winner"}'
