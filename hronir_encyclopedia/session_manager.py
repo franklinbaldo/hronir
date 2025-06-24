@@ -82,7 +82,7 @@ def create_session(
         # Acquire session for ratings.determine_next_duel_entropy
         db_session_for_duel = storage.get_db_session()
         try:
-            duel_info = ratings.determine_next_duel_entropy( # Correct function name
+            duel_info = ratings.determine_next_duel_entropy(  # Correct function name
                 position=p_idx,  # We are determining duels for this position p_idx
                 predecessor_hronir_uuid=predecessor_hronir_uuid_for_duel,
                 # forking_path_dir and ratings_dir are no longer needed

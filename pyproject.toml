@@ -18,7 +18,7 @@ dependencies = [
 hronir = "hronir_encyclopedia.cli:main"
 
 [project.optional-dependencies]
-dev = ["pytest", "pre-commit", "ruff", "black"]
+dev = ["pytest", "pre-commit", "ruff"]
 viz = ["matplotlib"]
 
 [tool.ruff]
@@ -28,8 +28,6 @@ line-length = 100
 select = ["E", "F", "W", "I", "UP"] # Standard lints + isort + pyupgrade
 ignore = ["E501"] # Ignore line too long errors
 
-[tool.black]
-line-length = 100
 
 [tool.setuptools]
 packages = ["hronir_encyclopedia"]
@@ -39,7 +37,6 @@ package = true
 
 [dependency-groups]
 dev = [
-    "black>=25.1.0",
     "pre-commit>=4.2.0",
     "pytest>=8.4.1",
     "repomix>=0.2.9",

@@ -1,15 +1,13 @@
-import math
-import sys # For debug prints
-import uuid
-from pathlib import Path # Kept for potential future use
 import itertools
+import math
 
 import pandas as pd
 from sqlalchemy.orm import Session
 
+from . import storage  # To get DB session
+
 # Import models used in this file
-from .models import VoteDB, ForkDB, TransactionDB # Added TransactionDB
-from . import storage # To get DB session
+from .models import ForkDB, VoteDB  # Added TransactionDB
 
 
 def _calculate_elo_probability(elo_a: float, elo_b: float) -> float:
@@ -43,15 +41,10 @@ def record_vote(
         close_session_locally = True
 
     try:
-        vote = VoteDB(
-            position=position,
-            voter=voter,
-            winner=winner,
-            loser=loser
-        )
+        vote = VoteDB(position=position, voter=voter, winner=winner, loser=loser)
         session.add(vote)
         session.commit()
-    except Exception as e:
+    except Exception:
         if session:
             session.rollback()
         raise
@@ -83,10 +76,11 @@ def get_ranking(
         if predecessor_hronir_uuid is None:
             if position == 0:
                 query_forks = query_forks.filter(
-                    (ForkDB.prev_uuid == None) | (ForkDB.prev_uuid == "") # noqa: E711
+                    (ForkDB.prev_uuid == None) | (ForkDB.prev_uuid == "")  # noqa: E711
                 )
             else:
-                if close_session_locally and session is not None: session.close()
+                if close_session_locally and session is not None:
+                    session.close()
                 return empty_df
         else:
             query_forks = query_forks.filter(ForkDB.prev_uuid == predecessor_hronir_uuid)
@@ -94,23 +88,27 @@ def get_ranking(
         eligible_fork_db_entries = query_forks.all()
 
         if not eligible_fork_db_entries:
-            if close_session_locally and session is not None: session.close()
+            if close_session_locally and session is not None:
+                session.close()
             return empty_df
 
         eligible_fork_infos_list = [
             {"fork_uuid": f.fork_uuid, "hrönir_uuid": f.uuid} for f in eligible_fork_db_entries
         ]
 
-        eligible_fork_df = pd.DataFrame(eligible_fork_infos_list).drop_duplicates(subset=["fork_uuid"])
+        eligible_fork_df = pd.DataFrame(eligible_fork_infos_list).drop_duplicates(
+            subset=["fork_uuid"]
+        )
         if eligible_fork_df.empty:
-            if close_session_locally and session is not None: session.close()
+            if close_session_locally and session is not None:
+                session.close()
             return empty_df
 
         hronir_to_eligible_fork_map = pd.Series(
             eligible_fork_df.fork_uuid.values, index=eligible_fork_df.hrönir_uuid
         ).to_dict()
 
-        ELO_BASE = 1500.0 # Initialize with a float
+        ELO_BASE = 1500.0  # Initialize with a float
         ranking_list = [
             {
                 "fork_uuid": fork_info["fork_uuid"],
@@ -136,7 +134,11 @@ def get_ranking(
 
         if votes_at_position:
             votes_data = [
-                {"winner": v.winner, "loser": v.loser, "voter": v.voter} # Removed "id": v.id from debug
+                {
+                    "winner": v.winner,
+                    "loser": v.loser,
+                    "voter": v.voter,
+                }  # Removed "id": v.id from debug
                 for v in votes_at_position
             ]
             df_votes = pd.DataFrame(votes_data)
@@ -156,8 +158,10 @@ def get_ranking(
                         winner_fork = vote_row["winner_fork_uuid"]
                         loser_fork = vote_row["loser_fork_uuid"]
 
-                        if winner_fork not in current_ranking_df.index or \
-                           loser_fork not in current_ranking_df.index:
+                        if (
+                            winner_fork not in current_ranking_df.index
+                            or loser_fork not in current_ranking_df.index
+                        ):
                             continue
 
                         current_ranking_df.loc[winner_fork, "wins"] += 1
@@ -183,17 +187,17 @@ def get_ranking(
         )
         return final_df[output_columns]
 
-    except Exception as e:
-        if close_session_locally and session is not None: session.close()
+    except Exception:
+        if close_session_locally and session is not None:
+            session.close()
         return empty_df
     finally:
         if close_session_locally and session is not None:
             session.close()
 
+
 def determine_next_duel_entropy(
-    position: int,
-    predecessor_hronir_uuid: str | None,
-    session: Session | None = None
+    position: int, predecessor_hronir_uuid: str | None, session: Session | None = None
 ) -> dict | None:
     """
     Chooses the pair of forks with MAX Shannon entropy of predicted outcome,
@@ -206,17 +210,14 @@ def determine_next_duel_entropy(
 
     try:
         ranking_df = get_ranking(
-            position=position,
-            predecessor_hronir_uuid=predecessor_hronir_uuid,
-            session=session
+            position=position, predecessor_hronir_uuid=predecessor_hronir_uuid, session=session
         )
         if ranking_df.empty or len(ranking_df) < 2:
-            return None # No need to close session here, finally block will handle it.
+            return None  # No need to close session here, finally block will handle it.
 
         def p_win(rA, rB, k=400.0):
             return 1.0 / (1.0 + 10.0 ** ((rB - rA) / k))
 
-        duels_done = set()
         # TODO: Implement proper duels_done query once TransactionDB has structured columns:
         # duel_position, duel_predecessor_hronir_uuid, duel_winner_fork_uuid, duel_loser_fork_uuid.
         # This also requires transaction_manager.record_transaction to populate these new columns.
@@ -238,10 +239,12 @@ def determine_next_duel_entropy(
 
             possible_duels_count += 1
             # Using existing _calculate_duel_entropy as the Shannon entropy function
-            current_entropy = _calculate_duel_entropy(fork_elos[fork_A_uuid], fork_elos[fork_B_uuid])
+            current_entropy = _calculate_duel_entropy(
+                fork_elos[fork_A_uuid], fork_elos[fork_B_uuid]
+            )
 
             if current_entropy < ENTROPY_SATURATION_THRESHOLD:
-                low_entropy_duels_count +=1
+                low_entropy_duels_count += 1
 
             if current_entropy > best_pair_info["entropy"]:
                 best_pair_info["fork_A"] = fork_A_uuid
@@ -252,10 +255,12 @@ def determine_next_duel_entropy(
             return None
 
         if possible_duels_count > 0 and low_entropy_duels_count == possible_duels_count:
-            print(f"INFO: Ratings liga saturada para posição {position}, linhagem {predecessor_hronir_uuid}. "
-                  f"Todos os {possible_duels_count} duelos possíveis têm entropia < {ENTROPY_SATURATION_THRESHOLD}.")
+            print(
+                f"INFO: Ratings liga saturada para posição {position}, linhagem {predecessor_hronir_uuid}. "
+                f"Todos os {possible_duels_count} duelos possíveis têm entropia < {ENTROPY_SATURATION_THRESHOLD}."
+            )
             if best_pair_info["entropy"] < 0:
-                 return None
+                return None
 
         return {
             "position": position,
@@ -269,6 +274,7 @@ def determine_next_duel_entropy(
     finally:
         if close_session_locally and session is not None:
             session.close()
+
 
 def check_fork_qualification(
     fork_uuid: str,

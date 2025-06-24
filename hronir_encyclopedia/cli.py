@@ -1042,19 +1042,13 @@ def session_commit(
     ],
     ratings_dir: Annotated[
         Path, typer.Option(help="Directory containing rating CSV files.")
-    ] = Path(
-        "ratings"
-    ),  # Retained for run_temporal_cascade
+    ] = Path("ratings"),  # Retained for run_temporal_cascade
     forking_path_dir: Annotated[
         Path, typer.Option(help="Directory containing forking path CSV files.")
-    ] = Path(
-        "forking_path"
-    ),  # Retained for _get_successor_hronir_for_fork and cascade
+    ] = Path("forking_path"),  # Retained for _get_successor_hronir_for_fork and cascade
     canonical_path_file: Annotated[
         Path, typer.Option(help="Path to the canonical path JSON file.")
-    ] = Path(
-        "data/canonical_path.json"
-    ),  # Retained for run_temporal_cascade
+    ] = Path("data/canonical_path.json"),  # Retained for run_temporal_cascade
     max_cascade_positions: Annotated[
         int, typer.Option(help="Maximum number of positions for temporal cascade calculation.")
     ] = 100,
@@ -1135,9 +1129,9 @@ def session_commit(
     dossier_duels = session_data.get("dossier", {}).get("duels", {})
 
     valid_votes_to_record = []
-    processed_verdicts: dict[str, str] = (
-        {}
-    )  # For transaction record: position_str -> winning_fork_uuid
+    processed_verdicts: dict[
+        str, str
+    ] = {}  # For transaction record: position_str -> winning_fork_uuid
     oldest_voted_position = float("inf")
 
     for pos_str, winning_fork_uuid_verdict in verdicts.items():
