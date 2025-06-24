@@ -6,7 +6,6 @@ import uuid
 from pathlib import Path
 
 import pandas as pd
-from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session as SQLAlchemySession  # Renamed to avoid conflict
 
 from .models import (
@@ -894,8 +893,6 @@ def purge_fake_forking_csv(csv_path: Path, base: Path | str = "the_library") -> 
 def purge_fake_votes_csv(
     csv_path: Path,
     base: Path | str = "the_library",
-    fork_dir: Path | str = "forking_path",
-    conn: Engine | None = None,
 ) -> int:
     """Remove votes referencing missing chapters or duplicate voters."""
     import pandas as pd
@@ -922,7 +919,7 @@ def purge_fake_votes_csv(
         if voter in seen:
             removed += 1
             continue
-        if not forking_path_exists(voter, fork_dir, conn=conn):
+        if not forking_path_exists(voter):
             removed += 1
             continue
         if not (is_valid_uuid_v5(winner) and chapter_exists(winner, base)):

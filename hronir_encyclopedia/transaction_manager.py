@@ -108,7 +108,8 @@ def _get_all_forks_at_position(
         if predecessor_uuid is None:  # Position 0 case
             if position_num == 0:
                 query = query.filter(
-                    (storage.ForkDB.prev_uuid == None) | (storage.ForkDB.prev_uuid == "")  # noqa E711
+                    storage.ForkDB.prev_uuid.is_(None)
+                    | (storage.ForkDB.prev_uuid == "")  # noqa: E711
                 )
             else:
                 # For positions > 0, a predecessor_uuid should generally be specified.
