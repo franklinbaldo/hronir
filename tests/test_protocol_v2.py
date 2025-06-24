@@ -76,10 +76,28 @@ class TestProtocolV2(unittest.TestCase):
         self.original_sm_consumed_file = session_manager.CONSUMED_FORKS_FILE
         self.original_storage_uuid_namespace = storage.UUID_NAMESPACE  # Just in case
 
+        # Store original DataManager paths
+        self.original_dm_fork_csv_dir = storage.data_manager.fork_csv_dir
+        self.original_dm_ratings_csv_dir = storage.data_manager.ratings_csv_dir
+        self.original_dm_transactions_json_dir = storage.data_manager.transactions_json_dir
+
+        # Override DataManager paths to use test-specific directories
+        storage.data_manager.fork_csv_dir = self.forking_path_dir
+        storage.data_manager.ratings_csv_dir = self.ratings_dir
+        storage.data_manager.transactions_json_dir = self.transactions_dir
+
         transaction_manager.TRANSACTIONS_DIR = self.transactions_dir
         transaction_manager.HEAD_FILE = self.transactions_dir / "HEAD"
         session_manager.SESSIONS_DIR = self.sessions_dir
         session_manager.CONSUMED_FORKS_FILE = self.sessions_dir / "consumed_fork_uuids.json"
+
+        # Ensure DataManager is reset and initialized cleanly for each test
+        # This will clear DB tables before any potential load_all_data_from_csvs
+        # if get_db_session triggers initialization.
+        storage.data_manager._initialized = False # Force re-initialization
+        # Now initialize_and_load will use the overridden test paths
+        storage.data_manager.initialize_and_load(clear_existing_data=True)
+
 
         # Create a common predecessor chapter for position 0 if needed by many tests
         self.predecessor_ch_uuid_pos0 = _create_dummy_chapter(
@@ -89,12 +107,20 @@ class TestProtocolV2(unittest.TestCase):
         # For actual position 0 forks, prev_uuid will be None.
 
     def tearDown(self):
-        # Restore original paths
+        # Restore original paths for transaction_manager, session_manager
         transaction_manager.TRANSACTIONS_DIR = self.original_tm_transactions_dir
         transaction_manager.HEAD_FILE = self.original_tm_head_file
         session_manager.SESSIONS_DIR = self.original_sm_sessions_dir
         session_manager.CONSUMED_FORKS_FILE = self.original_sm_consumed_file
         storage.UUID_NAMESPACE = self.original_storage_uuid_namespace
+
+        # Restore original DataManager paths
+        storage.data_manager.fork_csv_dir = self.original_dm_fork_csv_dir
+        storage.data_manager.ratings_csv_dir = self.original_dm_ratings_csv_dir
+        storage.data_manager.transactions_json_dir = self.original_dm_transactions_json_dir
+        # Optionally, reset _initialized if it matters for inter-test-class state
+        # storage.data_manager._initialized = False
+
 
     def _create_fork_entry(
         self, creator_id: str, position: int, prev_uuid: str | None, current_hrönir_uuid: str
@@ -102,16 +128,34 @@ class TestProtocolV2(unittest.TestCase):
         """Helper to create a fork entry CSV and return the fork_uuid."""
         csv_path = self.forking_path_dir / f"fp_{creator_id}.csv"
         # storage.append_fork expects uuid_str for the current chapter, not fork_uuid
+        # The csv_file parameter was removed from storage.append_fork
         fork_uuid = storage.append_fork(
-            csv_file=csv_path,
             position=position,
             prev_uuid=(
                 prev_uuid if prev_uuid else ""
             ),  # append_fork might expect empty string for None
             uuid_str=current_hrönir_uuid,  # This is the hrönir (chapter) uuid
+            # session=None, # Allow storage.append_fork to get its own session
+            # status="PENDING" # Default status in append_fork
         )
         # Ensure status is PENDING by default due to Task 1.1, audit if necessary for old CSVs
-        storage.audit_forking_csv(csv_path, base=self.library_path)
+        # The audit_forking_csv function might need to be updated or used carefully
+        # if it relies on CSVs as the source of truth, while append_fork writes to DB.
+        # For now, assuming audit_forking_csv is meant to ensure CSVs are valid,
+        # but the primary record is now in the DB.
+        # This call might be redundant if all fork creations go through append_fork to DB
+        # and then DB is serialized to CSV.
+        # However, if tests directly create CSVs that are then loaded, audit is still relevant.
+        # Given the test structure, it seems forks are created via append_fork (to DB),
+        # then the test might assert based on re-reading from DB (or CSVs if serialized).
+        # Let's assume for now that the CSV is not the direct source of truth for append_fork's operation.
+        # If audit_forking_csv is problematic with DB-first approach, it might need adjustment.
+        # For the TypeError fix, removing csv_file from append_fork call is the direct solution.
+        # The audit_forking_csv call was removed as the function does not exist in storage.py.
+        # Fork creation and status are handled by append_fork in the DB.
+        # If CSVs are needed for other test assertions, they should be generated from DB state
+        # or tests should query DB directly.
+        # storage.audit_forking_csv(csv_path, base=self.library_path) # This line is removed
         return fork_uuid
 
     def test_sybil_resistance(self):
@@ -150,12 +194,13 @@ class TestProtocolV2(unittest.TestCase):
 
         # Assert all created forks are PENDING
         for fork_uuid in sybil_fork_uuids:
-            fork_data = storage.get_fork_file_and_data(
-                fork_uuid, fork_dir_base=self.forking_path_dir
-            )
-            self.assertIsNotNone(fork_data, f"Fork data for {fork_uuid} should exist.")
+            # fork_data = storage.get_fork_file_and_data(
+            #     fork_uuid, fork_dir_base=self.forking_path_dir
+            # )
+            fork_data_obj = storage.get_fork_data(fork_uuid) # Use DB-centric function
+            self.assertIsNotNone(fork_data_obj, f"Fork data for {fork_uuid} should exist in DB.")
             self.assertEqual(
-                fork_data.get("status"), "PENDING", f"Sybil fork {fork_uuid} should be PENDING."
+                fork_data_obj.status, "PENDING", f"Sybil fork {fork_uuid} should be PENDING."
             )
 
             # Attempt `hronir session start` with this PENDING fork
@@ -223,8 +268,12 @@ class TestProtocolV2(unittest.TestCase):
         self._create_fork_entry("creator_other_promo", 1, pos0_hrönir_A, fother_hrönir)
 
         # Ensure F_good starts as PENDING
-        fgood_initial_data = storage.get_fork_file_and_data(fgood_fork_uuid, self.forking_path_dir)
-        self.assertEqual(fgood_initial_data.get("status"), "PENDING")
+        # fgood_initial_data = storage.get_fork_file_and_data(fgood_fork_uuid, self.forking_path_dir)
+        # self.assertEqual(fgood_initial_data.get("status"), "PENDING")
+        fgood_initial_obj = storage.get_fork_data(fgood_fork_uuid)
+        self.assertIsNotNone(fgood_initial_obj, f"F_good fork {fgood_fork_uuid} not found in DB initially.")
+        self.assertEqual(fgood_initial_obj.status, "PENDING", f"F_good fork {fgood_fork_uuid} should be PENDING initially.")
+
 
         # 2. Simulate votes to make F_good qualify
         # For this test, let's aim for Elo qualification (>=1550).
@@ -257,14 +306,24 @@ class TestProtocolV2(unittest.TestCase):
 
         for i in range(num_wins_for_elo_qualification):
             # In each "session", fgood wins.
-            # For simplicity, fgood always duels fother. In reality, opponents might change.
+            # Create a new dummy loser hrönir for each vote.
+            dummy_loser_hrönir = _create_dummy_chapter(self.library_path, f"dummy_loser_promo_{i}")
+            # Also create a fork entry for this dummy loser so it's recognized in the rating segment.
+            self._create_fork_entry(
+                creator_id=f"dummy_loser_creator_{i}", # Unique creator ID for the dummy fork
+                position=1,
+                prev_uuid=pos0_hrönir_A, # Same predecessor as fgood_hrönir
+                current_hrönir_uuid=dummy_loser_hrönir
+            )
             votes_to_qualify_fgood.append(
                 {
                     "position": 1,  # Position of the duel
                     "winner_hrönir_uuid": fgood_hrönir,  # fgood's chapter wins
-                    "loser_hrönir_uuid": fother_hrönir,  # fother's chapter loses
+                    "loser_hrönir_uuid": dummy_loser_hrönir, # Unique loser hrönir for each vote
                 }
             )
+        # The original fother_hrönir is still a valid competitor but isn't directly involved in these specific qualifying votes.
+        # It helps ensure num_competitors > 1 for the min_wins_threshold if that path was taken for qualification.
 
         # Process these votes through transaction_manager. This will call ratings.record_vote
         # and then check for qualifications.
@@ -283,13 +342,14 @@ class TestProtocolV2(unittest.TestCase):
         self.assertIn("transaction_uuid", tx_result_data)
 
         # 3. Assert F_good's status is QUALIFIED and mandate_id is present
-        fgood_final_data = storage.get_fork_file_and_data(fgood_fork_uuid, self.forking_path_dir)
-        self.assertIsNotNone(fgood_final_data, "F_good fork data should still exist.")
+        # fgood_final_data = storage.get_fork_file_and_data(fgood_fork_uuid, self.forking_path_dir)
+        fgood_final_obj = storage.get_fork_data(fgood_fork_uuid)
+        self.assertIsNotNone(fgood_final_obj, "F_good fork data should still exist in DB after transaction.")
         self.assertEqual(
-            fgood_final_data.get("status"), "QUALIFIED", "F_good fork should be QUALIFIED."
+            fgood_final_obj.status, "QUALIFIED", "F_good fork should be QUALIFIED."
         )
 
-        generated_mandate_id = fgood_final_data.get("mandate_id")
+        generated_mandate_id = fgood_final_obj.mandate_id
         self.assertIsNotNone(generated_mandate_id, "F_good should have a mandate_id.")
         self.assertTrue(len(generated_mandate_id) > 0)  # Basic check for non-empty
 
@@ -341,14 +401,23 @@ class TestProtocolV2(unittest.TestCase):
 
         # Votes to qualify fork_to_spend_uuid
         votes_for_qualification = []
-        for _ in range(4):  # Qualify by Elo
+        for i in range(4):  # Qualify by Elo
+            dummy_loser_hrönir_ds = _create_dummy_chapter(self.library_path, f"dummy_loser_ds_{i}")
+            # Create a fork for the dummy loser
+            self._create_fork_entry(
+                creator_id=f"dummy_loser_ds_creator_{i}",
+                position=1,
+                prev_uuid=pos0_hrönir_pred, # Same predecessor as fork_to_spend_hrönir
+                current_hrönir_uuid=dummy_loser_hrönir_ds
+            )
             votes_for_qualification.append(
                 {
                     "position": 1,
                     "winner_hrönir_uuid": fork_to_spend_hrönir,
-                    "loser_hrönir_uuid": other_hrönir_ds,
+                    "loser_hrönir_uuid": dummy_loser_hrönir_ds,
                 }
             )
+        # The original other_hrönir_ds is still created and part of the segment.
 
         qualifying_tx_data = transaction_manager.record_transaction(
             session_id=str(uuid.uuid4()),
@@ -358,11 +427,13 @@ class TestProtocolV2(unittest.TestCase):
         self.assertIsNotNone(qualifying_tx_data)
 
         # Verify qualification and get mandate_id
-        fork_data_qualified = storage.get_fork_file_and_data(
-            fork_to_spend_uuid, self.forking_path_dir
-        )
-        self.assertEqual(fork_data_qualified.get("status"), "QUALIFIED")
-        mandate_id_to_spend = fork_data_qualified.get("mandate_id")
+        # fork_data_qualified = storage.get_fork_file_and_data(
+        #     fork_to_spend_uuid, self.forking_path_dir
+        # )
+        fork_data_qualified_obj = storage.get_fork_data(fork_to_spend_uuid)
+        self.assertIsNotNone(fork_data_qualified_obj, f"Fork {fork_to_spend_uuid} not found in DB after qualification.")
+        self.assertEqual(fork_data_qualified_obj.status, "QUALIFIED")
+        mandate_id_to_spend = fork_data_qualified_obj.mandate_id
         self.assertIsNotNone(mandate_id_to_spend)
 
         # 2. Start a session using this fork's mandate (CLI call)
@@ -393,10 +464,10 @@ class TestProtocolV2(unittest.TestCase):
                 str(self.ratings_dir),
                 "--canonical-path-file",
                 str(self.canonical_path_file),
-                "--library-dir",
-                str(
-                    self.library_path
-                ),  # Assuming cli needs this for _get_successor_hronir_for_fork
+                # "--library-dir", # This option is not defined for 'session start'
+                # str(
+                #     self.library_path
+                # ),
             ],
         )
         self.assertEqual(start_result.exit_code, 0, f"Session start failed: {start_result.stdout}")
@@ -441,9 +512,11 @@ class TestProtocolV2(unittest.TestCase):
         )
 
         # 4. Assert fork status is SPENT
-        fork_data_spent = storage.get_fork_file_and_data(fork_to_spend_uuid, self.forking_path_dir)
+        # fork_data_spent = storage.get_fork_file_and_data(fork_to_spend_uuid, self.forking_path_dir)
+        fork_data_spent_obj = storage.get_fork_data(fork_to_spend_uuid)
+        self.assertIsNotNone(fork_data_spent_obj, f"Fork {fork_to_spend_uuid} not found in DB after spending.")
         self.assertEqual(
-            fork_data_spent.get("status"), "SPENT", "Fork should be SPENT after session commit."
+            fork_data_spent_obj.status, "SPENT", "Fork should be SPENT after session commit."
         )
 
         # 5. Attempt to start another session with the same (now SPENT) fork_uuid
@@ -519,23 +592,34 @@ class TestProtocolV2(unittest.TestCase):
         )
 
         votes_for_qf_qualification = []
-        for _ in range(4):  # Qualify by Elo
+        for i in range(4):  # Qualify by Elo
+            dummy_loser_qf = _create_dummy_chapter(self.library_path, f"dummy_loser_qf_{i}")
+            # Create a fork for the dummy loser
+            self._create_fork_entry(
+                creator_id=f"dummy_loser_qf_creator_{i}",
+                position=qualifying_fork_pos,
+                prev_uuid=p1_ch_X, # Same predecessor as qf_hrönir
+                current_hrönir_uuid=dummy_loser_qf
+            )
             votes_for_qf_qualification.append(
                 {
                     "position": qualifying_fork_pos,
                     "winner_hrönir_uuid": qf_hrönir,
-                    "loser_hrönir_uuid": qf_other_hrönir,  # Dummy opponent for qualification
+                    "loser_hrönir_uuid": dummy_loser_qf,
                 }
             )
+        # The original qf_other_hrönir is still created and part of the segment.
 
         transaction_manager.record_transaction(  # Just to qualify qf_uuid
             session_id=str(uuid.uuid4()),
             initiating_fork_uuid="dummy_qf_qualifier_cascade",
             session_verdicts=votes_for_qf_qualification,
         )
-        qf_data_qualified = storage.get_fork_file_and_data(qf_uuid, self.forking_path_dir)
+        # qf_data_qualified = storage.get_fork_file_and_data(qf_uuid, self.forking_path_dir)
+        qf_data_qualified_obj = storage.get_fork_data(qf_uuid)
+        self.assertIsNotNone(qf_data_qualified_obj, f"Judging fork {qf_uuid} not found in DB after qualification.")
         self.assertEqual(
-            qf_data_qualified.get("status"), "QUALIFIED", "Judging fork QF failed to qualify."
+            qf_data_qualified_obj.status, "QUALIFIED", "Judging fork QF failed to qualify."
         )
 
         # 3. Start session with the qualified fork qf_uuid
