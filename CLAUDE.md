@@ -108,6 +108,9 @@ uv run pytest             # All tests must pass
 # Main CLI entry point
 uv run hronir
 
+# Quick setup for experimentation
+uv run hronir init-test
+
 # Store a new chapter
 uv run hronir store drafts/chapter.md
 # Create the fork

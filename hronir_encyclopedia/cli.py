@@ -68,6 +68,53 @@ def recover_canon(
     typer.echo("Manual canon recovery via Temporal Cascade complete.")
 
 
+@app.command("init-test", help="Generate a minimal sample narrative for quick testing.")
+def init_test(
+    library_dir: Annotated[
+        Path, typer.Option(help="Directory to store sample hr\u00f6nirs.")
+    ] = Path("the_library"),
+    forking_path_dir: Annotated[
+        Path, typer.Option(help="Directory for fork CSV files.")
+    ] = Path("forking_path"),
+    ratings_dir: Annotated[
+        Path, typer.Option(help="Directory for rating CSV files.")
+    ] = Path("ratings"),
+    data_dir: Annotated[
+        Path, typer.Option(help="Directory for canonical data files.")
+    ] = Path("data"),
+) -> None:
+    """Create sample directories, chapters, forks, and a canonical path."""
+    library_dir.mkdir(parents=True, exist_ok=True)
+    forking_path_dir.mkdir(parents=True, exist_ok=True)
+    ratings_dir.mkdir(parents=True, exist_ok=True)
+    (data_dir / "sessions").mkdir(parents=True, exist_ok=True)
+    (data_dir / "transactions").mkdir(parents=True, exist_ok=True)
+
+    h0_uuid = storage.store_chapter_text("Example Hr\u00f6nir 0", base=library_dir)
+    h1_uuid = storage.store_chapter_text("Example Hr\u00f6nir 1", base=library_dir)
+
+    f0_uuid = storage.append_fork(0, "", h0_uuid)
+    f1_uuid = storage.append_fork(1, h0_uuid, h1_uuid)
+
+    canonical = {
+        "title": "The Hr\u00f6nir Encyclopedia - Canonical Path",
+        "path": {
+            "0": {"fork_uuid": f0_uuid, "hr\u00f6nir_uuid": h0_uuid},
+            "1": {"fork_uuid": f1_uuid, "hr\u00f6nir_uuid": h1_uuid},
+        },
+    }
+    canonical_file = data_dir / "canonical_path.json"
+    canonical_file.write_text(json.dumps(canonical, indent=2))
+
+    storage.data_manager.serialize_db_to_files()
+
+    typer.echo("Sample data initialized:")
+    typer.echo(f"  Position 0 hr\u00f6nir UUID: {h0_uuid}")
+    typer.echo(f"  Position 0 fork UUID: {f0_uuid}")
+    typer.echo(f"  Position 1 hr\u00f6nir UUID: {h1_uuid}")
+    typer.echo(f"  Position 1 fork UUID: {f1_uuid}")
+
+
 # Command `export` and `tree` removed as they depended on the old book structure.
 
 
@@ -76,7 +123,10 @@ def validate(
     chapter: Annotated[
         Path,
         typer.Argument(
-            help="Path to chapter markdown file.", exists=True, dir_okay=False, readable=True
+            help="Path to chapter markdown file.",
+            exists=True,
+            dir_okay=False,
+            readable=True,
         ),
     ],
 ):
@@ -86,7 +136,9 @@ def validate(
     """
     # The original logic was just a print, keeping it simple.
     # More complex validation would go into storage.validate_or_move
-    typer.echo(f"Chapter file {chapter} exists and is readable. Basic validation passed.")
+    typer.echo(
+        f"Chapter file {chapter} exists and is readable. Basic validation passed."
+    )
     # For a more meaningful validation, one might call storage.validate_or_move or parts of it.
 
 
@@ -95,7 +147,10 @@ def store(
     chapter: Annotated[
         Path,
         typer.Argument(
-            help="Path to chapter markdown file.", exists=True, dir_okay=False, readable=True
+            help="Path to chapter markdown file.",
+            exists=True,
+            dir_okay=False,
+            readable=True,
         ),
     ],
 ):
@@ -110,7 +165,9 @@ def store(
 @app.command(help="Create a narrative connection (fork) between hrönirs.")
 def fork(
     position: Annotated[int, typer.Option(help="Position in the narrative sequence")],
-    target: Annotated[str, typer.Option(help="Target hrönir UUID (destination content node)")],
+    target: Annotated[
+        str, typer.Option(help="Target hrönir UUID (destination content node)")
+    ],
     source: Annotated[
         str, typer.Option(help="Source hrönir UUID (empty string for position 0)")
     ] = "",
@@ -324,7 +381,9 @@ def status(
     ] = False,
     forking_path_dir: Annotated[
         Path,
-        typer.Option(help="Directory containing forking path CSV files (for --counts)."),
+        typer.Option(
+            help="Directory containing forking path CSV files (for --counts)."
+        ),
     ] = Path("forking_path"),
 ) -> None:
     """Show canonical path entries and optional fork status counts."""
@@ -393,19 +452,29 @@ def audit():
             typer.echo("WARNING: Narrative graph contains cycles!")
     else:
         typer.echo(f"Forking path directory {fork_dir} not found. Skipping audit.")
-    typer.echo("Audit complete (Note: hrönir validation primarily via 'clean' command).")
+    typer.echo(
+        "Audit complete (Note: hrönir validation primarily via 'clean' command)."
+    )
 
 
-@app.command(help="Generate competing chapters from a predecessor and record an initial vote.")
+@app.command(
+    help="Generate competing chapters from a predecessor and record an initial vote."
+)
 def synthesize(
-    position: Annotated[int, typer.Option(help="Chapter position for the new hrönirs.")],
-    prev: Annotated[str, typer.Option(help="UUID of the predecessor chapter to fork from.")],
+    position: Annotated[
+        int, typer.Option(help="Chapter position for the new hrönirs.")
+    ],
+    prev: Annotated[
+        str, typer.Option(help="UUID of the predecessor chapter to fork from.")
+    ],
 ):
     """
     Synthesizes two new hrönirs from a predecessor for a given position
     and records an initial 'vote' or assessment by the generating agent.
     """
-    typer.echo(f"Synthesizing two new hrönirs from predecessor '{prev}' at position {position}...")
+    typer.echo(
+        f"Synthesizing two new hrönirs from predecessor '{prev}' at position {position}..."
+    )
     with database.open_database() as conn:
         voter_uuid = "00000000-agent-0000-0000-000000000000"  # Example agent UUID
         winner_uuid = gemini_util.auto_vote(position, prev, voter_uuid, conn=conn)
@@ -449,13 +518,15 @@ def ranking(
 @app.command(help="Obtém o duelo de máxima entropia entre forks para uma posição.")
 def get_duel(
     position: Annotated[
-        int, typer.Option(help="A posição do capítulo para a qual obter o duelo de forks.")
+        int,
+        typer.Option(help="A posição do capítulo para a qual obter o duelo de forks."),
     ],
     ratings_dir: Annotated[
         Path, typer.Option(help="Diretório contendo arquivos CSV de classificação.")
     ] = Path("ratings"),
     forking_path_dir: Annotated[
-        Path, typer.Option(help="Diretório contendo arquivos CSV de caminhos de bifurcação.")
+        Path,
+        typer.Option(help="Diretório contendo arquivos CSV de caminhos de bifurcação."),
     ] = Path("forking_path"),
     canonical_path_file: Annotated[
         Path, typer.Option(help="Caminho para o arquivo JSON do caminho canônico.")
@@ -470,7 +541,10 @@ def get_duel(
         canonical_fork_info_prev_pos = storage.get_canonical_fork_info(
             position - 1, canonical_path_file
         )
-        if not canonical_fork_info_prev_pos or "hrönir_uuid" not in canonical_fork_info_prev_pos:
+        if (
+            not canonical_fork_info_prev_pos
+            or "hrönir_uuid" not in canonical_fork_info_prev_pos
+        ):
             typer.echo(
                 json.dumps(
                     {
@@ -486,7 +560,10 @@ def get_duel(
     elif position < 0:
         typer.echo(
             json.dumps(
-                {"error": "Posição inválida. Deve ser >= 0.", "position_requested": position},
+                {
+                    "error": "Posição inválida. Deve ser >= 0.",
+                    "position_requested": position,
+                },
                 indent=2,
             )
         )
@@ -496,7 +573,9 @@ def get_duel(
     db_session = storage.get_db_session()
     try:
         duel_info = ratings.determine_next_duel_entropy(
-            position=position, predecessor_hronir_uuid=predecessor_hronir_uuid, session=db_session
+            position=position,
+            predecessor_hronir_uuid=predecessor_hronir_uuid,
+            session=db_session,
         )
     finally:
         db_session.close()
@@ -554,7 +633,9 @@ def _git_remove_deleted_files():  # Renamed to avoid conflict and be more descri
         typer.echo("Git command not found. Skipping Git operations.", err=True)
     except subprocess.CalledProcessError as e:
         if "not a git repository" in e.stderr.lower():
-            typer.echo("Not inside a Git repository. Skipping Git operations for deleted files.")
+            typer.echo(
+                "Not inside a Git repository. Skipping Git operations for deleted files."
+            )
         else:
             typer.echo(f"Git ls-files or rm command failed: {e.stderr}", err=True)
     except Exception as e:
@@ -564,7 +645,10 @@ def _git_remove_deleted_files():  # Renamed to avoid conflict and be more descri
 @app.command(help="Remove invalid entries (fake hrönirs, votes, etc.) from storage.")
 def clean(
     git_stage_deleted: Annotated[
-        bool, typer.Option("--git", help="Also stage deleted files for removal in the Git index.")
+        bool,
+        typer.Option(
+            "--git", help="Also stage deleted files for removal in the Git index."
+        ),
     ] = False,
 ):
     """
@@ -578,7 +662,9 @@ def clean(
     if fork_dir.exists():
         typer.echo(f"Cleaning fake forking CSVs in {fork_dir}...")
         for csv_file in fork_dir.glob("*.csv"):
-            storage.purge_fake_forking_csv(csv_file)  # Assumes this function prints its actions
+            storage.purge_fake_forking_csv(
+                csv_file
+            )  # Assumes this function prints its actions
     else:
         typer.echo(f"Forking path directory {fork_dir} not found. Skipping.")
 
@@ -586,7 +672,9 @@ def clean(
     if rating_dir.exists():
         typer.echo(f"Cleaning fake votes CSVs in {rating_dir}...")
         for csv_file in rating_dir.glob("*.csv"):
-            storage.purge_fake_votes_csv(csv_file)  # Assumes this function prints its actions
+            storage.purge_fake_votes_csv(
+                csv_file
+            )  # Assumes this function prints its actions
     else:
         typer.echo(f"Ratings directory {rating_dir} not found. Skipping.")
 
@@ -610,7 +698,11 @@ def main_callback(ctx: typer.Context):
     try:
         storage.data_manager.initialize_and_load()
     except Exception as e:
-        typer.secho(f"Fatal: DataManager initialization failed: {e}", fg=typer.colors.RED, err=True)
+        typer.secho(
+            f"Fatal: DataManager initialization failed: {e}",
+            fg=typer.colors.RED,
+            err=True,
+        )
         raise typer.Exit(code=1)
 
 
@@ -625,7 +717,9 @@ session_app = typer.Typer(help="Manage Hrönir judgment sessions.", no_args_is_h
 app.add_typer(session_app, name="session")
 
 
-@session_app.command("start", help="Initiate a Judgment Session using a QUALIFIED fork's mandate.")
+@session_app.command(
+    "start", help="Initiate a Judgment Session using a QUALIFIED fork's mandate."
+)
 def session_start(
     # position: Annotated[int, typer.Option("--position", "-p", help="The current position N of the new fork being created.")], # Position is now derived from fork_uuid
     fork_uuid: Annotated[
@@ -695,7 +789,8 @@ def session_start(
     if position_n_str is None:
         typer.echo(
             json.dumps(
-                {"error": f"Fork UUID {fork_uuid} is missing position information."}, indent=2
+                {"error": f"Fork UUID {fork_uuid} is missing position information."},
+                indent=2,
             )
         )
         raise typer.Exit(code=1)
@@ -704,7 +799,9 @@ def session_start(
     except ValueError:
         typer.echo(
             json.dumps(
-                {"error": f"Fork UUID {fork_uuid} has an invalid position: {position_n_str}."},
+                {
+                    "error": f"Fork UUID {fork_uuid} has an invalid position: {position_n_str}."
+                },
                 indent=2,
             )
         )
@@ -713,7 +810,9 @@ def session_start(
     if position < 0:  # Should be caught by storage validation, but good to check.
         typer.echo(
             json.dumps(
-                {"error": f"Fork UUID {fork_uuid} has an invalid negative position: {position}."},
+                {
+                    "error": f"Fork UUID {fork_uuid} has an invalid negative position: {position}."
+                },
                 indent=2,
             )
         )
@@ -868,7 +967,9 @@ def session_start(
         )
     except Exception as e:
         # Catch any other errors during session creation (e.g., file system issues)
-        typer.echo(json.dumps({"error": f"Failed to create session: {str(e)}"}, indent=2))
+        typer.echo(
+            json.dumps({"error": f"Failed to create session: {str(e)}"}, indent=2)
+        )
         raise typer.Exit(code=1)
 
 
@@ -912,9 +1013,14 @@ def run_temporal_cascade(
             f"Error reading or parsing canonical path file: {canonical_path_file}. Initializing new path.",
             err=True,
         )
-        canonical_path_data = {"title": "The Hrönir Encyclopedia - Canonical Path", "path": {}}
+        canonical_path_data = {
+            "title": "The Hrönir Encyclopedia - Canonical Path",
+            "path": {},
+        }
 
-    if "path" not in canonical_path_data or not isinstance(canonical_path_data["path"], dict):
+    if "path" not in canonical_path_data or not isinstance(
+        canonical_path_data["path"], dict
+    ):
         canonical_path_data["path"] = {}
 
     updated_any_position_in_cascade = False
@@ -937,8 +1043,13 @@ def run_temporal_cascade(
             predecessor_hronir_uuid_for_ranking = None
         else:
             # Get the hrönir_uuid from the *just determined* canonical fork of the previous position
-            prev_pos_canonical_info = canonical_path_data["path"].get(str(current_pos_idx - 1))
-            if not prev_pos_canonical_info or "hrönir_uuid" not in prev_pos_canonical_info:
+            prev_pos_canonical_info = canonical_path_data["path"].get(
+                str(current_pos_idx - 1)
+            )
+            if (
+                not prev_pos_canonical_info
+                or "hrönir_uuid" not in prev_pos_canonical_info
+            ):
                 typer_echo(
                     f"Cascade broken: Canonical fork for position {current_pos_idx - 1} not found during cascade. Stopping."
                 )
@@ -997,7 +1108,10 @@ def run_temporal_cascade(
         champion_elo = ranking_df.iloc[0]["elo_rating"]
 
         # current_entry_in_path = canonical_path_data["path"].get(position_str) # Not needed due to initial clear
-        new_entry_for_path = {"fork_uuid": champion_fork_uuid, "hrönir_uuid": champion_hronir_uuid}
+        new_entry_for_path = {
+            "fork_uuid": champion_fork_uuid,
+            "hrönir_uuid": champion_hronir_uuid,
+        }
 
         # Since we cleared, any new entry is a change or reinstatement.
         canonical_path_data["path"][position_str] = new_entry_for_path
@@ -1010,9 +1124,13 @@ def run_temporal_cascade(
         try:
             canonical_path_file.parent.mkdir(parents=True, exist_ok=True)
             canonical_path_file.write_text(json.dumps(canonical_path_data, indent=2))
-            typer_echo(f"Temporal Cascade: Canonical path file updated: {canonical_path_file}")
+            typer_echo(
+                f"Temporal Cascade: Canonical path file updated: {canonical_path_file}"
+            )
         except Exception as e:
-            typer_echo(f"Temporal Cascade: Error writing canonical path file: {e}", err=True)
+            typer_echo(
+                f"Temporal Cascade: Error writing canonical path file: {e}", err=True
+            )
             # Depending on policy, this might need to raise an exception or handle failure
     else:
         typer_echo(
@@ -1030,7 +1148,11 @@ def run_temporal_cascade(
 def session_commit(
     session_id: Annotated[
         str,
-        typer.Option("--session-id", "-s", help="The ID of the active Judgment Session to commit."),
+        typer.Option(
+            "--session-id",
+            "-s",
+            help="The ID of the active Judgment Session to commit.",
+        ),
     ],
     verdicts_input: Annotated[
         str,
@@ -1042,15 +1164,24 @@ def session_commit(
     ],
     ratings_dir: Annotated[
         Path, typer.Option(help="Directory containing rating CSV files.")
-    ] = Path("ratings"),  # Retained for run_temporal_cascade
+    ] = Path(
+        "ratings"
+    ),  # Retained for run_temporal_cascade
     forking_path_dir: Annotated[
         Path, typer.Option(help="Directory containing forking path CSV files.")
-    ] = Path("forking_path"),  # Retained for _get_successor_hronir_for_fork and cascade
+    ] = Path(
+        "forking_path"
+    ),  # Retained for _get_successor_hronir_for_fork and cascade
     canonical_path_file: Annotated[
         Path, typer.Option(help="Path to the canonical path JSON file.")
-    ] = Path("data/canonical_path.json"),  # Retained for run_temporal_cascade
+    ] = Path(
+        "data/canonical_path.json"
+    ),  # Retained for run_temporal_cascade
     max_cascade_positions: Annotated[
-        int, typer.Option(help="Maximum number of positions for temporal cascade calculation.")
+        int,
+        typer.Option(
+            help="Maximum number of positions for temporal cascade calculation."
+        ),
     ] = 100,
 ):
     """
@@ -1085,7 +1216,9 @@ def session_commit(
     """
     session_data = session_manager.get_session(session_id)
     if not session_data:
-        typer.echo(json.dumps({"error": f"Session ID {session_id} not found."}, indent=2))
+        typer.echo(
+            json.dumps({"error": f"Session ID {session_id} not found."}, indent=2)
+        )
         raise typer.Exit(code=1)
 
     if session_data.get("status") != "active":
@@ -1108,7 +1241,10 @@ def session_commit(
         except Exception as e:
             typer.echo(
                 json.dumps(
-                    {"error": f"Failed to parse verdicts JSON file {verdicts_input}: {e}"}, indent=2
+                    {
+                        "error": f"Failed to parse verdicts JSON file {verdicts_input}: {e}"
+                    },
+                    indent=2,
                 )
             )
             raise typer.Exit(code=1)
@@ -1117,28 +1253,36 @@ def session_commit(
             verdicts = json.loads(verdicts_input)
         except Exception as e:
             typer.echo(
-                json.dumps({"error": f"Failed to parse verdicts JSON string: {e}"}, indent=2)
+                json.dumps(
+                    {"error": f"Failed to parse verdicts JSON string: {e}"}, indent=2
+                )
             )
             raise typer.Exit(code=1)
 
     if not isinstance(verdicts, dict):
-        typer.echo(json.dumps({"error": "Verdicts must be a JSON object (dictionary)."}, indent=2))
+        typer.echo(
+            json.dumps(
+                {"error": "Verdicts must be a JSON object (dictionary)."}, indent=2
+            )
+        )
         raise typer.Exit(code=1)
 
     initiating_fork_uuid = session_data["initiating_fork_uuid"]
     dossier_duels = session_data.get("dossier", {}).get("duels", {})
 
     valid_votes_to_record = []
-    processed_verdicts: dict[
-        str, str
-    ] = {}  # For transaction record: position_str -> winning_fork_uuid
+    processed_verdicts: dict[str, str] = (
+        {}
+    )  # For transaction record: position_str -> winning_fork_uuid
     oldest_voted_position = float("inf")
 
     for pos_str, winning_fork_uuid_verdict in verdicts.items():
         if not isinstance(winning_fork_uuid_verdict, str):
             typer.echo(
                 json.dumps(
-                    {"warning": f"Verdict for position {pos_str} is not a string. Skipping."},
+                    {
+                        "warning": f"Verdict for position {pos_str} is not a string. Skipping."
+                    },
                     indent=2,
                 )
             )
@@ -1150,14 +1294,19 @@ def session_commit(
             if position_idx < 0:  # Ensure positive position
                 typer.echo(
                     json.dumps(
-                        {"warning": f"Invalid position {pos_str} in verdicts. Skipping."}, indent=2
+                        {
+                            "warning": f"Invalid position {pos_str} in verdicts. Skipping."
+                        },
+                        indent=2,
                     )
                 )
                 continue
         except ValueError:
             typer.echo(
                 json.dumps(
-                    {"warning": f"Invalid position key '{pos_str}' in verdicts. Skipping."},
+                    {
+                        "warning": f"Invalid position key '{pos_str}' in verdicts. Skipping."
+                    },
                     indent=2,
                 )
             )
@@ -1189,7 +1338,9 @@ def session_commit(
             )
             continue
 
-        loser_fork_uuid_verdict = fork_a if winning_fork_uuid_verdict == fork_b else fork_b
+        loser_fork_uuid_verdict = (
+            fork_a if winning_fork_uuid_verdict == fork_b else fork_b
+        )
 
         # Map fork UUIDs to their successor hrönir UUIDs for voting
         # _get_successor_hronir_for_fork is defined in cli.py
@@ -1277,14 +1428,19 @@ def session_commit(
                 {
                     "message": "Transaction processing complete.",
                     "transaction_uuid": transaction_result["transaction_uuid"],
-                    "promotions_granted": transaction_result.get("promotions_granted", []),
+                    "promotions_granted": transaction_result.get(
+                        "promotions_granted", []
+                    ),
                 },
                 indent=2,
             )
         )
     except Exception as e:
         typer.echo(
-            json.dumps({"error": f"Failed to process transaction: {e}. Aborting commit."}, indent=2)
+            json.dumps(
+                {"error": f"Failed to process transaction: {e}. Aborting commit."},
+                indent=2,
+            )
         )
         # Votes might not have been recorded, or only partially. State could be inconsistent.
         # Session status should reflect this if possible.
@@ -1307,7 +1463,10 @@ def session_commit(
         if update_spent_success:
             typer.echo(
                 json.dumps(
-                    {"message": f"Fork {initiating_fork_uuid} status updated to SPENT."}, indent=2
+                    {
+                        "message": f"Fork {initiating_fork_uuid} status updated to SPENT."
+                    },
+                    indent=2,
                 )
             )
         else:
@@ -1332,7 +1491,9 @@ def session_commit(
 
     # Trigger Temporal Cascade (SC.11)
     # Use oldest_voted_position from transaction_result
-    tm_oldest_voted_position = transaction_result.get("oldest_voted_position", float("inf"))
+    tm_oldest_voted_position = transaction_result.get(
+        "oldest_voted_position", float("inf")
+    )
 
     if tm_oldest_voted_position != float("inf") and tm_oldest_voted_position >= 0:
         typer.echo(
@@ -1349,7 +1510,9 @@ def session_commit(
             if cascade_made_changes:
                 typer.echo(
                     json.dumps(
-                        {"message": "Temporal Cascade completed and updated the canonical path."},
+                        {
+                            "message": "Temporal Cascade completed and updated the canonical path."
+                        },
                         indent=2,
                     )
                 )
@@ -1364,7 +1527,9 @@ def session_commit(
                 )
 
         except Exception as e:
-            typer.echo(json.dumps({"error": f"Temporal Cascade failed: {e}."}, indent=2))
+            typer.echo(
+                json.dumps({"error": f"Temporal Cascade failed: {e}."}, indent=2)
+            )
             # Votes and TX recorded, but cascade failed. State is inconsistent.
             # This needs careful consideration for recovery.
             # For now, we'll report and exit. Session status might indicate this.
@@ -1374,16 +1539,25 @@ def session_commit(
         # This case should be caught by "No valid verdicts" earlier, but as a safeguard:
         typer.echo(
             json.dumps(
-                {"message": "No votes were cast, so no Temporal Cascade was triggered."}, indent=2
+                {
+                    "message": "No votes were cast, so no Temporal Cascade was triggered."
+                },
+                indent=2,
             )
         )
 
     # Update session status to 'committed'
     session_manager.update_session_status(session_id, "committed")
-    typer.echo(json.dumps({"message": f"Session {session_id} committed successfully."}, indent=2))
+    typer.echo(
+        json.dumps(
+            {"message": f"Session {session_id} committed successfully."}, indent=2
+        )
+    )
 
 
-@app.command("metrics", help="Expose fork status metrics in Prometheus format (TDD 2.6).")
+@app.command(
+    "metrics", help="Expose fork status metrics in Prometheus format (TDD 2.6)."
+)
 def metrics_command(
     forking_path_dir: Annotated[
         Path, typer.Option(help="Directory containing forking path CSV files.")
@@ -1400,7 +1574,9 @@ def metrics_command(
             err=True,
         )
         for status_val, count in status_counts.items():
-            typer.echo(f'hronir_fork_status_total{{status="{status_val.lower()}"}} {count}')
+            typer.echo(
+                f'hronir_fork_status_total{{status="{status_val.lower()}"}} {count}'
+            )
         raise typer.Exit(code=1)
 
     # Print metrics in Prometheus format
