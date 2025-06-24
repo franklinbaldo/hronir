@@ -17,6 +17,16 @@ This document outlines the development roadmap for the **Hrönir Encyclopedia** 
 - [ ] **Integrity validation** for path→hrönir relationships
 - [ ] **Error messages** need more context about predecessors
 
+### Enhanced Data Models 🏗️
+- [ ] **Session models** (`Session`, `SessionDossier`, `SessionDuel`) for type-safe session management
+- [ ] **Hrönir content model** (`Hronir`) for story content with metadata and validation
+- [ ] **Canonical path models** (`CanonicalPath`, `CanonicalEntry`) for structured canonical state
+- [ ] **Enhanced transaction model** (`TransactionContent`, `SessionVerdict`) for structured transaction content
+- [ ] **Duel/ranking models** (`DuelResult`, `RankingEntry`) for Elo system type safety
+- [ ] **Mandate/qualification models** (`Mandate`, `QualificationCriteria`) for validation logic
+- [ ] **Configuration models** (`SystemConfig`, `StoragePaths`) for system administration
+- [ ] **Validation models** (`ValidationIssue`, `DataIntegrityReport`) for debugging and maintenance
+
 ### Essential CLI Commands 📟
 - [ ] **`hronir validate-paths`** command for debugging path integrity
 - [ ] **`hronir tutorial`** command that executes complete workflow demonstration
