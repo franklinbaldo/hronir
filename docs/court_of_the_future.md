@@ -68,7 +68,7 @@ Rule_Merge_Same_Size:
 
 ## 8. Fluxo Completo (incorpora SC.13)
 
-1. **Fork criado** → `PENDING`
+1. **Path criado** → `PENDING`
 2. **Duelos internos** → atinge limiar → `QUALIFIED`
 3. **Entra em waiting\_branches\[valid\_tx\_count]**
 4. **Merge** por Regra 3 ou fallback Regra 4
@@ -142,7 +142,7 @@ Pronto para v3.0-alpha, totalmente self-contained.
 | Camada existente                     | Ajuste mínimo                                                                                                   |
 | ------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
 | **Qualificação por Mérito (SC .13)** | Continua igual: só ramos QUALIFIED entram na fila de merge.                                                     |
-| **Mandate único por fork**           | O *mandate* só nasce após primeiro merge bem-sucedido. Multiplica a fricção para Sybil.                         |
+| **Mandate único por path**           | O *mandate* só nasce após primeiro merge bem-sucedido. Multiplica a fricção para Sybil.                         |
 | **Enum de status**                   | `WAITING_FOR_PAIR` novo status intermediário.                                                                   |
 | **Ledger append-only**               | Ao fundir, grava um “super-bloco” com `parent_A`, `parent_B`, `size=N`. O hash desse super-bloco é o novo head. |
 

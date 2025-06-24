@@ -7,9 +7,9 @@ This document outlines the development roadmap for the **Hrönir Encyclopedia** 
 ## 🚨 **IMMEDIATE PRIORITIES**
 
 ### Terminology Cleanup 🔥
-- [ ] **Complete fork→path terminology replacement** using regex `\Wfork\W` patterns throughout codebase
-- [ ] **Update all documentation** to use path terminology consistently
-- [ ] **Fix CLI command references** in help text and examples
+- [x] **Complete fork→path terminology replacement** using regex `\Wfork\W` patterns throughout codebase
+- [x] **Update all documentation** to use path terminology consistently
+- [x] **Fix CLI command references** in help text and examples
 
 ### Critical Bug Fixes 🐛
 - [ ] **Path→hrönir mapping issues** in session commit workflow

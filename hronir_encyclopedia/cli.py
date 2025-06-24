@@ -38,9 +38,9 @@ def recover_canon(
     ratings_dir: Annotated[
         Path, typer.Option(help="Directory containing rating CSV files.")
     ] = Path("ratings"),
-    forking_path_dir: Annotated[
-        Path, typer.Option(help="Directory containing forking path CSV files.")
-    ] = Path("the_garden"),
+    narrative_paths_dir: Annotated[
+        Path, typer.Option(help="Directory containing narrative path CSV files.")
+    ] = Path("narrative_paths"),
     canonical_path_file: Annotated[
         Path, typer.Option(help="Path to the canonical path JSON file.")
     ] = Path("data/canonical_path.json"),
@@ -62,7 +62,7 @@ def recover_canon(
         start_position=0,
         max_positions_to_consolidate=max_positions_to_rebuild,  # Renamed param for clarity
         canonical_path_file=canonical_path_file,
-        # forking_path_dir and ratings_dir removed as args from run_temporal_cascade
+        # narrative_paths_dir and ratings_dir removed as args from run_temporal_cascade
         typer_echo=typer.echo,
     )
     typer.echo("Manual canon recovery via Temporal Cascade complete.")
@@ -73,8 +73,8 @@ def init_test(
     library_dir: Annotated[
         Path, typer.Option(help="Directory to store sample hr\u00f6nirs.")
     ] = Path("the_library"),
-    forking_path_dir: Annotated[Path, typer.Option(help="Directory for fork CSV files.")] = Path(
-        "forking_path"
+    narrative_paths_dir: Annotated[Path, typer.Option(help="Directory for path CSV files.")] = Path(
+        "narrative_paths"
     ),
     ratings_dir: Annotated[Path, typer.Option(help="Directory for rating CSV files.")] = Path(
         "ratings"
@@ -83,9 +83,9 @@ def init_test(
         "data"
     ),
 ) -> None:
-    """Create sample directories, chapters, forks, and a canonical path."""
+    """Create sample directories, chapters, paths, and a canonical path."""
     library_dir.mkdir(parents=True, exist_ok=True)
-    forking_path_dir.mkdir(parents=True, exist_ok=True)
+    narrative_paths_dir.mkdir(parents=True, exist_ok=True)
     ratings_dir.mkdir(parents=True, exist_ok=True)
     (data_dir / "sessions").mkdir(parents=True, exist_ok=True)
     (data_dir / "transactions").mkdir(parents=True, exist_ok=True)
@@ -111,9 +111,9 @@ def init_test(
 
     typer.echo("Sample data initialized:")
     typer.echo(f"  Position 0 hr\u00f6nir UUID: {h0_uuid}")
-    typer.echo(f"  Position 0 fork UUID: {p0_uuid}")
+    typer.echo(f"  Position 0 path UUID: {p0_uuid}")
     typer.echo(f"  Position 1 hr\u00f6nir UUID: {h1_uuid}")
-    typer.echo(f"  Position 1 fork UUID: {p1_uuid}")
+    typer.echo(f"  Position 1 path UUID: {p1_uuid}")
 
 
 # Command `export` and `tree` removed as they depended on the old book structure.
@@ -136,7 +136,7 @@ def validate(
     Currently, just checks for existence.
     """
     # The original logic was just a print, keeping it simple.
-    # More complex validation would go into storage.validate_or_move
+    # More complex validation would go into storage.validate_or_move or parts of it.
     typer.echo(f"Chapter file {chapter} exists and is readable. Basic validation passed.")
     # For a more meaningful validation, one might call storage.validate_or_move or parts of it.
 
@@ -155,14 +155,14 @@ def store(
 ):
     """
     Stores a given chapter file into the hrönir library as a content node.
-    Narrative connections are managed separately via forking_path CSVs.
+    Narrative connections are managed separately via narrative_paths CSVs.
     """
     uuid_str = storage.store_chapter(chapter)
     typer.echo(uuid_str)
 
 
-@app.command(help="Create a narrative connection (fork) between hrönirs.")
-def fork(
+@app.command(help="Create a narrative connection (path) between hrönirs.")
+def path(
     position: Annotated[int, typer.Option(help="Position in the narrative sequence")],
     target: Annotated[str, typer.Option(help="Target hrönir UUID (destination content node)")],
     source: Annotated[
@@ -170,7 +170,7 @@ def fork(
     ] = "",
 ):
     """
-    Creates a forking path entry connecting two hrönirs in the narrative graph.
+    Creates a narrative path entry connecting two hrönirs in the narrative graph.
     This establishes a directed edge: source → target based purely on narrative merit.
     """
     from pathlib import Path
@@ -191,102 +191,102 @@ def fork(
 
     # Validate hrönir UUIDs exist in library
     library_dir = Path("the_library")
-    target_path = library_dir / target
-    if not target_path.exists():
+    target_path_lib = library_dir / target # Renamed to avoid conflict
+    if not target_path_lib.exists():
         typer.echo(f"Error: Target hrönir {target} not found in library")
         raise typer.Exit(1)
 
     if source:
-        source_path = library_dir / source
-        if not source_path.exists():
+        source_path_lib = library_dir / source # Renamed to avoid conflict
+        if not source_path_lib.exists():
             typer.echo(f"Error: Source hrönir {source} not found in library")
             raise typer.Exit(1)
 
-    # Generate deterministic fork UUID
-    path_uuid = storage.compute_forking_uuid(position, source, target)
+    # Generate deterministic path UUID
+    path_uuid = storage.compute_narrative_path_uuid(position, source, target)
 
-    # Create forking path entry
-    forking_path_dir = Path("the_garden")
-    forking_path_dir.mkdir(exist_ok=True)
+    # Create narrative path entry
+    narrative_paths_dir = Path("narrative_paths")
+    narrative_paths_dir.mkdir(exist_ok=True)
 
     # Use position-based CSV file naming
-    csv_file = forking_path_dir / f"position_{position:03d}.csv"
+    csv_file = narrative_paths_dir / f"position_{position:03d}.csv"
 
     # Create CSV with headers if it doesn't exist
     if not csv_file.exists():
         csv_file.write_text("position,prev_uuid,uuid,path_uuid,status\n")
 
-    # Check if fork already exists
+    # Check if path already exists
     import pandas as pd
 
     try:
         df = pd.read_csv(csv_file)
         if not df.empty and ((df["path_uuid"] == path_uuid).any()):
-            typer.echo(f"Fork already exists: {path_uuid}")
+            typer.echo(f"Path already exists: {path_uuid}")
             return
     except (pd.errors.EmptyDataError, FileNotFoundError):
         # File is empty or doesn't exist, create headers
         csv_file.write_text("position,prev_uuid,uuid,path_uuid,status\n")
 
-    # Append new fork entry (mapping to CSV column names: source→prev_uuid, target→uuid)
-    fork_entry = f"{position},{source},{target},{path_uuid},PENDING\n"
+    # Append new path entry (mapping to CSV column names: source→prev_uuid, target→uuid)
+    path_entry = f"{position},{source},{target},{path_uuid},PENDING\n"
     with csv_file.open("a") as f:
-        f.write(fork_entry)
+        f.write(path_entry)
 
-    typer.echo(f"Created fork: {path_uuid}")
+    typer.echo(f"Created path: {path_uuid}")
     typer.echo(f"  Position: {position}")
     typer.echo(f"  Source: {source or '(none)'}")
     typer.echo(f"  Target: {target}")
     typer.echo("  Status: PENDING")
 
 
-@app.command(help="List existing forks at a position.")
-def list_forks(
-    position: Annotated[int, typer.Option(help="Position to list forks for")] = None,
+@app.command(help="List existing paths at a position.")
+def list_paths(
+    position: Annotated[int, typer.Option(help="Position to list paths for")] = None,
 ):
     """
-    Lists all existing forks, optionally filtered by position.
+    Lists all existing paths, optionally filtered by position.
     Shows the narrative graph structure without creator attribution.
     """
     from pathlib import Path
 
     import pandas as pd
 
-    forking_path_dir = Path("the_garden")
-    if not forking_path_dir.exists():
-        typer.echo("No forking path directory found.")
+    narrative_paths_dir = Path("narrative_paths")
+    if not narrative_paths_dir.exists():
+        typer.echo("No narrative path directory found.")
         return
 
-    all_forks = []
-    csv_files = list(forking_path_dir.glob("*.csv"))
+    all_paths = []
+    csv_files = list(narrative_paths_dir.glob("*.csv"))
 
     if not csv_files:
-        typer.echo("No fork files found.")
+        typer.echo("No path files found.")
         return
 
     for csv_file in csv_files:
         try:
             df = pd.read_csv(csv_file)
             if not df.empty:
-                all_forks.append(df)
+                all_paths.append(df)
         except (pd.errors.EmptyDataError, FileNotFoundError):
             continue
 
-    if not all_forks:
-        typer.echo("No forks found.")
+    if not all_paths:
+        typer.echo("No paths found.")
         return
 
-    combined_df = pd.concat(all_forks, ignore_index=True)
+    combined_df = pd.concat(all_paths, ignore_index=True)
 
     # Filter by position if specified
     if position is not None:
         combined_df = combined_df[combined_df["position"] == position]
         if combined_df.empty:
-            typer.echo(f"No forks found at position {position}.")
+            typer.echo(f"No paths found at position {position}.")
             return
-        typer.echo(f"Forks at position {position}:")
+        typer.echo(f"Paths at position {position}:")
     else:
-        typer.echo("All forks:")
+        typer.echo("All paths:")
 
     # Display relevant columns only (no creator info)
     display_cols = ["position", "prev_uuid", "uuid", "path_uuid", "status"]
@@ -295,44 +295,44 @@ def list_forks(
     typer.echo(combined_df[available_cols].to_string(index=False))
 
 
-@app.command(help="Show status details for a specific fork.")
-def fork_status(path_uuid: str) -> None:
-    """Display status information for the given fork UUID."""
-    fork_data = storage.get_fork_data(path_uuid)
-    if not fork_data:
+@app.command(help="Show status details for a specific path.")
+def path_status(path_uuid: str) -> None:
+    """Display status information for the given path UUID."""
+    path_data = storage.get_path_data(path_uuid)
+    if not path_data:
         typer.echo(f"Error: path_uuid {path_uuid} not found.")
         raise typer.Exit(code=1)
 
-    typer.echo(f"Position: {fork_data.position}")
-    typer.echo(f"Prev UUID: {fork_data.prev_uuid}")
-    typer.echo(f"UUID: {fork_data.uuid}")
-    typer.echo(f"Status: {fork_data.status}")
-    if fork_data.mandate_id:
-        typer.echo(f"Mandate ID: {fork_data.mandate_id}")
+    typer.echo(f"Position: {path_data.position}")
+    typer.echo(f"Prev UUID: {path_data.prev_uuid}")
+    typer.echo(f"UUID: {path_data.uuid}")
+    typer.echo(f"Status: {path_data.status}")
+    if path_data.mandate_id:
+        typer.echo(f"Mandate ID: {path_data.mandate_id}")
 
-    consumed_by = session_manager.is_fork_consumed(path_uuid)
+    consumed_by = session_manager.is_path_consumed(path_uuid)
     if consumed_by:
         typer.echo(f"Consumed by session: {consumed_by}")
 
 
 # Helper function to find successor hrönir_uuid for a given path_uuid
-def _get_successor_hronir_for_fork(path_uuid_to_find: str) -> str | None:
-    """Return the hrönir UUID (ForkDB.uuid) that a fork points to by querying the database."""
-    # forking_path_dir parameter is removed as this function now uses the DB.
-    fork_data_obj = storage.get_fork_data(path_uuid_to_find)
-    if fork_data_obj:
-        return fork_data_obj.uuid  # ForkDB.uuid stores the hrönir_uuid
+def _get_successor_hronir_for_path(path_uuid_to_find: str) -> str | None:
+    """Return the hrönir UUID (PathDB.uuid) that a path points to by querying the database."""
+    # narrative_paths_dir parameter is removed as this function now uses the DB.
+    path_data_obj = storage.get_path_data(path_uuid_to_find)
+    if path_data_obj:
+        return path_data_obj.uuid  # PathDB.uuid stores the hrönir_uuid
     return None
 
 
-def _calculate_status_counts(forking_path_dir: Path) -> dict[str, int]:
-    """Return a count of forks by status for the given directory."""
+def _calculate_status_counts(narrative_paths_dir: Path) -> dict[str, int]:
+    """Return a count of paths by status for the given directory."""
     status_counts = {"PENDING": 0, "QUALIFIED": 0, "SPENT": 0, "UNKNOWN": 0}
-    if not forking_path_dir.is_dir():
+    if not narrative_paths_dir.is_dir():
         return status_counts
 
     all_path_uuids_processed: set[str] = set()
-    for csv_file in forking_path_dir.glob("*.csv"):
+    for csv_file in narrative_paths_dir.glob("*.csv"):
         if csv_file.stat().st_size == 0:
             continue
         try:
@@ -350,13 +350,13 @@ def _calculate_status_counts(forking_path_dir: Path) -> dict[str, int]:
 
         for _, row in df.iterrows():
             path_uuid = str(row.get("path_uuid", "")).strip()
-            status = str(row.get("status", "")).strip()
+            status_val = str(row.get("status", "")).strip() # Renamed to avoid conflict
             if not path_uuid or path_uuid in all_path_uuids_processed:
                 continue
-            if not status:
+            if not status_val:
                 status_counts["UNKNOWN"] += 1
-            elif status in status_counts:
-                status_counts[status] += 1
+            elif status_val in status_counts:
+                status_counts[status_val] += 1
             else:
                 status_counts["UNKNOWN"] += 1
             all_path_uuids_processed.add(path_uuid)
@@ -364,7 +364,7 @@ def _calculate_status_counts(forking_path_dir: Path) -> dict[str, int]:
     return status_counts
 
 
-@app.command(help="Display the canonical path and optional fork status counts.")
+@app.command(help="Display the canonical path and optional path status counts.")
 def status(
     canonical_path_file: Annotated[
         Path, typer.Option(help="Path to the canonical path JSON file.")
@@ -373,15 +373,15 @@ def status(
         bool,
         typer.Option(
             "--counts",
-            help="Also show number of forks by status using forking_path data.",
+            help="Also show number of paths by status using narrative_paths data.",
         ),
     ] = False,
-    forking_path_dir: Annotated[
+    narrative_paths_dir: Annotated[
         Path,
-        typer.Option(help="Directory containing forking path CSV files (for --counts)."),
-    ] = Path("the_garden"),
+        typer.Option(help="Directory containing narrative path CSV files (for --counts)."),
+    ] = Path("narrative_paths"),
 ) -> None:
-    """Show canonical path entries and optional fork status counts."""
+    """Show canonical path entries and optional path status counts."""
     try:
         with open(canonical_path_file) as f:
             canonical_data = json.load(f)
@@ -404,8 +404,8 @@ def status(
 
     if counts:
         typer.echo("")
-        typer.echo("Fork status counts:")
-        counts_dict = _calculate_status_counts(forking_path_dir)
+        typer.echo("Path status counts:")
+        counts_dict = _calculate_status_counts(narrative_paths_dir)
         for status_val, count in counts_dict.items():
             typer.echo(f"  {status_val}: {count}")
 
@@ -414,18 +414,18 @@ def status(
 # All voting now occurs through the 'session commit' flow.
 
 
-@app.command(help="Validate and repair storage, audit forking CSVs.")
+@app.command(help="Validate and repair storage, audit narrative CSVs.")
 def audit():
     """
     Performs audit operations: validates chapters in the library,
-    and audits forking path CSV files.
+    and audits narrative path CSV files.
     """
     library_dir = Path("the_library")
     typer.echo(f"Auditing library directory: {library_dir}...")
     # This part needs to be adjusted. `validate_or_move` expects a specific file.
     # We should iterate through hrönirs in a way that's compatible with `purge_fake_hronirs` logic,
     # or rely on `purge_fake_hronirs` called by `clean` command.
-    # For now, let's simplify the audit's scope for this command, focusing on forking paths.
+    # For now, let's simplify the audit's scope for this command, focusing on narrative paths.
     # A more thorough audit of `the_library` is implicitly handled by `storage.chapter_exists`
     # when other commands use it, and explicitly by `clean`.
     # Consider enhancing `audit` in the future if a standalone deep library audit is needed here.
@@ -434,26 +434,26 @@ def audit():
     )
     # No direct action on library_dir here, purge_fake_hronirs in 'clean' is more comprehensive.
 
-    fork_dir = Path("the_garden")
-    if fork_dir.exists():
-        typer.echo(f"Auditing forking path directory: {fork_dir}...")
-        for csv_file in fork_dir.glob("*.csv"):
-            storage.audit_forking_csv(csv_file)
+    path_dir = Path("narrative_paths")
+    if path_dir.exists():
+        typer.echo(f"Auditing narrative path directory: {path_dir}...")
+        for csv_file in path_dir.glob("*.csv"):
+            storage.audit_narrative_csv(csv_file)
         from . import graph_logic
 
-        if graph_logic.is_narrative_consistent(fork_dir):
+        if graph_logic.is_narrative_consistent(path_dir):
             typer.echo("Narrative graph is consistent (no cycles detected).")
         else:
             typer.echo("WARNING: Narrative graph contains cycles!")
     else:
-        typer.echo(f"Forking path directory {fork_dir} not found. Skipping audit.")
+        typer.echo(f"Narrative path directory {path_dir} not found. Skipping audit.")
     typer.echo("Audit complete (Note: hrönir validation primarily via 'clean' command).")
 
 
 @app.command(help="Generate competing chapters from a predecessor and record an initial vote.")
 def synthesize(
     position: Annotated[int, typer.Option(help="Chapter position for the new hrönirs.")],
-    prev: Annotated[str, typer.Option(help="UUID of the predecessor chapter to fork from.")],
+    prev: Annotated[str, typer.Option(help="UUID of the predecessor chapter to create a path from.")],
 ):
     """
     Synthesizes two new hrönirs from a predecessor for a given position
@@ -500,33 +500,33 @@ def ranking(
         typer.echo(ranking_data.to_string(index=False))
 
 
-@app.command(help="Obtém o duelo de máxima entropia entre forks para uma posição.")
+@app.command(help="Obtém o duelo de máxima entropia entre paths para uma posição.")
 def get_duel(
     position: Annotated[
         int,
-        typer.Option(help="A posição do capítulo para a qual obter o duelo de forks."),
+        typer.Option(help="A posição do capítulo para a qual obter o duelo de paths."),
     ],
     ratings_dir: Annotated[
         Path, typer.Option(help="Diretório contendo arquivos CSV de classificação.")
     ] = Path("ratings"),
-    forking_path_dir: Annotated[
+    narrative_paths_dir: Annotated[
         Path,
-        typer.Option(help="Diretório contendo arquivos CSV de caminhos de bifurcação."),
-    ] = Path("the_garden"),
+        typer.Option(help="Diretório contendo arquivos CSV de caminhos de narrativa."),
+    ] = Path("narrative_paths"),
     canonical_path_file: Annotated[
         Path, typer.Option(help="Caminho para o arquivo JSON do caminho canônico.")
     ] = Path("data/canonical_path.json"),
 ):
     """
-    Obtém o duelo de forks de máxima entropia para uma determinada posição,
+    Obtém o duelo de paths de máxima entropia para uma determinada posição,
     considerando a linhagem canônica.
     """
     predecessor_hronir_uuid: str | None = None
     if position > 0:
-        canonical_fork_info_prev_pos = storage.get_canonical_fork_info(
+        canonical_path_info_prev_pos = storage.get_canonical_path_info(
             position - 1, canonical_path_file
         )
-        if not canonical_fork_info_prev_pos or "hrönir_uuid" not in canonical_fork_info_prev_pos:
+        if not canonical_path_info_prev_pos or "hrönir_uuid" not in canonical_path_info_prev_pos:
             typer.echo(
                 json.dumps(
                     {
@@ -538,7 +538,7 @@ def get_duel(
                 )
             )
             raise typer.Exit(code=1)
-        predecessor_hronir_uuid = canonical_fork_info_prev_pos["hrönir_uuid"]
+        predecessor_hronir_uuid = canonical_path_info_prev_pos["hrönir_uuid"]
     elif position < 0:
         typer.echo(
             json.dumps(
@@ -569,8 +569,8 @@ def get_duel(
         #   "strategy": "max_entropy_duel",
         #   "entropy": max_entropy,
         #   "duel_pair": {
-        #       "fork_A": duel_fork_A_uuid,
-        #       "fork_B": duel_fork_B_uuid,
+        #       "path_A": duel_path_A_uuid,
+        #       "path_B": duel_path_B_uuid,
         #   }
         # }
         typer.echo(json.dumps(duel_info, indent=2))
@@ -578,8 +578,8 @@ def get_duel(
         typer.echo(
             json.dumps(
                 {
-                    "error": "Não foi possível determinar um duelo de forks. "
-                    "Verifique se existem forks elegíveis suficientes (pelo menos 2) para a linhagem e posição.",
+                    "error": "Não foi possível determinar um duelo de paths. "
+                    "Verifique se existem paths elegíveis suficientes (pelo menos 2) para a linhagem e posição.",
                     "position": position,
                     "predecessor_hronir_uuid_used": predecessor_hronir_uuid,
                 },
@@ -636,13 +636,13 @@ def clean(
     typer.echo("Starting cleanup process...")
     storage.purge_fake_hronirs()  # Assumes this function prints its actions
 
-    fork_dir = Path("the_garden")
-    if fork_dir.exists():
-        typer.echo(f"Cleaning fake forking CSVs in {fork_dir}...")
-        for csv_file in fork_dir.glob("*.csv"):
-            storage.purge_fake_forking_csv(csv_file)  # Assumes this function prints its actions
+    path_dir = Path("narrative_paths")
+    if path_dir.exists():
+        typer.echo(f"Cleaning fake narrative CSVs in {path_dir}...")
+        for csv_file in path_dir.glob("*.csv"):
+            storage.purge_fake_narrative_csv(csv_file)  # Assumes this function prints its actions
     else:
-        typer.echo(f"Forking path directory {fork_dir} not found. Skipping.")
+        typer.echo(f"Narrative path directory {path_dir} not found. Skipping.")
 
     rating_dir = Path("ratings")
     if rating_dir.exists():
@@ -692,23 +692,23 @@ session_app = typer.Typer(help="Manage Hrönir judgment sessions.", no_args_is_h
 app.add_typer(session_app, name="session")
 
 
-@session_app.command("start", help="Initiate a Judgment Session using a QUALIFIED fork's mandate.")
+@session_app.command("start", help="Initiate a Judgment Session using a QUALIFIED path's mandate.")
 def session_start(
-    # position: Annotated[int, typer.Option("--position", "-p", help="The current position N of the new fork being created.")], # Position is now derived from path_uuid
+    # position: Annotated[int, typer.Option("--position", "-p", help="The current position N of the new path being created.")], # Position is now derived from path_uuid
     path_uuid: Annotated[
         str,
         typer.Option(
-            "--fork-uuid",
-            "-f",
+            "--path-uuid", # Changed from --fork-uuid
+            "-p", # Changed from -f
             help="The QUALIFIED path_uuid granting the mandate for this session.",
         ),
     ],
     ratings_dir: Annotated[
         Path, typer.Option(help="Directory containing rating CSV files.")
     ] = Path("ratings"),
-    forking_path_dir: Annotated[
-        Path, typer.Option(help="Directory containing forking path CSV files.")
-    ] = Path("the_garden"),
+    narrative_paths_dir: Annotated[
+        Path, typer.Option(help="Directory containing narrative path CSV files.")
+    ] = Path("narrative_paths"),
     canonical_path_file: Annotated[
         Path, typer.Option(help="Path to the canonical path JSON file.")
     ] = Path("data/canonical_path.json"),
@@ -717,8 +717,8 @@ def session_start(
     Initiates a new Judgment Session (SC.8, SC.9).
 
     This command allows a user to exercise the 'mandate for judgment' granted by a
-    fork that has achieved `QUALIFIED` status. The `path_uuid` of this qualified
-    fork must be provided.
+    path that has achieved `QUALIFIED` status. The `path_uuid` of this qualified
+    path must be provided.
 
     The system will:
     1. Validate the provided `path_uuid`:
@@ -734,35 +734,35 @@ def session_start(
        consumed for session initiation purposes.
     5. Output the `session_id` and the dossier to the user.
 
-    If `N=0` (the qualified fork is at position 0), no prior positions exist to be
+    If `N=0` (the qualified path is at position 0), no prior positions exist to be
     judged. An empty dossier is created, and the session is immediately ready for
     a (vacuous) commit, primarily to log the use of the mandate.
     """
     # Position is now derived from the path_uuid itself, not passed as a separate CLI arg.
     # This makes the command simpler and less prone to user error.
-    # We will fetch the fork's details to get its position N.
+    # We will fetch the path's details to get its position N.
 
     # Validate the path_uuid - it must exist in the database
-    # fork_data = storage.get_fork_file_and_data(path_uuid, fork_dir_base=forking_path_dir) # Legacy
-    fork_data_obj = storage.get_fork_data(path_uuid)  # DB query
+    # path_data = storage.get_path_file_and_data(path_uuid, path_dir_base=narrative_paths_dir) # Legacy
+    path_data_obj = storage.get_path_data(path_uuid)  # DB query
 
-    if not fork_data_obj:
+    if not path_data_obj:
         typer.echo(
             json.dumps(
                 {
-                    "error": f"Fork UUID {path_uuid} not found in the database. Cannot start session."
+                    "error": f"Path UUID {path_uuid} not found in the database. Cannot start session."
                 },
                 indent=2,
             )
         )
         raise typer.Exit(code=1)
 
-    # Get position N from the fork_data_obj
-    position_n_str = str(fork_data_obj.position)  # position is int in ForkDB
+    # Get position N from the path_data_obj
+    position_n_str = str(path_data_obj.position)  # position is int in PathDB
     if position_n_str is None:
         typer.echo(
             json.dumps(
-                {"error": f"Fork UUID {path_uuid} is missing position information."},
+                {"error": f"Path UUID {path_uuid} is missing position information."},
                 indent=2,
             )
         )
@@ -772,7 +772,7 @@ def session_start(
     except ValueError:
         typer.echo(
             json.dumps(
-                {"error": f"Fork UUID {path_uuid} has an invalid position: {position_n_str}."},
+                {"error": f"Path UUID {path_uuid} has an invalid position: {position_n_str}."},
                 indent=2,
             )
         )
@@ -781,18 +781,18 @@ def session_start(
     if position < 0:  # Should be caught by storage validation, but good to check.
         typer.echo(
             json.dumps(
-                {"error": f"Fork UUID {path_uuid} has an invalid negative position: {position}."},
+                {"error": f"Path UUID {path_uuid} has an invalid negative position: {position}."},
                 indent=2,
             )
         )
         raise typer.Exit(code=1)
 
-    # Validate the path_uuid - it must exist in forking_path (already done by get_fork_data)
-    # if not storage.forking_path_exists(path_uuid, fork_dir=forking_path_dir): # Legacy, and redundant
+    # Validate the path_uuid - it must exist in narrative_paths (already done by get_path_data)
+    # if not storage.narrative_path_exists(path_uuid, path_dir=narrative_paths_dir): # Legacy, and redundant
     #     typer.echo(
     #         json.dumps(
     #             {
-    #                 "error": f"Fork UUID {path_uuid} not found in forking paths. Cannot start session."
+    #                 "error": f"Path UUID {path_uuid} not found in narrative paths. Cannot start session."
     #             },
     #             indent=2,
     #         )
@@ -800,7 +800,7 @@ def session_start(
     #     raise typer.Exit(code=1)
 
     # Check if path_uuid has already been consumed for a session (SC.8)
-    consumed_by_session_id = session_manager.is_fork_consumed(path_uuid)
+    consumed_by_session_id = session_manager.is_path_consumed(path_uuid)
     if consumed_by_session_id:
         typer.echo(
             json.dumps(
@@ -816,7 +816,7 @@ def session_start(
 
     if position == 0:  # Corrected condition: No prior positions if N=0
         # If N=0, there are no prior positions (N-1 to 0) to judge.
-        # Create an empty session and mark fork as consumed.
+        # Create an empty session and mark path as consumed.
         session_id = str(uuid.uuid4())
         session_manager.SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
         session_file = session_manager.SESSIONS_DIR / f"{session_id}.json"
@@ -828,7 +828,7 @@ def session_start(
             "status": "active",
         }
         session_file.write_text(json.dumps(session_data, indent=2))
-        session_manager.mark_fork_as_consumed(path_uuid, session_id)
+        session_manager.mark_path_as_consumed(path_uuid, session_id)
         typer.echo(
             json.dumps(
                 {
@@ -841,26 +841,26 @@ def session_start(
         )
         raise typer.Exit(code=0)
 
-    # Validate the path_uuid's status and get mandate_id (using the fork_data_obj from earlier)
-    # fork_data = storage.get_fork_file_and_data(path_uuid, fork_dir_base=forking_path_dir) # Legacy and redundant
+    # Validate the path_uuid's status and get mandate_id (using the path_data_obj from earlier)
+    # path_data = storage.get_path_file_and_data(path_uuid, path_dir_base=narrative_paths_dir) # Legacy and redundant
 
-    # if not fork_data_obj: # Already checked, but being defensive if logic flow changes
+    # if not path_data_obj: # Already checked, but being defensive if logic flow changes
     #     typer.echo(
     #         json.dumps(
     #             {
-    #                 "error": f"Fork UUID {path_uuid} details not found in database (second check). Cannot start session."
+    #                 "error": f"Path UUID {path_uuid} details not found in database (second check). Cannot start session."
     #             },
     #             indent=2,
     #         )
     #     )
     #     raise typer.Exit(code=1)
 
-    fork_status = fork_data_obj.status
-    if fork_status != "QUALIFIED":
+    path_status_val = path_data_obj.status # Renamed to avoid conflict
+    if path_status_val != "QUALIFIED":
         typer.echo(
             json.dumps(
                 {
-                    "error": f"Fork UUID {path_uuid} does not have 'QUALIFIED' status. Current status: '{fork_status}'. Cannot start session.",
+                    "error": f"Path UUID {path_uuid} does not have 'QUALIFIED' status. Current status: '{path_status_val}'. Cannot start session.",
                     "path_uuid": path_uuid,
                 },
                 indent=2,
@@ -868,12 +868,12 @@ def session_start(
         )
         raise typer.Exit(code=1)
 
-    mandate_id = fork_data_obj.mandate_id
+    mandate_id = path_data_obj.mandate_id
     if not mandate_id:
         typer.echo(
             json.dumps(
                 {
-                    "error": f"Fork UUID {path_uuid} is 'QUALIFIED' but does not have an associated mandate_id. This indicates an inconsistency.",
+                    "error": f"Path UUID {path_uuid} is 'QUALIFIED' but does not have an associated mandate_id. This indicates an inconsistency.",
                     "path_uuid": path_uuid,
                 },
                 indent=2,
@@ -881,27 +881,27 @@ def session_start(
         )
         raise typer.Exit(code=1)
 
-    # Verify that the derived position matches the fork's actual position (already have position from fork_data_obj)
-    # fork_actual_position = fork_data_obj.position # This is an int
-    # The 'position' variable was derived from fork_data_obj.position earlier.
-    # No need for this redundant check as 'position' var is directly from fork_data_obj.position.
+    # Verify that the derived position matches the path's actual position (already have position from path_data_obj)
+    # path_actual_position = path_data_obj.position # This is an int
+    # The 'position' variable was derived from path_data_obj.position earlier.
+    # No need for this redundant check as 'position' var is directly from path_data_obj.position.
     # try:
-    #     if fork_actual_position is not None and int(fork_actual_position) != position:
+    #     if path_actual_position is not None and int(path_actual_position) != position:
     #         typer.echo(
     #             json.dumps(
     #                 {
-    #                     "error": f"Derived position {position} does not match the fork's actual position {fork_actual_position}.",
+    #                     "error": f"Derived position {position} does not match the path's actual position {path_actual_position}.",
     #                     "path_uuid": path_uuid,
     #                 },
     #                 indent=2,
     #             )
     #         )
     #         raise typer.Exit(code=1)
-    # except ValueError: # Should not happen as fork_data_obj.position is int
+    # except ValueError: # Should not happen as path_data_obj.position is int
     #     typer.echo(
     #         json.dumps(
     #             {
-    #                 "error": f"Fork's actual position '{fork_actual_position}' is not a valid number.",
+    #                 "error": f"Path's actual position '{path_actual_position}' is not a valid number.",
     #                 "path_uuid": path_uuid,
     #             },
     #             indent=2,
@@ -916,10 +916,10 @@ def session_start(
     # Create the session and get the dossier (SC.9)
     try:
         session_info = session_manager.create_session(
-            fork_n_uuid=path_uuid,
-            position_n=position,  # This is N, the position of the qualified fork
+            path_n_uuid=path_uuid,
+            position_n=position,  # This is N, the position of the qualified path
             mandate_id=mandate_id,  # Pass the validated mandate_id
-            forking_path_dir=forking_path_dir,
+            narrative_paths_dir=narrative_paths_dir,
             ratings_dir=ratings_dir,
             canonical_path_file=canonical_path_file,
         )
@@ -945,7 +945,7 @@ def run_temporal_cascade(
     start_position: int,
     max_positions_to_consolidate: int,  # Similar to consolidate_book
     canonical_path_file: Path,
-    # forking_path_dir: Path, # No longer needed by DB-centric ratings.get_ranking
+    # narrative_paths_dir: Path, # No longer needed by DB-centric ratings.get_ranking
     # ratings_dir: Path, # No longer needed by DB-centric ratings.get_ranking
     typer_echo: callable,  # Pass typer.echo for output
 ):
@@ -957,15 +957,15 @@ def run_temporal_cascade(
 
     # from . import graph_logic # graph_logic might still use paths if called elsewhere,
     # but not directly by get_ranking path.
-    # For is_narrative_consistent, it likely still needs forking_path_dir.
+    # For is_narrative_consistent, it likely still needs narrative_paths_dir.
     # This needs to be passed if that check is to be kept.
     # For now, let's assume the primary issue is get_ranking.
     # If graph_logic.is_narrative_consistent is essential and uses paths,
-    # then forking_path_dir would need to be passed to run_temporal_cascade for that specific call.
+    # then narrative_paths_dir would need to be passed to run_temporal_cascade for that specific call.
     # Let's temporarily comment out the consistency check to isolate the get_ranking issue.
     # TODO: Re-evaluate if graph_logic.is_narrative_consistent is needed here and how to handle its path dependency.
     # from . import graph_logic
-    # if not graph_logic.is_narrative_consistent(forking_path_dir): # This would need forking_path_dir
+    # if not graph_logic.is_narrative_consistent(narrative_paths_dir): # This would need narrative_paths_dir
     #     typer_echo("Error: narrative graph contains cycles. Abort cascade.", err=True)
     #     return False
 
@@ -1007,11 +1007,11 @@ def run_temporal_cascade(
         if current_pos_idx == 0:
             predecessor_hronir_uuid_for_ranking = None
         else:
-            # Get the hrönir_uuid from the *just determined* canonical fork of the previous position
+            # Get the hrönir_uuid from the *just determined* canonical path of the previous position
             prev_pos_canonical_info = canonical_path_data["path"].get(str(current_pos_idx - 1))
             if not prev_pos_canonical_info or "hrönir_uuid" not in prev_pos_canonical_info:
                 typer_echo(
-                    f"Cascade broken: Canonical fork for position {current_pos_idx - 1} not found during cascade. Stopping."
+                    f"Cascade broken: Canonical path for position {current_pos_idx - 1} not found during cascade. Stopping."
                 )
                 # All subsequent positions are effectively removed from canonical path
                 keys_to_remove = [
@@ -1037,7 +1037,7 @@ def run_temporal_cascade(
             ranking_df = ratings.get_ranking(
                 position=current_pos_idx,
                 predecessor_hronir_uuid=predecessor_hronir_uuid_for_ranking,
-                # forking_path_dir and ratings_dir are no longer needed
+                # narrative_paths_dir and ratings_dir are no longer needed
                 session=db_session_for_cascade,
             )
         finally:
@@ -1045,7 +1045,7 @@ def run_temporal_cascade(
 
         if ranking_df.empty:
             typer_echo(
-                f"Cascade: No ranking found for eligible forks at position {current_pos_idx}. Path ends here."
+                f"Cascade: No ranking found for eligible paths at position {current_pos_idx}. Path ends here."
             )
             # If this position previously had a canonical entry, it's now removed implicitly by the clearing step
             # or explicitly if loop breaks and removes subsequent entries.
@@ -1076,7 +1076,7 @@ def run_temporal_cascade(
         # Since we cleared, any new entry is a change or reinstatement.
         canonical_path_data["path"][position_str] = new_entry_for_path
         typer_echo(
-            f"Cascade: Position {current_pos_idx}: Set fork {champion_path_uuid[:8]} (hrönir: {champion_hronir_uuid[:8]}, Elo: {champion_elo}) as canonical."
+            f"Cascade: Position {current_pos_idx}: Set path {champion_path_uuid[:8]} (hrönir: {champion_hronir_uuid[:8]}, Elo: {champion_elo}) as canonical."
         )
         updated_any_position_in_cascade = True
 
@@ -1121,9 +1121,9 @@ def session_commit(
     ratings_dir: Annotated[
         Path, typer.Option(help="Directory containing rating CSV files.")
     ] = Path("ratings"),  # Retained for run_temporal_cascade
-    forking_path_dir: Annotated[
-        Path, typer.Option(help="Directory containing forking path CSV files.")
-    ] = Path("the_garden"),  # Retained for _get_successor_hronir_for_fork and cascade
+    narrative_paths_dir: Annotated[
+        Path, typer.Option(help="Directory containing narrative path CSV files.")
+    ] = Path("narrative_paths"),  # Retained for _get_successor_hronir_for_path and cascade
     canonical_path_file: Annotated[
         Path, typer.Option(help="Path to the canonical path JSON file.")
     ] = Path("data/canonical_path.json"),  # Retained for run_temporal_cascade
@@ -1142,13 +1142,13 @@ def session_commit(
         `path_uuid` chosen as the winner for that position's duel.
     3.  Validating each submitted verdict:
         - Ensures the position exists in the session's dossier.
-        - Confirms the chosen winning `path_uuid` was one of the two forks presented
+        - Confirms the chosen winning `path_uuid` was one of the two paths presented
           in the dossier for that position (Sovereignty of Curadoria, SC.10).
     4.  Preparing a list of valid votes, mapping winning/losing `path_uuid`s to their
         respective successor `hrönir_uuid`s (needed for `ratings.record_vote`).
     5.  Invoking `transaction_manager.record_transaction` to:
         - Record all valid votes.
-        - Check for any forks that become `QUALIFIED` as a result of these votes
+        - Check for any paths that become `QUALIFIED` as a result of these votes
           and update their status/mandate_id.
         - Create an immutable transaction block in the `data/transactions/` ledger (SYS.1),
           linking it to the previous transaction.
@@ -1158,7 +1158,7 @@ def session_commit(
         recalculates the canonical path.
     8.  Updating the session's status to `committed`.
 
-    The `ratings_dir`, `forking_path_dir`, and `canonical_path_file` options are
+    The `ratings_dir`, `narrative_paths_dir`, and `canonical_path_file` options are
     primarily used by the `transaction_manager` and subsequent `run_temporal_cascade`
     functions, not directly for parsing verdicts in this command's immediate scope.
     """
@@ -1256,32 +1256,32 @@ def session_commit(
             )
             continue
 
-        fork_a = duel_for_pos["fork_A"]
-        fork_b = duel_for_pos["fork_B"]
+        path_a = duel_for_pos["path_A"] # Changed from fork_A
+        path_b = duel_for_pos["path_B"] # Changed from fork_B
 
-        if winning_path_uuid_verdict not in [fork_a, fork_b]:
+        if winning_path_uuid_verdict not in [path_a, path_b]:
             typer.echo(
                 json.dumps(
                     {
-                        "warning": f"Verdict for position {pos_str}: winning fork {winning_path_uuid_verdict[:8]} is not part of the original duel ({fork_a[:8]} vs {fork_b[:8]}). Skipping.",
+                        "warning": f"Verdict for position {pos_str}: winning path {winning_path_uuid_verdict[:8]} is not part of the original duel ({path_a[:8]} vs {path_b[:8]}). Skipping.",
                     },
                     indent=2,
                 )
             )
             continue
 
-        loser_path_uuid_verdict = fork_a if winning_path_uuid_verdict == fork_b else fork_b
+        loser_path_uuid_verdict = path_a if winning_path_uuid_verdict == path_b else path_b
 
-        # Map fork UUIDs to their successor hrönir UUIDs for voting
-        # _get_successor_hronir_for_fork is defined in cli.py
-        winner_hronir_uuid = _get_successor_hronir_for_fork(winning_path_uuid_verdict)
-        loser_hronir_uuid = _get_successor_hronir_for_fork(loser_path_uuid_verdict)
+        # Map path UUIDs to their successor hrönir UUIDs for voting
+        # _get_successor_hronir_for_path is defined in cli.py
+        winner_hronir_uuid = _get_successor_hronir_for_path(winning_path_uuid_verdict)
+        loser_hronir_uuid = _get_successor_hronir_for_path(loser_path_uuid_verdict)
 
         if not winner_hronir_uuid or not loser_hronir_uuid:
             typer.echo(
                 json.dumps(
                     {
-                        "error": f"Could not map one or both duel forks for position {pos_str} to their successor hrönir_uuids. "
+                        "error": f"Could not map one or both duel paths for position {pos_str} to their successor hrönir_uuids. "
                         f"Winner: {winning_path_uuid_verdict[:8]} -> {winner_hronir_uuid[:8] if winner_hronir_uuid else 'Not Found'}, "
                         f"Loser: {loser_path_uuid_verdict[:8]} -> {loser_hronir_uuid[:8] if loser_hronir_uuid else 'Not Found'}. "
                         "Aborting commit.",
@@ -1295,7 +1295,7 @@ def session_commit(
         valid_votes_to_record.append(
             {
                 "position": position_idx,
-                "voter": initiating_path_uuid,  # The fork that started the session is the voter
+                "voter": initiating_path_uuid,  # The path that started the session is the voter
                 "winner_hronir": winner_hronir_uuid,
                 "loser_hronir": loser_hronir_uuid,
             }
@@ -1350,7 +1350,7 @@ def session_commit(
     try:
         transaction_result = transaction_manager.record_transaction(
             session_id=session_id,
-            initiating_path_uuid=initiating_path_uuid,  # Fork whose mandate is used
+            initiating_path_uuid=initiating_path_uuid,  # Path whose mandate is used
             session_verdicts=session_verdicts_for_tm,
         )
         typer.echo(
@@ -1377,21 +1377,21 @@ def session_commit(
 
     # Update the status of the initiating_path_uuid to "SPENT"
     # The mandate_id was implicitly "spent" by starting the session and consuming the path_uuid.
-    # Now we mark the fork itself as SPENT.
+    # Now we mark the path itself as SPENT.
     try:
-        update_spent_success = storage.update_fork_status(
+        update_spent_success = storage.update_path_status(
             path_uuid_to_update=initiating_path_uuid,
             new_status="SPENT",
             mandate_id=session_data.get(
                 "mandate_id"
             ),  # Pass mandate_id for completeness, though not strictly needed for 'SPENT'
-            # fork_dir_base is no longer needed by storage.update_fork_status
-            # session=None, # Allow update_fork_status to get its own session
+            # path_dir_base is no longer needed by storage.update_path_status
+            # session=None, # Allow update_path_status to get its own session
         )
         if update_spent_success:
             typer.echo(
                 json.dumps(
-                    {"message": f"Fork {initiating_path_uuid} status updated to SPENT."},
+                    {"message": f"Path {initiating_path_uuid} status updated to SPENT."},
                     indent=2,
                 )
             )
@@ -1399,7 +1399,7 @@ def session_commit(
             typer.echo(
                 json.dumps(
                     {
-                        "warning": f"Could not update status to SPENT for fork {initiating_path_uuid}. Manual check may be needed."
+                        "warning": f"Could not update status to SPENT for path {initiating_path_uuid}. Manual check may be needed."
                     },
                     indent=2,
                 )
@@ -1409,7 +1409,7 @@ def session_commit(
         typer.echo(
             json.dumps(
                 {
-                    "warning": f"Error updating status for fork {initiating_path_uuid} to SPENT: {e}. Manual check may be needed."
+                    "warning": f"Error updating status for path {initiating_path_uuid} to SPENT: {e}. Manual check may be needed."
                 },
                 indent=2,
             )
@@ -1428,7 +1428,7 @@ def session_commit(
                 start_position=tm_oldest_voted_position,
                 max_positions_to_consolidate=max_cascade_positions,
                 canonical_path_file=canonical_path_file,
-                # forking_path_dir and ratings_dir removed as args from run_temporal_cascade
+                # narrative_paths_dir and ratings_dir removed as args from run_temporal_cascade
                 typer_echo=typer.echo,  # Pass the echo function
             )
             if cascade_made_changes:
@@ -1469,32 +1469,32 @@ def session_commit(
     typer.echo(json.dumps({"message": f"Session {session_id} committed successfully."}, indent=2))
 
 
-@app.command("metrics", help="Expose fork status metrics in Prometheus format (TDD 2.6).")
+@app.command("metrics", help="Expose path status metrics in Prometheus format (TDD 2.6).")
 def metrics_command(
-    forking_path_dir: Annotated[
-        Path, typer.Option(help="Directory containing forking path CSV files.")
-    ] = Path("the_garden"),
+    narrative_paths_dir: Annotated[
+        Path, typer.Option(help="Directory containing narrative path CSV files.")
+    ] = Path("narrative_paths"),
 ):
     """
-    Scans all forking_path/*.csv files and prints the total number of forks
+    Scans all narrative_paths/*.csv files and prints the total number of paths
     in each status (PENDING, QUALIFIED, SPENT) in Prometheus exposition format.
     """
-    status_counts = _calculate_status_counts(forking_path_dir)
-    if not forking_path_dir.is_dir():
+    status_counts = _calculate_status_counts(narrative_paths_dir)
+    if not narrative_paths_dir.is_dir():
         typer.echo(
-            f"# Metrics generation skipped: Directory not found: {forking_path_dir}",
+            f"# Metrics generation skipped: Directory not found: {narrative_paths_dir}",
             err=True,
         )
         for status_val, count in status_counts.items():
-            typer.echo(f'hronir_fork_status_total{{status="{status_val.lower()}"}} {count}')
+            typer.echo(f'hronir_path_status_total{{status="{status_val.lower()}"}} {count}')
         raise typer.Exit(code=1)
 
     # Print metrics in Prometheus format
-    typer.echo("# HELP hronir_fork_status_total Total number of forks by status.")
-    typer.echo("# TYPE hronir_fork_status_total gauge")
+    typer.echo("# HELP hronir_path_status_total Total number of paths by status.")
+    typer.echo("# TYPE hronir_path_status_total gauge")
     for status_val, count in status_counts.items():
         # Prometheus labels are typically lowercase.
-        typer.echo(f'hronir_fork_status_total{{status="{status_val.lower()}"}} {count}')
+        typer.echo(f'hronir_path_status_total{{status="{status_val.lower()}"}} {count}')
 
 
 if __name__ == "__main__":
