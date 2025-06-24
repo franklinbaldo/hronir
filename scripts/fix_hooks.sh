@@ -1,81 +1,88 @@
 #!/bin/bash
 
-echo "--- Verificando configurações de Git hooks ---"
+echo "--- Verificando configurações de Git hooks (Modificado) ---"
 
-LOCAL_HOOKS_PATH=$(git config core.hooksPath)
-# pre-commit sets core.hooksPath to .git/hooks, so we check against that.
-# However, the actual pre-commit hook script is what matters.
-# The check for `pre-commit install` success is more important.
+# Function to check if a git config is truly set (not empty and not /dev/null)
+is_git_config_set() {
+    local value="$1"
+    if [ -n "$value" ] && [ "$value" != "/dev/null" ]; then
+        return 0 # True, it is set
+    else
+        return 1 # False, it is not set (or is /dev/null)
+    fi
+}
 
 echo ""
 echo "Configuração local de core.hooksPath (git config core.hooksPath):"
-if [ -n "$LOCAL_HOOKS_PATH" ]; then
+LOCAL_HOOKS_PATH=$(git config core.hooksPath)
+
+if is_git_config_set "$LOCAL_HOOKS_PATH"; then
     echo "  Definido como: $LOCAL_HOOKS_PATH"
-    # pre-commit versions >= 2.0.0 set core.hooksPath = .git/hooks
-    # and then pre-commit manages the actual .git/hooks/pre-commit script.
-    # If it's set to something else, it's a definite conflict.
     if [ "$LOCAL_HOOKS_PATH" != ".git/hooks" ]; then
         echo "  AVISO: core.hooksPath local está definido para um caminho não padrão ('$LOCAL_HOOKS_PATH')."
-        echo "  Isso VAI conflitar com 'pre-commit install'."
-        echo "  'pre-commit install' tentará definir core.hooksPath para '.git/hooks'."
-        read -p "  Deseja remover a configuração local de core.hooksPath (git config --unset core.hooksPath)? (s/N): " answer
-        if [[ "$answer" =~ ^[Ss]$ ]]; then
-            echo "  Removendo core.hooksPath local..."
-            git config --unset core.hooksPath
-            if [ $? -eq 0 ]; then
-                 echo "  core.hooksPath local removido com sucesso."
-            else
-                 echo "  FALHA ao remover core.hooksPath local. Por favor, verifique manualmente."
-            fi
+        echo "  Isso PODE conflitar com 'uv run pre-commit install'."
+        echo "  'uv run pre-commit install' tentará definir core.hooksPath para '.git/hooks' ou pode falhar se já estiver definido incorretamente."
+
+        echo "  Tentando remover a configuração local de core.hooksPath (git config --unset-all core.hooksPath)..."
+        git config --unset-all core.hooksPath
+        if [ $? -eq 0 ]; then
+            echo "  core.hooksPath local removido com sucesso."
+            LOCAL_HOOKS_PATH=$(git config core.hooksPath) # Re-fetch
         else
-            echo "  Mantendo core.hooksPath local. 'pre-commit install' provavelmente falhará ou não terá efeito."
+            echo "  FALHA ao remover core.hooksPath local. Por favor, verifique manualmente."
         fi
     else
-        echo "  Está configurado para '.git/hooks'. Isso é o esperado se pre-commit já foi instalado."
+        echo "  Está configurado para '.git/hooks'. Isso é o esperado se pre-commit já foi instalado e está funcionando."
     fi
 else
-    echo "  Não está definido localmente. 'pre-commit install' poderá configurá-lo."
+    echo "  Não está definido localmente (ou é /dev/null). 'uv run pre-commit install' poderá configurá-lo."
 fi
 
 echo ""
 echo "Verificando configuração global de core.hooksPath (git config --global core.hooksPath)..."
-GLOBAL_HOOKS_PATH=$(git config --global core.hooksPath 2>/dev/null) # 2>/dev/null to suppress error if not set
-if [ -n "$GLOBAL_HOOKS_PATH" ]; then
+GLOBAL_HOOKS_PATH=$(git config --global core.hooksPath 2>/dev/null)
+if is_git_config_set "$GLOBAL_HOOKS_PATH"; then
     echo "  Definido globalmente como: $GLOBAL_HOOKS_PATH"
-    echo "  AVISO: Uma configuração global de core.hooksPath pode, às vezes, substituir ou"
-    echo "  interferir na configuração que o 'pre-commit install' tenta aplicar localmente."
-    echo "  Se 'pre-commit install' falhar ou os hooks não executarem, considere"
-    echo "  remover a configuração global com: 'git config --global --unset core.hooksPath'"
-    echo "  ou garantir que ela não impeça o pre-commit de funcionar neste repositório."
+    echo "  AVISO: Uma configuração global de core.hooksPath pode interferir."
 else
-    echo "  Não está definido globalmente. Isso geralmente é bom para o pre-commit operar localmente."
+    echo "  Não está definido globalmente (ou é /dev/null). Isso geralmente é bom."
 fi
 
 echo ""
-echo "--- Tentando instalar/reinstalar pre-commit hooks ---"
-if command -v pre-commit &> /dev/null; then
-    echo "Executando 'pre-commit install'..."
-    pre-commit install
-    if [ $? -eq 0 ]; then
-        echo "  'pre-commit install' executado com sucesso."
-        echo "  Verifique se o arquivo .git/hooks/pre-commit existe e é um script do pre-commit."
-        echo "  A configuração local de core.hooksPath deve ser agora '.git/hooks'."
+echo "--- Tentando instalar/reinstalar pre-commit hooks usando 'uv run' ---"
+if command -v uv &> /dev/null; then
+    echo "Executando 'uv run pre-commit install'..."
+    uv run pre-commit install
+    INSTALL_STATUS=$?
+    if [ $INSTALL_STATUS -eq 0 ]; then
+        echo "  'uv run pre-commit install' executado com sucesso."
         NEW_LOCAL_HOOKS_PATH=$(git config core.hooksPath)
         echo "  Valor atual de core.hooksPath local: '$NEW_LOCAL_HOOKS_PATH'"
 
+        # Check if hooks were actually installed
+        if [ -f ".git/hooks/pre-commit" ] && grep -q "Generated by pre-commit" ".git/hooks/pre-commit"; then
+            echo "  Script .git/hooks/pre-commit encontrado e parece ser gerenciado pelo pre-commit."
+            if [ "$NEW_LOCAL_HOOKS_PATH" == ".git/hooks" ] || (! is_git_config_set "$NEW_LOCAL_HOOKS_PATH"); then
+                 echo "  Configuração de core.hooksPath está consistente com a instalação do pre-commit."
+                 echo "  RESOLVIDO: Pre-commit hooks parecem estar instalados corretamente."
+            else
+                 echo "  AVISO: core.hooksPath é '$NEW_LOCAL_HOOKS_PATH', mas esperava-se '.git/hooks' ou não definido."
+                 echo "  Pode ainda haver um problema de configuração, mas os hooks podem funcionar."
+            fi
+        else
+            echo "  ERRO: .git/hooks/pre-commit não encontrado ou não gerenciado pelo pre-commit."
+            echo "  FALHA NA RESOLUÇÃO: Pre-commit hooks não parecem estar instalados corretamente."
+        fi
     else
-        echo "  FALHA ao executar 'pre-commit install'. Verifique as mensagens de erro."
-        echo "  Causas comuns incluem permissões ou um estado inconsistente do repositório Git."
+        echo "  FALHA ao executar 'uv run pre-commit install' (código de saída: $INSTALL_STATUS). Verifique as mensagens de erro."
+        echo "  A mensagem de erro comum é '[ERROR] Cowardly refusing to install hooks with core.hooksPath set.'"
+        echo "  Se isso ocorrer, o problema de detecção de core.hooksPath pelo pre-commit persiste."
+        echo "  FALHA NA RESOLUÇÃO: Pre-commit hooks não puderam ser instalados."
     fi
 else
-    echo "ERRO: Comando 'pre-commit' não encontrado."
-    echo "Por favor, instale pre-commit primeiro (ex: pip install pre-commit ou uv pip install pre-commit)"
-    echo "e certifique-se de que está no seu PATH."
+    echo "ERRO: Comando 'uv' não encontrado. O ambiente não está configurado como esperado."
+    echo "  FALHA NA RESOLUÇÃO: Ambiente não suporta 'uv run'."
 fi
 
 echo ""
-echo "--- Verificação de hooks concluída ---"
-echo "Se os hooks não estiverem funcionando, verifique:"
-echo "1. Se '.git/hooks/pre-commit' é um script gerenciado pelo pre-commit."
-echo "2. Se 'git config core.hooksPath' está apontando para '.git/hooks'."
-echo "3. Se não há configurações globais de Git interferindo."
+echo "--- Verificação de hooks concluída (Modificado) ---"

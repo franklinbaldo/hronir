@@ -121,10 +121,11 @@ class TestProtocolV2(unittest.TestCase):
         # storage.data_manager._initialized = False
 
     def _create_fork_entry(
-        self, creator_id: str, position: int, prev_uuid: str | None, current_hrönir_uuid: str
+        self, position: int, prev_uuid: str | None, current_hrönir_uuid: str
     ) -> str:
         """Helper to create a fork entry CSV and return the fork_uuid."""
-        _ = self.forking_path_dir / f"fp_{creator_id}.csv"
+        # The line below, related to creator_id specific CSVs, is removed as creator_id is being phased out.
+        # _ = self.forking_path_dir / f"fp_{creator_id}.csv"
         # storage.append_fork expects uuid_str for the current chapter, not fork_uuid
         # The csv_file parameter was removed from storage.append_fork
         fork_uuid = storage.append_fork(
@@ -164,7 +165,7 @@ class TestProtocolV2(unittest.TestCase):
         """
         num_sybil_forks = 50  # Reduced from 100 for test speed
         sybil_fork_uuids = []
-        creator_file_id = "sybil_creator"
+        # creator_file_id = "sybil_creator" # Unused variable removed
 
         # Create a common predecessor for all sybil forks at position 1
         # Position 0's canonical chapter
@@ -174,17 +175,14 @@ class TestProtocolV2(unittest.TestCase):
         # Create one canonical fork at pos 0 to serve as predecessor for pos 1 forks
         # This isn't strictly necessary for testing session start with PENDING sybils,
         # but sets up a more realistic scenario if we were to simulate duels.
-        self._create_fork_entry(
-            "canon_creator_pos0", 0, pos0_prev_hrönir_uuid, pos0_canonical_hrönir_uuid
-        )
+        self._create_fork_entry(0, pos0_prev_hrönir_uuid, pos0_canonical_hrönir_uuid)
         # For this test, we don't qualify it, just need it to exist.
 
         for i in range(num_sybil_forks):
             sybil_hrönir_uuid = _create_dummy_chapter(self.library_path, f"sybil_ch_pos1_{i}")
             # These Sybils are at position 1, forking from the same (dummy) canonical chapter at pos 0
             fork_uuid = self._create_fork_entry(
-                creator_id=f"{creator_file_id}_{i}",  # Each fork in its own CSV to simulate different creators
-                position=1,
+                position=1,  # creator_id was f"{creator_file_id}_{i}"
                 prev_uuid=pos0_canonical_hrönir_uuid,
                 current_hrönir_uuid=sybil_hrönir_uuid,
             )
@@ -252,7 +250,7 @@ class TestProtocolV2(unittest.TestCase):
         - Assert: A unique and deterministic mandate_id is associated.
         """
         # 1. Setup: Create chapters and initial fork entries
-        creator_fgood_id = "creator_fgood"
+        # creator_fgood_id = "creator_fgood" # Unused variable removed
         pos0_hrönir_A = _create_dummy_chapter(
             self.library_path, "pos0_chA_promo"
         )  # Common predecessor for pos 1 forks
@@ -261,9 +259,13 @@ class TestProtocolV2(unittest.TestCase):
         fother_hrönir = _create_dummy_chapter(self.library_path, "fother_ch_pos1")
 
         # F_good at position 1
-        fgood_fork_uuid = self._create_fork_entry(creator_fgood_id, 1, pos0_hrönir_A, fgood_hrönir)
+        fgood_fork_uuid = self._create_fork_entry(
+            1, pos0_hrönir_A, fgood_hrönir
+        )  # creator_id was creator_fgood_id
         # Another fork at position 1 to vote against
-        self._create_fork_entry("creator_other_promo", 1, pos0_hrönir_A, fother_hrönir)
+        self._create_fork_entry(
+            1, pos0_hrönir_A, fother_hrönir
+        )  # creator_id was "creator_other_promo"
 
         # Ensure F_good starts as PENDING
         # fgood_initial_data = storage.get_fork_file_and_data(fgood_fork_uuid, self.forking_path_dir)
@@ -313,8 +315,7 @@ class TestProtocolV2(unittest.TestCase):
             dummy_loser_hrönir = _create_dummy_chapter(self.library_path, f"dummy_loser_promo_{i}")
             # Also create a fork entry for this dummy loser so it's recognized in the rating segment.
             self._create_fork_entry(
-                creator_id=f"dummy_loser_creator_{i}",  # Unique creator ID for the dummy fork
-                position=1,
+                position=1,  # creator_id was f"dummy_loser_creator_{i}"
                 prev_uuid=pos0_hrönir_A,  # Same predecessor as fgood_hrönir
                 current_hrönir_uuid=dummy_loser_hrönir,
             )
@@ -392,14 +393,16 @@ class TestProtocolV2(unittest.TestCase):
         - Also check: `is_fork_consumed` by session_manager after first session start.
         """
         # 1. Qualify a fork (similar to previous test)
-        creator_id = "creator_double_spend"
+        # creator_id = "creator_double_spend" # Unused variable removed
         pos0_hrönir_pred = _create_dummy_chapter(self.library_path, "pos0_chDS_pred")
 
         fork_to_spend_hrönir = _create_dummy_chapter(self.library_path, "ch_to_spend_pos1")
         _ = _create_dummy_chapter(self.library_path, "ch_other_ds_pos1")
 
         fork_to_spend_uuid = self._create_fork_entry(
-            creator_id, 1, pos0_hrönir_pred, fork_to_spend_hrönir
+            1,
+            pos0_hrönir_pred,
+            fork_to_spend_hrönir,  # creator_id was creator_id ("creator_double_spend")
         )
 
         # Votes to qualify fork_to_spend_uuid
@@ -408,8 +411,7 @@ class TestProtocolV2(unittest.TestCase):
             dummy_loser_hrönir_ds = _create_dummy_chapter(self.library_path, f"dummy_loser_ds_{i}")
             # Create a fork for the dummy loser
             self._create_fork_entry(
-                creator_id=f"dummy_loser_ds_creator_{i}",
-                position=1,
+                position=1,  # creator_id was f"dummy_loser_ds_creator_{i}"
                 prev_uuid=pos0_hrönir_pred,  # Same predecessor as fork_to_spend_hrönir
                 current_hrönir_uuid=dummy_loser_hrönir_ds,
             )
@@ -448,8 +450,8 @@ class TestProtocolV2(unittest.TestCase):
         # Let's create two forks at position 0 for the dossier.
         p0_duel_chA = _create_dummy_chapter(self.library_path, "p0_duelA_ds")
         p0_duel_chB = _create_dummy_chapter(self.library_path, "p0_duelB_ds")
-        self._create_fork_entry("p0_creatorA_ds", 0, None, p0_duel_chA)
-        self._create_fork_entry("p0_creatorB_ds", 0, None, p0_duel_chB)
+        self._create_fork_entry(0, None, p0_duel_chA)  # creator_id was "p0_creatorA_ds"
+        self._create_fork_entry(0, None, p0_duel_chB)  # creator_id was "p0_creatorB_ds"
 
         # Create canonical path file for session start to read (even if empty for pos 0)
         self.canonical_path_file.write_text(
@@ -565,18 +567,24 @@ class TestProtocolV2(unittest.TestCase):
         p0_ch_A = _create_dummy_chapter(self.library_path, "p0_cascade_A")
         p0_ch_B = _create_dummy_chapter(self.library_path, "p0_cascade_B")
         p0_fork_A_uuid = self._create_fork_entry(
-            "creatorP0A_cascade", 0, None, p0_ch_A
+            0,
+            None,
+            p0_ch_A,  # creator_id was "creatorP0A_cascade"
         )  # Initial canon for P0
-        p0_fork_B_uuid = self._create_fork_entry("creatorP0B_cascade", 0, None, p0_ch_B)
+        p0_fork_B_uuid = self._create_fork_entry(
+            0, None, p0_ch_B
+        )  # creator_id was "creatorP0B_cascade"
 
         # Position 1: Two forks, F1_X (initial canon from F0_A), F1_Y (from F0_A)
         p1_ch_X = _create_dummy_chapter(self.library_path, "p1_cascade_X")
         p1_ch_Y = _create_dummy_chapter(self.library_path, "p1_cascade_Y")
         # Both fork from p0_ch_A (successor of F0_A)
         p1_fork_X_uuid = self._create_fork_entry(
-            "creatorP1X_cascade", 1, p0_ch_A, p1_ch_X
+            1,
+            p0_ch_A,
+            p1_ch_X,  # creator_id was "creatorP1X_cascade"
         )  # Initial canon for P1
-        self._create_fork_entry("creatorP1Y_cascade", 1, p0_ch_A, p1_ch_Y)
+        self._create_fork_entry(1, p0_ch_A, p1_ch_Y)  # creator_id was "creatorP1Y_cascade"
 
         # Initial canonical path: P0 -> F0_A (p0_ch_A), P1 -> F1_X (p1_ch_X)
         initial_canon_data = {
@@ -596,7 +604,9 @@ class TestProtocolV2(unittest.TestCase):
         _ = _create_dummy_chapter(self.library_path, "qf_other_cascade_ch")
 
         qf_uuid = self._create_fork_entry(
-            "creatorQF_cascade", qualifying_fork_pos, p1_ch_X, qf_hrönir
+            qualifying_fork_pos,
+            p1_ch_X,
+            qf_hrönir,  # creator_id was "creatorQF_cascade"
         )
 
         votes_for_qf_qualification = []
@@ -604,8 +614,7 @@ class TestProtocolV2(unittest.TestCase):
             dummy_loser_qf = _create_dummy_chapter(self.library_path, f"dummy_loser_qf_{i}")
             # Create a fork for the dummy loser
             self._create_fork_entry(
-                creator_id=f"dummy_loser_qf_creator_{i}",
-                position=qualifying_fork_pos,
+                position=qualifying_fork_pos,  # creator_id was f"dummy_loser_qf_creator_{i}"
                 prev_uuid=p1_ch_X,  # Same predecessor as qf_hrönir
                 current_hrönir_uuid=dummy_loser_qf,
             )
@@ -697,7 +706,7 @@ class TestProtocolV2(unittest.TestCase):
         # So, the canonical path should end at position 0 if no forks exist from p0_ch_B at position 1.
         # Let's create one such fork to see if cascade picks it up.
         p1_ch_Z_from_B = _create_dummy_chapter(self.library_path, "p1_cascade_Z_from_B")
-        self._create_fork_entry("creatorP1Z_cascade", 1, p0_ch_B, p1_ch_Z_from_B)
+        self._create_fork_entry(1, p0_ch_B, p1_ch_Z_from_B)  # creator_id was "creatorP1Z_cascade"
 
         # Re-run the commit and cascade logic by calling the commit again.
         # This is a bit of a hack for testing; ideally, the test setup has all forks from the start.

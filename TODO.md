@@ -49,18 +49,18 @@ This document outlines the development roadmap for the **Hrönir Encyclopedia** 
 - [ ] **System Status Command**: `hronir status` to show current canonical path and system state
 
 ### Phase 6 — Architectural Cleanup 🔧
-- [ ] **Remove Creator Attribution**: Eliminate `creator_id` from forking path structure (pure meritocracy)
+- [x] **Remove Creator Attribution**: Eliminate `creator_id` from forking path structure (pure meritocracy) ✅ COMPLETED
 - [ ] **Fix CLI Parameter Mismatches**: `get_ranking()` function signature vs CLI usage
 - [ ] **Empty CSV Handling**: Graceful handling of empty CSV files in database loading
 - [ ] **Storage Parameter Cleanup**: Remove outdated `--prev` parameter from store command ✅ COMPLETED
-- [ ] **Anonymous Forking**: Ensure all fork creation is content-based, not author-based
+- [x] **Anonymous Forking**: Ensure all fork creation is content-based, not author-based ✅ COMPLETED
 
 ### Phase 7 — Documentation & UX 🎯
-- [ ] **Fix Documentation Confusion**: Remove all `--prev` parameter references from documentation
+- [x] **Fix Documentation Confusion**: Remove all `--prev` parameter references from documentation ✅ COMPLETED
 - [ ] **Update Fork Examples**: Replace confusing hrönir/fork terminology with clear source → target examples
 - [ ] **Node/Edge Distinction**: Clarify hrönirs (nodes) vs forking_paths (edges) in docs
 - [ ] **Complete Workflow Guide**: "Store → Fork → Vote" tutorial with clean CLI examples
-- [ ] **Remove Creator Attribution**: Eliminate all references to creator/author tracking (pure meritocracy)
+- [x] **Remove Creator Attribution**: Eliminate all references to creator/author tracking (pure meritocracy) ✅ COMPLETED
 - [ ] **CLI Reference**: Complete command reference with new `--source` `--target` parameters
 - [ ] **Architecture Overview**: Visual diagram of hybrid storage system
 

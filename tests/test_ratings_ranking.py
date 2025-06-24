@@ -3,6 +3,41 @@ from pathlib import Path  # Necessário para Path operations
 import pandas as pd  # Necessário para criar DataFrames para CSVs
 
 from hronir_encyclopedia import ratings
+from hronir_encyclopedia import storage # Added for DataManager
+
+# Helper function to manage DataManager and call get_ranking
+# This is identical to the one in test_ranking_filtering.py
+# Consider moving to a conftest.py if used by more test files.
+def _call_get_ranking_with_setup(position, predecessor_hronir_uuid, forking_dir, ratings_dir):
+    original_fork_csv_dir = storage.data_manager.fork_csv_dir
+    original_ratings_csv_dir = storage.data_manager.ratings_csv_dir
+    original_initialized = storage.data_manager._initialized
+    db_cleared_by_this_run = False
+
+    try:
+        storage.data_manager.fork_csv_dir = forking_dir
+        storage.data_manager.ratings_csv_dir = ratings_dir
+        storage.data_manager._initialized = False
+        storage.data_manager.clear_in_memory_data()
+        db_cleared_by_this_run = True
+        storage.data_manager.initialize_and_load(clear_existing_data=False)
+
+        db_session = storage.get_db_session()
+        try:
+            df = ratings.get_ranking(
+                position=position,
+                predecessor_hronir_uuid=predecessor_hronir_uuid,
+                session=db_session
+            )
+        finally:
+            db_session.close()
+        return df
+    finally:
+        storage.data_manager.fork_csv_dir = original_fork_csv_dir
+        storage.data_manager.ratings_csv_dir = original_ratings_csv_dir
+        storage.data_manager._initialized = original_initialized
+        if db_cleared_by_this_run and storage.data_manager._initialized:
+             storage.data_manager.clear_in_memory_data()
 
 # Definir UUIDs de teste de forma consistente
 UUID_A = "hr-a"
@@ -38,11 +73,11 @@ def test_get_ranking(tmp_path: Path):
     )  # Use renamed var
 
     # Chamar ratings.get_ranking com os novos parâmetros
-    df = ratings.get_ranking(
+    df = _call_get_ranking_with_setup(
         position=1,
-        predecessor_hronir_uuid=PREDECESSOR_POS1,  # Updated
-        forking_path_dir=forking_path_dir,
-        ratings_dir=ratings_dir_test_var,  # Updated and use renamed var
+        predecessor_hronir_uuid=PREDECESSOR_POS1,
+        forking_dir=forking_path_dir,
+        ratings_dir=ratings_dir_test_var,
     )
 
     # As asserções originais sobre Elos, vitórias e derrotas devem continuar válidas
