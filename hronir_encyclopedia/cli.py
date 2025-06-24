@@ -351,10 +351,7 @@ def ranking(
                         "hrönir_uuid"
                     ]
 
-    forking_path_dir = Path("forking_path")
-    ranking_data = ratings.get_ranking(
-        position, predecessor_hronir_uuid, forking_path_dir, ratings_dir
-    )
+    ranking_data = ratings.get_ranking(position, predecessor_hronir_uuid)
     if ranking_data.empty:
         typer.echo(f"No ranking data found for position {position}.")
     else:
