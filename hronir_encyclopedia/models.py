@@ -12,8 +12,8 @@ class Vote(BaseModel):
     loser: str
 
 
-class Fork(BaseModel):
-    fork_uuid: UUID5
+class Path(BaseModel):
+    path_uuid: UUID5
     position: int
     prev_uuid: UUID5 | None = None
     uuid: UUID5

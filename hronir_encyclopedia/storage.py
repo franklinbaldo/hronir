@@ -2,7 +2,7 @@ import shutil
 import uuid
 from pathlib import Path
 
-from .models import Fork, Transaction, Vote
+from .models import Path as PathModel, Transaction, Vote
 from .pandas_data_manager import PandasDataManager
 
 UUID_NAMESPACE = uuid.NAMESPACE_URL
@@ -21,7 +21,7 @@ class DataManager:
 
     def __init__(
         self,
-        fork_csv_dir="the_garden",
+        path_csv_dir="narrative_paths",
         ratings_csv_dir="ratings",
         transactions_json_dir="data/transactions",
     ):
@@ -29,7 +29,7 @@ class DataManager:
             return
 
         self.pandas_manager = PandasDataManager(
-            fork_csv_dir=fork_csv_dir,
+            path_csv_dir=path_csv_dir,
             ratings_csv_dir=ratings_csv_dir,
             transactions_json_dir=transactions_json_dir
         )
@@ -45,7 +45,7 @@ class DataManager:
 
     def clear_in_memory_data(self):
         """Clear all in-memory data."""
-        self.pandas_manager._forks_df = None
+        self.pandas_manager._paths_df = None
         self.pandas_manager._votes_df = None
         self.pandas_manager._transactions = {}
 
@@ -53,34 +53,34 @@ class DataManager:
         """Save all data back to CSV files."""
         self.pandas_manager.save_all_data()
 
-    # --- Fork operations ---
-    def get_all_forks(self) -> list[Fork]:
-        """Get all forks."""
+    # --- Path operations ---
+    def get_all_paths(self) -> list[PathModel]:
+        """Get all paths."""
         self.pandas_manager.initialize_if_needed()
-        return self.pandas_manager.get_all_forks()
+        return self.pandas_manager.get_all_paths()
 
-    def get_forks_by_position(self, position: int) -> list[Fork]:
-        """Get forks at a specific position."""
+    def get_paths_by_position(self, position: int) -> list[PathModel]:
+        """Get paths at a specific position."""
         self.pandas_manager.initialize_if_needed()
-        return self.pandas_manager.get_forks_by_position(position)
+        return self.pandas_manager.get_paths_by_position(position)
 
-    def add_fork(self, fork: Fork):
-        """Add a new fork."""
+    def add_path(self, path: PathModel):
+        """Add a new path."""
         self.pandas_manager.initialize_if_needed()
-        self.pandas_manager.add_fork(fork)
+        self.pandas_manager.add_path(path)
 
-    def update_fork_status(self, fork_uuid: str, status: str):
-        """Update fork status."""
+    def update_path_status(self, path_uuid: str, status: str):
+        """Update path status."""
         self.pandas_manager.initialize_if_needed()
-        self.pandas_manager.update_fork_status(fork_uuid, status)
+        self.pandas_manager.update_path_status(path_uuid, status)
 
-    def get_fork_by_uuid(self, fork_uuid: str) -> Fork | None:
-        """Get a specific fork by UUID."""
+    def get_path_by_uuid(self, path_uuid: str) -> PathModel | None:
+        """Get a specific path by UUID."""
         self.pandas_manager.initialize_if_needed()
-        forks = self.pandas_manager.get_all_forks()
-        for fork in forks:
-            if str(fork.fork_uuid) == fork_uuid:
-                return fork
+        paths = self.pandas_manager.get_all_paths()
+        for path in paths:
+            if str(path.path_uuid) == path_uuid:
+                return path
         return None
 
     # --- Vote operations ---
@@ -157,10 +157,10 @@ class DataManager:
         issues = []
 
         # Check that all referenced hrönirs exist
-        forks = self.get_all_forks()
-        for fork in forks:
-            if not self.hrönir_exists(str(fork.uuid)):
-                issues.append(f"Fork {fork.fork_uuid} references non-existent hrönir {fork.uuid}")
+        paths = self.get_all_paths()
+        for path in paths:
+            if not self.hrönir_exists(str(path.uuid)):
+                issues.append(f"Path {path.path_uuid} references non-existent hrönir {path.uuid}")
 
         return issues
 

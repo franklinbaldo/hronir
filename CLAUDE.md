@@ -105,23 +105,23 @@ uv run hronir init-test
 
 # Store a new chapter
 uv run hronir store drafts/chapter.md
-# Create the fork
-uv run hronir fork --position N --source <uuid_of_previous> --target <new_uuid>
+# Create the path
+uv run hronir path --position N --source <uuid_of_previous> --target <new_uuid>
 
 # Start judgment session
-uv run hronir session start --fork-uuid <qualified_fork_uuid>
+uv run hronir session start --path-uuid <qualified_path_uuid>
 
 # Commit session verdicts
-uv run hronir session commit --session-id <id> --verdicts '{"position": "winning_fork_uuid"}'
+uv run hronir session commit --session-id <id> --verdicts '{"position": "winning_path_uuid"}'
 
 # View rankings
 uv run hronir ranking <position>
 
-# List forks (optional --position to filter)
-uv run hronir list-forks --position <position>
+# List paths (optional --position to filter)
+uv run hronir list-paths --position <position>
 
-# Check status of a specific fork
-uv run hronir fork-status <fork_uuid>
+# Check status of a specific path
+uv run hronir path-status <path_uuid>
 
 # Show canonical path status
 uv run hronir status
@@ -154,9 +154,9 @@ uv run hronir recover-canon
 
 ### Core System Flow
 The system follows a Protocol v2 architecture with these key phases:
-1. **Fork Creation**: Agents store new chapters and then register forks using the `fork` command
-2. **Qualification**: Forks earn `QUALIFIED` status through duel performance 
-3. **Judgment Sessions**: Qualified forks grant mandate to judge prior history
+1. **Path Creation**: Agents store new chapters and then register paths using the `path` command
+2. **Qualification**: Paths earn `QUALIFIED` status through duel performance 
+3. **Judgment Sessions**: Qualified paths grant mandate to judge prior history
 4. **Temporal Cascade**: Session commits trigger canonical path recalculation
 
 ### Key Components
@@ -168,7 +168,7 @@ The system follows a Protocol v2 architecture with these key phases:
 - **`models.py`**: Pure Pydantic models for data validation and business logic
 - **`graph_logic.py`**: NetworkX-based narrative consistency validation
 - **`session_manager.py`**: Manages judgment sessions and dossier generation
-- **`transaction_manager.py`**: Immutable ledger for session commits and fork promotions
+- **`transaction_manager.py`**: Immutable ledger for session commits and path promotions
 - **`ratings.py`**: Elo ranking system and duel determination logic
 - **`gemini_util.py`**: AI generation utilities using Google Gemini
 - **`database.py`**: SQLAlchemy database utilities (secondary to CSV storage)
@@ -180,21 +180,21 @@ data/
 ├── canonical_path.json    # Current canonical narrative path
 ├── sessions/             # Active/completed judgment sessions
 └── transactions/         # Immutable ledger of all commits
-forking_path/            # Fork definitions (CSV files)
+narrative_paths/         # Path definitions (CSV files)
 ratings/                 # Vote records and Elo calculations (CSV files)
 ```
 
 ### Key Protocol Concepts
 
-#### Fork Status Lifecycle
+#### Path Status Lifecycle
 - `PENDING` → `QUALIFIED` → `SPENT`
-- Only `QUALIFIED` forks can initiate judgment sessions
+- Only `QUALIFIED` paths can initiate judgment sessions
 - Qualification requires strong duel performance (Elo-based)
 
 #### Session Workflow
-1. Agent creates hrönir → receives `fork_uuid`
-2. Fork becomes `QUALIFIED` through competitive performance
-3. Agent uses qualified fork to start session → receives dossier of maximum entropy duels
+1. Agent creates hrönir → receives `path_uuid`
+2. Path becomes `QUALIFIED` through competitive performance
+3. Agent uses qualified path to start session → receives dossier of maximum entropy duels
 4. Agent submits verdicts → triggers transaction recording and temporal cascade
 
 #### Temporal Cascade
@@ -204,9 +204,9 @@ ratings/                 # Vote records and Elo calculations (CSV files)
 
 ### UUID System
 - All content uses deterministic UUIDv5 generation
-- Fork UUIDs: `uuid5(position:prev_uuid:current_uuid)`
+- Path UUIDs: `uuid5(position:prev_uuid:current_uuid)`
 - Content UUIDs: `uuid5(text_content)`
-- Mandate IDs: `blake3(fork_uuid + previous_transaction_hash)[:16]`
+- Mandate IDs: `blake3(path_uuid + previous_transaction_hash)[:16]`
 
 ### Testing Strategy
 Tests focus on protocol dynamics:
@@ -259,19 +259,19 @@ For comprehensive testing of the Hrönir Encyclopedia, follow this standardized 
 
 #### 2. Execute Complete Protocol Testing
 ```bash
-# Test the full happy path: store → fork → session → vote
+# Test the full happy path: store → path → session → vote
 
 # Store all test hrönirs
 uv run hronir store test_temp/hrönir1.md
 uv run hronir store test_temp/hrönir2.md
 # ... (repeat for all test files)
 
-# Create forking paths
-uv run hronir fork --position N --source <prev_uuid> --target <new_uuid>
+# Create narrative paths
+uv run hronir path --position N --source <prev_uuid> --target <new_uuid>
 
 # Generate and execute judgment sessions
-uv run hronir session start --fork-uuid <qualified_fork_uuid>
-uv run hronir session commit --session-id <id> --verdicts '{"position": "winning_fork_uuid"}'
+uv run hronir session start --path-uuid <qualified_path_uuid>
+uv run hronir session commit --session-id <id> --verdicts '{"position": "winning_path_uuid"}'
 
 # Validate system state
 uv run hronir audit

@@ -93,14 +93,14 @@ def init_test(
     h0_uuid = storage.store_chapter_text("Example Hr\u00f6nir 0", base=library_dir)
     h1_uuid = storage.store_chapter_text("Example Hr\u00f6nir 1", base=library_dir)
 
-    f0_uuid = storage.append_fork(0, "", h0_uuid)
-    f1_uuid = storage.append_fork(1, h0_uuid, h1_uuid)
+    p0_uuid = storage.append_path(0, "", h0_uuid)
+    p1_uuid = storage.append_path(1, h0_uuid, h1_uuid)
 
     canonical = {
         "title": "The Hr\u00f6nir Encyclopedia - Canonical Path",
         "path": {
-            "0": {"fork_uuid": f0_uuid, "hr\u00f6nir_uuid": h0_uuid},
-            "1": {"fork_uuid": f1_uuid, "hr\u00f6nir_uuid": h1_uuid},
+            "0": {"path_uuid": p0_uuid, "hr\u00f6nir_uuid": h0_uuid},
+            "1": {"path_uuid": p1_uuid, "hr\u00f6nir_uuid": h1_uuid},
         },
     }
     canonical_file = data_dir / "canonical_path.json"
@@ -111,9 +111,9 @@ def init_test(
 
     typer.echo("Sample data initialized:")
     typer.echo(f"  Position 0 hr\u00f6nir UUID: {h0_uuid}")
-    typer.echo(f"  Position 0 fork UUID: {f0_uuid}")
+    typer.echo(f"  Position 0 fork UUID: {p0_uuid}")
     typer.echo(f"  Position 1 hr\u00f6nir UUID: {h1_uuid}")
-    typer.echo(f"  Position 1 fork UUID: {f1_uuid}")
+    typer.echo(f"  Position 1 fork UUID: {p1_uuid}")
 
 
 # Command `export` and `tree` removed as they depended on the old book structure.
@@ -203,7 +203,7 @@ def fork(
             raise typer.Exit(1)
 
     # Generate deterministic fork UUID
-    fork_uuid = storage.compute_forking_uuid(position, source, target)
+    path_uuid = storage.compute_forking_uuid(position, source, target)
 
     # Create forking path entry
     forking_path_dir = Path("the_garden")
@@ -214,26 +214,26 @@ def fork(
 
     # Create CSV with headers if it doesn't exist
     if not csv_file.exists():
-        csv_file.write_text("position,prev_uuid,uuid,fork_uuid,status\n")
+        csv_file.write_text("position,prev_uuid,uuid,path_uuid,status\n")
 
     # Check if fork already exists
     import pandas as pd
 
     try:
         df = pd.read_csv(csv_file)
-        if not df.empty and ((df["fork_uuid"] == fork_uuid).any()):
-            typer.echo(f"Fork already exists: {fork_uuid}")
+        if not df.empty and ((df["path_uuid"] == path_uuid).any()):
+            typer.echo(f"Fork already exists: {path_uuid}")
             return
     except (pd.errors.EmptyDataError, FileNotFoundError):
         # File is empty or doesn't exist, create headers
-        csv_file.write_text("position,prev_uuid,uuid,fork_uuid,status\n")
+        csv_file.write_text("position,prev_uuid,uuid,path_uuid,status\n")
 
     # Append new fork entry (mapping to CSV column names: source→prev_uuid, target→uuid)
-    fork_entry = f"{position},{source},{target},{fork_uuid},PENDING\n"
+    fork_entry = f"{position},{source},{target},{path_uuid},PENDING\n"
     with csv_file.open("a") as f:
         f.write(fork_entry)
 
-    typer.echo(f"Created fork: {fork_uuid}")
+    typer.echo(f"Created fork: {path_uuid}")
     typer.echo(f"  Position: {position}")
     typer.echo(f"  Source: {source or '(none)'}")
     typer.echo(f"  Target: {target}")
@@ -289,18 +289,18 @@ def list_forks(
         typer.echo("All forks:")
 
     # Display relevant columns only (no creator info)
-    display_cols = ["position", "prev_uuid", "uuid", "fork_uuid", "status"]
+    display_cols = ["position", "prev_uuid", "uuid", "path_uuid", "status"]
     available_cols = [col for col in display_cols if col in combined_df.columns]
 
     typer.echo(combined_df[available_cols].to_string(index=False))
 
 
 @app.command(help="Show status details for a specific fork.")
-def fork_status(fork_uuid: str) -> None:
+def fork_status(path_uuid: str) -> None:
     """Display status information for the given fork UUID."""
-    fork_data = storage.get_fork_data(fork_uuid)
+    fork_data = storage.get_fork_data(path_uuid)
     if not fork_data:
-        typer.echo(f"Error: fork_uuid {fork_uuid} not found.")
+        typer.echo(f"Error: path_uuid {path_uuid} not found.")
         raise typer.Exit(code=1)
 
     typer.echo(f"Position: {fork_data.position}")
@@ -310,16 +310,16 @@ def fork_status(fork_uuid: str) -> None:
     if fork_data.mandate_id:
         typer.echo(f"Mandate ID: {fork_data.mandate_id}")
 
-    consumed_by = session_manager.is_fork_consumed(fork_uuid)
+    consumed_by = session_manager.is_fork_consumed(path_uuid)
     if consumed_by:
         typer.echo(f"Consumed by session: {consumed_by}")
 
 
-# Helper function to find successor hrönir_uuid for a given fork_uuid
-def _get_successor_hronir_for_fork(fork_uuid_to_find: str) -> str | None:
+# Helper function to find successor hrönir_uuid for a given path_uuid
+def _get_successor_hronir_for_fork(path_uuid_to_find: str) -> str | None:
     """Return the hrönir UUID (ForkDB.uuid) that a fork points to by querying the database."""
     # forking_path_dir parameter is removed as this function now uses the DB.
-    fork_data_obj = storage.get_fork_data(fork_uuid_to_find)
+    fork_data_obj = storage.get_fork_data(path_uuid_to_find)
     if fork_data_obj:
         return fork_data_obj.uuid  # ForkDB.uuid stores the hrönir_uuid
     return None
@@ -331,15 +331,15 @@ def _calculate_status_counts(forking_path_dir: Path) -> dict[str, int]:
     if not forking_path_dir.is_dir():
         return status_counts
 
-    all_fork_uuids_processed: set[str] = set()
+    all_path_uuids_processed: set[str] = set()
     for csv_file in forking_path_dir.glob("*.csv"):
         if csv_file.stat().st_size == 0:
             continue
         try:
             df = pd.read_csv(
                 csv_file,
-                usecols=["fork_uuid", "status"],
-                dtype={"fork_uuid": str, "status": str},
+                usecols=["path_uuid", "status"],
+                dtype={"path_uuid": str, "status": str},
             )
         except (pd.errors.EmptyDataError, ValueError):
             continue
@@ -349,9 +349,9 @@ def _calculate_status_counts(forking_path_dir: Path) -> dict[str, int]:
             continue
 
         for _, row in df.iterrows():
-            fork_uuid = str(row.get("fork_uuid", "")).strip()
+            path_uuid = str(row.get("path_uuid", "")).strip()
             status = str(row.get("status", "")).strip()
-            if not fork_uuid or fork_uuid in all_fork_uuids_processed:
+            if not path_uuid or path_uuid in all_path_uuids_processed:
                 continue
             if not status:
                 status_counts["UNKNOWN"] += 1
@@ -359,7 +359,7 @@ def _calculate_status_counts(forking_path_dir: Path) -> dict[str, int]:
                 status_counts[status] += 1
             else:
                 status_counts["UNKNOWN"] += 1
-            all_fork_uuids_processed.add(fork_uuid)
+            all_path_uuids_processed.add(path_uuid)
 
     return status_counts
 
@@ -396,10 +396,10 @@ def status(
 
     for pos in sorted(path_entries.keys(), key=lambda p: int(p)):
         entry = path_entries.get(pos, {})
-        fork_uuid = entry.get("fork_uuid", "")
+        path_uuid = entry.get("path_uuid", "")
         hronir_uuid = entry.get("hrönir_uuid", "")
         typer.echo(f"Position {pos}:")
-        typer.echo(f"  fork_uuid: {fork_uuid}")
+        typer.echo(f"  path_uuid: {path_uuid}")
         typer.echo(f"  hrönir_uuid: {hronir_uuid}")
 
     if counts:
@@ -694,13 +694,13 @@ app.add_typer(session_app, name="session")
 
 @session_app.command("start", help="Initiate a Judgment Session using a QUALIFIED fork's mandate.")
 def session_start(
-    # position: Annotated[int, typer.Option("--position", "-p", help="The current position N of the new fork being created.")], # Position is now derived from fork_uuid
-    fork_uuid: Annotated[
+    # position: Annotated[int, typer.Option("--position", "-p", help="The current position N of the new fork being created.")], # Position is now derived from path_uuid
+    path_uuid: Annotated[
         str,
         typer.Option(
             "--fork-uuid",
             "-f",
-            help="The QUALIFIED fork_uuid granting the mandate for this session.",
+            help="The QUALIFIED path_uuid granting the mandate for this session.",
         ),
     ],
     ratings_dir: Annotated[
@@ -717,20 +717,20 @@ def session_start(
     Initiates a new Judgment Session (SC.8, SC.9).
 
     This command allows a user to exercise the 'mandate for judgment' granted by a
-    fork that has achieved `QUALIFIED` status. The `fork_uuid` of this qualified
+    fork that has achieved `QUALIFIED` status. The `path_uuid` of this qualified
     fork must be provided.
 
     The system will:
-    1. Validate the provided `fork_uuid`:
+    1. Validate the provided `path_uuid`:
         - Ensure it exists.
         - Confirm its status is `QUALIFIED`.
         - Verify it has an associated `mandate_id`.
         - Check it hasn't been `SPENT` (i.e., already used for a session).
-    2. Determine `N`, the position of the qualified `fork_uuid`.
+    2. Determine `N`, the position of the qualified `path_uuid`.
     3. Generate a static "dossier" containing the duel of maximum entropy for each
        prior position (from `N-1` down to `0`), based on the canonical path at the
        moment the session is started.
-    4. Create a new session record, store the dossier, and mark the `fork_uuid` as
+    4. Create a new session record, store the dossier, and mark the `path_uuid` as
        consumed for session initiation purposes.
     5. Output the `session_id` and the dossier to the user.
 
@@ -738,19 +738,19 @@ def session_start(
     judged. An empty dossier is created, and the session is immediately ready for
     a (vacuous) commit, primarily to log the use of the mandate.
     """
-    # Position is now derived from the fork_uuid itself, not passed as a separate CLI arg.
+    # Position is now derived from the path_uuid itself, not passed as a separate CLI arg.
     # This makes the command simpler and less prone to user error.
     # We will fetch the fork's details to get its position N.
 
-    # Validate the fork_uuid - it must exist in the database
-    # fork_data = storage.get_fork_file_and_data(fork_uuid, fork_dir_base=forking_path_dir) # Legacy
-    fork_data_obj = storage.get_fork_data(fork_uuid)  # DB query
+    # Validate the path_uuid - it must exist in the database
+    # fork_data = storage.get_fork_file_and_data(path_uuid, fork_dir_base=forking_path_dir) # Legacy
+    fork_data_obj = storage.get_fork_data(path_uuid)  # DB query
 
     if not fork_data_obj:
         typer.echo(
             json.dumps(
                 {
-                    "error": f"Fork UUID {fork_uuid} not found in the database. Cannot start session."
+                    "error": f"Fork UUID {path_uuid} not found in the database. Cannot start session."
                 },
                 indent=2,
             )
@@ -762,7 +762,7 @@ def session_start(
     if position_n_str is None:
         typer.echo(
             json.dumps(
-                {"error": f"Fork UUID {fork_uuid} is missing position information."},
+                {"error": f"Fork UUID {path_uuid} is missing position information."},
                 indent=2,
             )
         )
@@ -772,7 +772,7 @@ def session_start(
     except ValueError:
         typer.echo(
             json.dumps(
-                {"error": f"Fork UUID {fork_uuid} has an invalid position: {position_n_str}."},
+                {"error": f"Fork UUID {path_uuid} has an invalid position: {position_n_str}."},
                 indent=2,
             )
         )
@@ -781,32 +781,32 @@ def session_start(
     if position < 0:  # Should be caught by storage validation, but good to check.
         typer.echo(
             json.dumps(
-                {"error": f"Fork UUID {fork_uuid} has an invalid negative position: {position}."},
+                {"error": f"Fork UUID {path_uuid} has an invalid negative position: {position}."},
                 indent=2,
             )
         )
         raise typer.Exit(code=1)
 
-    # Validate the fork_uuid - it must exist in forking_path (already done by get_fork_data)
-    # if not storage.forking_path_exists(fork_uuid, fork_dir=forking_path_dir): # Legacy, and redundant
+    # Validate the path_uuid - it must exist in forking_path (already done by get_fork_data)
+    # if not storage.forking_path_exists(path_uuid, fork_dir=forking_path_dir): # Legacy, and redundant
     #     typer.echo(
     #         json.dumps(
     #             {
-    #                 "error": f"Fork UUID {fork_uuid} not found in forking paths. Cannot start session."
+    #                 "error": f"Fork UUID {path_uuid} not found in forking paths. Cannot start session."
     #             },
     #             indent=2,
     #         )
     #     )
     #     raise typer.Exit(code=1)
 
-    # Check if fork_uuid has already been consumed for a session (SC.8)
-    consumed_by_session_id = session_manager.is_fork_consumed(fork_uuid)
+    # Check if path_uuid has already been consumed for a session (SC.8)
+    consumed_by_session_id = session_manager.is_fork_consumed(path_uuid)
     if consumed_by_session_id:
         typer.echo(
             json.dumps(
                 {
-                    "error": "This fork_uuid has already been used to initiate a judgment session.",
-                    "fork_uuid": fork_uuid,
+                    "error": "This path_uuid has already been used to initiate a judgment session.",
+                    "path_uuid": path_uuid,
                     "session_id": consumed_by_session_id,
                 },
                 indent=2,
@@ -822,13 +822,13 @@ def session_start(
         session_file = session_manager.SESSIONS_DIR / f"{session_id}.json"
         session_data = {
             "session_id": session_id,
-            "initiating_fork_uuid": fork_uuid,
+            "initiating_path_uuid": path_uuid,
             "position_n": position,
             "dossier": {"duels": {}},  # No duels for N=0
             "status": "active",
         }
         session_file.write_text(json.dumps(session_data, indent=2))
-        session_manager.mark_fork_as_consumed(fork_uuid, session_id)
+        session_manager.mark_fork_as_consumed(path_uuid, session_id)
         typer.echo(
             json.dumps(
                 {
@@ -841,14 +841,14 @@ def session_start(
         )
         raise typer.Exit(code=0)
 
-    # Validate the fork_uuid's status and get mandate_id (using the fork_data_obj from earlier)
-    # fork_data = storage.get_fork_file_and_data(fork_uuid, fork_dir_base=forking_path_dir) # Legacy and redundant
+    # Validate the path_uuid's status and get mandate_id (using the fork_data_obj from earlier)
+    # fork_data = storage.get_fork_file_and_data(path_uuid, fork_dir_base=forking_path_dir) # Legacy and redundant
 
     # if not fork_data_obj: # Already checked, but being defensive if logic flow changes
     #     typer.echo(
     #         json.dumps(
     #             {
-    #                 "error": f"Fork UUID {fork_uuid} details not found in database (second check). Cannot start session."
+    #                 "error": f"Fork UUID {path_uuid} details not found in database (second check). Cannot start session."
     #             },
     #             indent=2,
     #         )
@@ -860,8 +860,8 @@ def session_start(
         typer.echo(
             json.dumps(
                 {
-                    "error": f"Fork UUID {fork_uuid} does not have 'QUALIFIED' status. Current status: '{fork_status}'. Cannot start session.",
-                    "fork_uuid": fork_uuid,
+                    "error": f"Fork UUID {path_uuid} does not have 'QUALIFIED' status. Current status: '{fork_status}'. Cannot start session.",
+                    "path_uuid": path_uuid,
                 },
                 indent=2,
             )
@@ -873,8 +873,8 @@ def session_start(
         typer.echo(
             json.dumps(
                 {
-                    "error": f"Fork UUID {fork_uuid} is 'QUALIFIED' but does not have an associated mandate_id. This indicates an inconsistency.",
-                    "fork_uuid": fork_uuid,
+                    "error": f"Fork UUID {path_uuid} is 'QUALIFIED' but does not have an associated mandate_id. This indicates an inconsistency.",
+                    "path_uuid": path_uuid,
                 },
                 indent=2,
             )
@@ -891,7 +891,7 @@ def session_start(
     #             json.dumps(
     #                 {
     #                     "error": f"Derived position {position} does not match the fork's actual position {fork_actual_position}.",
-    #                     "fork_uuid": fork_uuid,
+    #                     "path_uuid": path_uuid,
     #                 },
     #                 indent=2,
     #             )
@@ -902,7 +902,7 @@ def session_start(
     #         json.dumps(
     #             {
     #                 "error": f"Fork's actual position '{fork_actual_position}' is not a valid number.",
-    #                 "fork_uuid": fork_uuid,
+    #                 "path_uuid": path_uuid,
     #             },
     #             indent=2,
     #         )
@@ -916,7 +916,7 @@ def session_start(
     # Create the session and get the dossier (SC.9)
     try:
         session_info = session_manager.create_session(
-            fork_n_uuid=fork_uuid,
+            fork_n_uuid=path_uuid,
             position_n=position,  # This is N, the position of the qualified fork
             mandate_id=mandate_id,  # Pass the validated mandate_id
             forking_path_dir=forking_path_dir,
@@ -1063,20 +1063,20 @@ def run_temporal_cascade(
                         updated_any_position_in_cascade = True
             break  # End of the canonical path for this cascade
 
-        champion_fork_uuid = ranking_df.iloc[0]["fork_uuid"]
+        champion_path_uuid = ranking_df.iloc[0]["path_uuid"]
         champion_hronir_uuid = ranking_df.iloc[0]["hrönir_uuid"]
         champion_elo = ranking_df.iloc[0]["elo_rating"]
 
         # current_entry_in_path = canonical_path_data["path"].get(position_str) # Not needed due to initial clear
         new_entry_for_path = {
-            "fork_uuid": champion_fork_uuid,
+            "path_uuid": champion_path_uuid,
             "hrönir_uuid": champion_hronir_uuid,
         }
 
         # Since we cleared, any new entry is a change or reinstatement.
         canonical_path_data["path"][position_str] = new_entry_for_path
         typer_echo(
-            f"Cascade: Position {current_pos_idx}: Set fork {champion_fork_uuid[:8]} (hrönir: {champion_hronir_uuid[:8]}, Elo: {champion_elo}) as canonical."
+            f"Cascade: Position {current_pos_idx}: Set fork {champion_path_uuid[:8]} (hrönir: {champion_hronir_uuid[:8]}, Elo: {champion_elo}) as canonical."
         )
         updated_any_position_in_cascade = True
 
@@ -1115,7 +1115,7 @@ def session_commit(
         typer.Option(
             "--verdicts",
             "-v",
-            help='JSON string or path to a JSON file containing verdicts. Format: \'{"position_str": "winning_fork_uuid"}\'. Example: \'{"9": "fork_uuid_abc", "2": "fork_uuid_xyz"}\'. ',
+            help='JSON string or path to a JSON file containing verdicts. Format: \'{"position_str": "winning_path_uuid"}\'. Example: \'{"9": "path_uuid_abc", "2": "path_uuid_xyz"}\'. ',
         ),
     ],
     ratings_dir: Annotated[
@@ -1139,12 +1139,12 @@ def session_commit(
     1.  Retrieving the specified active session and its static dossier.
     2.  Parsing the provided `verdicts_input` (either a JSON string or a file path
         to a JSON file). The verdicts map position numbers (as strings) to the
-        `fork_uuid` chosen as the winner for that position's duel.
+        `path_uuid` chosen as the winner for that position's duel.
     3.  Validating each submitted verdict:
         - Ensures the position exists in the session's dossier.
-        - Confirms the chosen winning `fork_uuid` was one of the two forks presented
+        - Confirms the chosen winning `path_uuid` was one of the two forks presented
           in the dossier for that position (Sovereignty of Curadoria, SC.10).
-    4.  Preparing a list of valid votes, mapping winning/losing `fork_uuid`s to their
+    4.  Preparing a list of valid votes, mapping winning/losing `path_uuid`s to their
         respective successor `hrönir_uuid`s (needed for `ratings.record_vote`).
     5.  Invoking `transaction_manager.record_transaction` to:
         - Record all valid votes.
@@ -1152,7 +1152,7 @@ def session_commit(
           and update their status/mandate_id.
         - Create an immutable transaction block in the `data/transactions/` ledger (SYS.1),
           linking it to the previous transaction.
-    6.  Updating the status of the session-initiating `fork_uuid` to `SPENT`.
+    6.  Updating the status of the session-initiating `path_uuid` to `SPENT`.
     7.  Triggering the "Temporal Cascade" (`run_temporal_cascade`) starting from the
         oldest position that received a valid vote in this session (SC.11). This
         recalculates the canonical path.
@@ -1205,17 +1205,17 @@ def session_commit(
         typer.echo(json.dumps({"error": "Verdicts must be a JSON object (dictionary)."}, indent=2))
         raise typer.Exit(code=1)
 
-    initiating_fork_uuid = session_data["initiating_fork_uuid"]
+    initiating_path_uuid = session_data["initiating_path_uuid"]
     dossier_duels = session_data.get("dossier", {}).get("duels", {})
 
     valid_votes_to_record = []
     processed_verdicts: dict[
         str, str
-    ] = {}  # For transaction record: position_str -> winning_fork_uuid
+    ] = {}  # For transaction record: position_str -> winning_path_uuid
     oldest_voted_position = float("inf")
 
-    for pos_str, winning_fork_uuid_verdict in verdicts.items():
-        if not isinstance(winning_fork_uuid_verdict, str):
+    for pos_str, winning_path_uuid_verdict in verdicts.items():
+        if not isinstance(winning_path_uuid_verdict, str):
             typer.echo(
                 json.dumps(
                     {"warning": f"Verdict for position {pos_str} is not a string. Skipping."},
@@ -1259,31 +1259,31 @@ def session_commit(
         fork_a = duel_for_pos["fork_A"]
         fork_b = duel_for_pos["fork_B"]
 
-        if winning_fork_uuid_verdict not in [fork_a, fork_b]:
+        if winning_path_uuid_verdict not in [fork_a, fork_b]:
             typer.echo(
                 json.dumps(
                     {
-                        "warning": f"Verdict for position {pos_str}: winning fork {winning_fork_uuid_verdict[:8]} is not part of the original duel ({fork_a[:8]} vs {fork_b[:8]}). Skipping.",
+                        "warning": f"Verdict for position {pos_str}: winning fork {winning_path_uuid_verdict[:8]} is not part of the original duel ({fork_a[:8]} vs {fork_b[:8]}). Skipping.",
                     },
                     indent=2,
                 )
             )
             continue
 
-        loser_fork_uuid_verdict = fork_a if winning_fork_uuid_verdict == fork_b else fork_b
+        loser_path_uuid_verdict = fork_a if winning_path_uuid_verdict == fork_b else fork_b
 
         # Map fork UUIDs to their successor hrönir UUIDs for voting
         # _get_successor_hronir_for_fork is defined in cli.py
-        winner_hronir_uuid = _get_successor_hronir_for_fork(winning_fork_uuid_verdict)
-        loser_hronir_uuid = _get_successor_hronir_for_fork(loser_fork_uuid_verdict)
+        winner_hronir_uuid = _get_successor_hronir_for_fork(winning_path_uuid_verdict)
+        loser_hronir_uuid = _get_successor_hronir_for_fork(loser_path_uuid_verdict)
 
         if not winner_hronir_uuid or not loser_hronir_uuid:
             typer.echo(
                 json.dumps(
                     {
                         "error": f"Could not map one or both duel forks for position {pos_str} to their successor hrönir_uuids. "
-                        f"Winner: {winning_fork_uuid_verdict[:8]} -> {winner_hronir_uuid[:8] if winner_hronir_uuid else 'Not Found'}, "
-                        f"Loser: {loser_fork_uuid_verdict[:8]} -> {loser_hronir_uuid[:8] if loser_hronir_uuid else 'Not Found'}. "
+                        f"Winner: {winning_path_uuid_verdict[:8]} -> {winner_hronir_uuid[:8] if winner_hronir_uuid else 'Not Found'}, "
+                        f"Loser: {loser_path_uuid_verdict[:8]} -> {loser_hronir_uuid[:8] if loser_hronir_uuid else 'Not Found'}. "
                         "Aborting commit.",
                     },
                     indent=2,
@@ -1295,12 +1295,12 @@ def session_commit(
         valid_votes_to_record.append(
             {
                 "position": position_idx,
-                "voter": initiating_fork_uuid,  # The fork that started the session is the voter
+                "voter": initiating_path_uuid,  # The fork that started the session is the voter
                 "winner_hronir": winner_hronir_uuid,
                 "loser_hronir": loser_hronir_uuid,
             }
         )
-        processed_verdicts[pos_str] = winning_fork_uuid_verdict
+        processed_verdicts[pos_str] = winning_path_uuid_verdict
         if position_idx < oldest_voted_position:
             oldest_voted_position = position_idx
 
@@ -1322,7 +1322,7 @@ def session_commit(
     # We need to transform this into the format expected by the new transaction_manager:
     # session_verdicts: List[Dict[str, Any]] where each dict is
     # {"position": int, "winner_hrönir_uuid": str, "loser_hrönir_uuid": str}
-    # The initiating_fork_uuid is passed separately to transaction_manager.
+    # The initiating_path_uuid is passed separately to transaction_manager.
 
     session_verdicts_for_tm: list[dict[str, Any]] = []
     for vote_detail in valid_votes_to_record:
@@ -1350,7 +1350,7 @@ def session_commit(
     try:
         transaction_result = transaction_manager.record_transaction(
             session_id=session_id,
-            initiating_fork_uuid=initiating_fork_uuid,  # Fork whose mandate is used
+            initiating_path_uuid=initiating_path_uuid,  # Fork whose mandate is used
             session_verdicts=session_verdicts_for_tm,
         )
         typer.echo(
@@ -1375,12 +1375,12 @@ def session_commit(
         session_manager.update_session_status(session_id, "commit_failed_tx_processing")
         raise typer.Exit(code=1)
 
-    # Update the status of the initiating_fork_uuid to "SPENT"
-    # The mandate_id was implicitly "spent" by starting the session and consuming the fork_uuid.
+    # Update the status of the initiating_path_uuid to "SPENT"
+    # The mandate_id was implicitly "spent" by starting the session and consuming the path_uuid.
     # Now we mark the fork itself as SPENT.
     try:
         update_spent_success = storage.update_fork_status(
-            fork_uuid_to_update=initiating_fork_uuid,
+            path_uuid_to_update=initiating_path_uuid,
             new_status="SPENT",
             mandate_id=session_data.get(
                 "mandate_id"
@@ -1391,7 +1391,7 @@ def session_commit(
         if update_spent_success:
             typer.echo(
                 json.dumps(
-                    {"message": f"Fork {initiating_fork_uuid} status updated to SPENT."},
+                    {"message": f"Fork {initiating_path_uuid} status updated to SPENT."},
                     indent=2,
                 )
             )
@@ -1399,7 +1399,7 @@ def session_commit(
             typer.echo(
                 json.dumps(
                     {
-                        "warning": f"Could not update status to SPENT for fork {initiating_fork_uuid}. Manual check may be needed."
+                        "warning": f"Could not update status to SPENT for fork {initiating_path_uuid}. Manual check may be needed."
                     },
                     indent=2,
                 )
@@ -1409,7 +1409,7 @@ def session_commit(
         typer.echo(
             json.dumps(
                 {
-                    "warning": f"Error updating status for fork {initiating_fork_uuid} to SPENT: {e}. Manual check may be needed."
+                    "warning": f"Error updating status for fork {initiating_path_uuid} to SPENT: {e}. Manual check may be needed."
                 },
                 indent=2,
             )

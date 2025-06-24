@@ -1,4 +1,4 @@
-fork_uuid,position,prev_uuid,uuid,mandate_id
+path_uuid,position,prev_uuid,uuid,mandate_id
 f93ba11f-ec17-5857-93e4-f1fd56a101ff,0,,534a2a54-695f-5609-b3be-9be0d3b368a1,
 53df22c8-b357-534f-81a0-2347b987b974,0,,c7acc099-3d70-5090-8a72-9a2e2e7fb634,
 9562db9b-4094-5148-b049-defa275b59d2,1,534a2a54-695f-5609-b3be-9be0d3b368a1,c365ee75-5bd5-5a58-8cb7-27eb80d6b4f2,

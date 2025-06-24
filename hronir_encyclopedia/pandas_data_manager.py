@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 from pydantic import ValidationError
 
-from .models import Fork, Transaction, Vote
+from .models import Path as PathModel, Transaction, Vote
 
 UUID_NAMESPACE = uuid.NAMESPACE_URL
 
@@ -22,19 +22,19 @@ class PandasDataManager:
 
     def __init__(
         self,
-        fork_csv_dir="the_garden",
+        path_csv_dir="narrative_paths",
         ratings_csv_dir="ratings",
         transactions_json_dir="data/transactions",
     ):
         if hasattr(self, "_initialized") and self._initialized:
             return
 
-        self.fork_csv_dir = Path(fork_csv_dir)
+        self.path_csv_dir = Path(path_csv_dir)
         self.ratings_csv_dir = Path(ratings_csv_dir)
         self.transactions_json_dir = Path(transactions_json_dir)
 
         # In-memory dataframes
-        self._forks_df: pd.DataFrame | None = None
+        self._paths_df: pd.DataFrame | None = None
         self._votes_df: pd.DataFrame | None = None
         self._transactions: dict[str, Transaction] = {}
 
@@ -42,28 +42,28 @@ class PandasDataManager:
 
     def load_all_data(self):
         """Load all data from CSV files into memory."""
-        self._load_forks()
+        self._load_paths()
         self._load_votes()
         self._load_transactions()
         self._initialized = True
 
-    def _load_forks(self):
-        """Load forks from CSV files."""
-        fork_files = list(self.fork_csv_dir.glob("*.csv"))
-        if not fork_files:
-            self._forks_df = pd.DataFrame(columns=["fork_uuid", "position", "prev_uuid", "uuid", "status", "mandate_id"])
+    def _load_paths(self):
+        """Load paths from CSV files."""
+        path_files = list(self.path_csv_dir.glob("*.csv"))
+        if not path_files:
+            self._paths_df = pd.DataFrame(columns=["path_uuid", "position", "prev_uuid", "uuid", "status", "mandate_id"])
             return
 
         dfs = []
-        for file_path in fork_files:
+        for file_path in path_files:
             if file_path.stat().st_size > 0:
                 df = pd.read_csv(file_path)
                 dfs.append(df)
 
         if dfs:
-            self._forks_df = pd.concat(dfs, ignore_index=True)
+            self._paths_df = pd.concat(dfs, ignore_index=True)
         else:
-            self._forks_df = pd.DataFrame(columns=["fork_uuid", "position", "prev_uuid", "uuid", "status", "mandate_id"])
+            self._paths_df = pd.DataFrame(columns=["path_uuid", "position", "prev_uuid", "uuid", "status", "mandate_id"])
 
     def _load_votes(self):
         """Load votes from CSV file."""
@@ -90,20 +90,20 @@ class PandasDataManager:
 
     def save_all_data(self):
         """Save all data back to CSV files."""
-        self._save_forks()
+        self._save_paths()
         self._save_votes()
         self._save_transactions()
 
-    def _save_forks(self):
-        """Save forks to CSV files grouped by position."""
-        if self._forks_df is None or self._forks_df.empty:
+    def _save_paths(self):
+        """Save paths to CSV files grouped by position."""
+        if self._paths_df is None or self._paths_df.empty:
             return
 
-        self.fork_csv_dir.mkdir(exist_ok=True)
+        self.path_csv_dir.mkdir(exist_ok=True)
 
         # Group by position and save each to its own file
-        for position, group in self._forks_df.groupby("position"):
-            file_path = self.fork_csv_dir / f"forking_paths_position_{position}.csv"
+        for position, group in self._paths_df.groupby("position"):
+            file_path = self.path_csv_dir / f"narrative_paths_position_{position}.csv"
             group.to_csv(file_path, index=False)
 
     def _save_votes(self):
@@ -127,56 +127,56 @@ class PandasDataManager:
             with open(file_path, "w") as f:
                 json.dump(transaction.model_dump(), f, indent=2, default=str)
 
-    # --- Fork operations ---
-    def get_all_forks(self) -> list[Fork]:
-        """Get all forks as Pydantic models."""
-        if self._forks_df is None or self._forks_df.empty:
+    # --- Path operations ---
+    def get_all_paths(self) -> list[PathModel]:
+        """Get all paths as Pydantic models."""
+        if self._paths_df is None or self._paths_df.empty:
             return []
 
-        forks = []
-        for _, row in self._forks_df.iterrows():
+        paths = []
+        for _, row in self._paths_df.iterrows():
             try:
-                fork = Fork(**row.to_dict())
-                forks.append(fork)
+                path = PathModel(**row.to_dict())
+                paths.append(path)
             except ValidationError as e:
-                print(f"Validation error for fork {row.get('fork_uuid', 'unknown')}: {e}")
+                print(f"Validation error for path {row.get('path_uuid', 'unknown')}: {e}")
 
-        return forks
+        return paths
 
-    def get_forks_by_position(self, position: int) -> list[Fork]:
-        """Get forks at a specific position."""
-        if self._forks_df is None or self._forks_df.empty:
+    def get_paths_by_position(self, position: int) -> list[PathModel]:
+        """Get paths at a specific position."""
+        if self._paths_df is None or self._paths_df.empty:
             return []
 
-        position_forks = self._forks_df[self._forks_df["position"] == position]
-        forks = []
+        position_paths = self._paths_df[self._paths_df["position"] == position]
+        paths = []
 
-        for _, row in position_forks.iterrows():
+        for _, row in position_paths.iterrows():
             try:
-                fork = Fork(**row.to_dict())
-                forks.append(fork)
+                path = PathModel(**row.to_dict())
+                paths.append(path)
             except ValidationError as e:
-                print(f"Validation error for fork {row.get('fork_uuid', 'unknown')}: {e}")
+                print(f"Validation error for path {row.get('path_uuid', 'unknown')}: {e}")
 
-        return forks
+        return paths
 
-    def add_fork(self, fork: Fork):
-        """Add a new fork."""
-        if self._forks_df is None:
-            self._forks_df = pd.DataFrame(columns=["fork_uuid", "position", "prev_uuid", "uuid", "status", "mandate_id"])
+    def add_path(self, path: PathModel):
+        """Add a new path."""
+        if self._paths_df is None:
+            self._paths_df = pd.DataFrame(columns=["path_uuid", "position", "prev_uuid", "uuid", "status", "mandate_id"])
 
-        fork_data = fork.model_dump()
-        new_row = pd.DataFrame([fork_data])
-        self._forks_df = pd.concat([self._forks_df, new_row], ignore_index=True)
+        path_data = path.model_dump()
+        new_row = pd.DataFrame([path_data])
+        self._paths_df = pd.concat([self._paths_df, new_row], ignore_index=True)
 
-    def update_fork_status(self, fork_uuid: str, status: str):
-        """Update fork status."""
-        if self._forks_df is None:
+    def update_path_status(self, path_uuid: str, status: str):
+        """Update path status."""
+        if self._paths_df is None:
             return
 
-        mask = self._forks_df["fork_uuid"] == fork_uuid
+        mask = self._paths_df["path_uuid"] == path_uuid
         if mask.any():
-            self._forks_df.loc[mask, "status"] = status
+            self._paths_df.loc[mask, "status"] = status
 
     # --- Vote operations ---
     def get_all_votes(self) -> list[Vote]:
