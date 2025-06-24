@@ -222,6 +222,9 @@ The core mechanism for evolving the canonical narrative is the "Tribunal of the 
 
 ### Basic Operations
 ```bash
+# Set up a small test environment
+uv run hronir init-test
+
 # Store a new hrönir chapter and register the fork
 uv run hronir store drafts/my_chapter.md
 uv run hronir fork --position N --source <uuid_of_previous_hronir_in_path> --target <new_uuid>
