@@ -72,15 +72,8 @@ def record_transaction(
         if pos < oldest_voted_position:
             oldest_voted_position = pos
 
-        # Determine predecessor_hrönir_uuid for this context
-        # All paths involved in a duel at 'pos' share the same 'prev_uuid' (predecessor content hrönir)
-        # We can get it from any path that contains winner_hrönir_uuid as its target hrönir.
-        path_models_at_pos = dm.get_paths_by_position(pos)
-        predecessor_for_this_vote = None
-        for pm in path_models_at_pos:
-            if str(pm.uuid) == winner_hrönir_uuid:
-                predecessor_for_this_vote = str(pm.prev_uuid) if pm.prev_uuid else None
-                break
+        # The predecessor_hrönir_uuid is now directly provided in the verdict
+        predecessor_for_this_vote = verdict.get("predecessor_hrönir_uuid")
 
         # For position 0, predecessor_for_this_vote should be None
         if pos == 0:
