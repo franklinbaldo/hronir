@@ -123,6 +123,12 @@ uv run hronir ranking <position>
 # Get duel information
 uv run hronir get-duel --position <position>
 
+# Generate fork status metrics
+uv run hronir metrics
+
+# Show canonical path summary
+uv run hronir status
+
 # Trigger manual canonical path recovery
 uv run hronir recover-canon
 ```

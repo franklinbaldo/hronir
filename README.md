@@ -244,6 +244,9 @@ uv run hronir get-duel --position 1
 # Generate fork status metrics in Prometheus format
 uv run hronir metrics
 
+# Show canonical path summary and fork status counts
+uv run hronir status
+
 # Recover canon / Consolidate book (trigger Temporal Cascade from position 0)
 # Under the "Tribunal of the Future" protocol, the canonical path is primarily updated
 # by the Temporal Cascade triggered by `session commit`.

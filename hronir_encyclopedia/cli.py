@@ -240,7 +240,7 @@ def _get_successor_hronir_for_fork(fork_uuid_to_find: str) -> str | None:
     # forking_path_dir parameter is removed as this function now uses the DB.
     fork_data_obj = storage.get_fork_data(fork_uuid_to_find)
     if fork_data_obj:
-        return fork_data_obj.uuid # ForkDB.uuid stores the hrönir_uuid
+        return fork_data_obj.uuid  # ForkDB.uuid stores the hrönir_uuid
     return None
 
 
@@ -387,9 +387,7 @@ def get_duel(
     db_session = storage.get_db_session()
     try:
         duel_info = ratings.determine_next_duel_entropy(
-            position=position,
-            predecessor_hronir_uuid=predecessor_hronir_uuid,
-            session=db_session
+            position=position, predecessor_hronir_uuid=predecessor_hronir_uuid, session=db_session
         )
     finally:
         db_session.close()
@@ -496,6 +494,7 @@ def clean(
 # def submit_cmd():
 #     typer.echo("Submit command is in development.")
 
+
 @app.callback()
 def main_callback(ctx: typer.Context):
     """Initializes DataManager before any command."""
@@ -505,9 +504,11 @@ def main_callback(ctx: typer.Context):
         typer.secho(f"Fatal: DataManager initialization failed: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
 
+
 def main(argv: list[str] | None = None):
     """CLI entry point."""
     app(args=argv)
+
 
 # New session management commands
 session_app = typer.Typer(help="Manage Hrönir judgment sessions.", no_args_is_help=True)
@@ -570,7 +571,7 @@ def session_start(
 
     # Validate the fork_uuid - it must exist in the database
     # fork_data = storage.get_fork_file_and_data(fork_uuid, fork_dir_base=forking_path_dir) # Legacy
-    fork_data_obj = storage.get_fork_data(fork_uuid) # DB query
+    fork_data_obj = storage.get_fork_data(fork_uuid)  # DB query
 
     if not fork_data_obj:
         typer.echo(
@@ -584,7 +585,7 @@ def session_start(
         raise typer.Exit(code=1)
 
     # Get position N from the fork_data_obj
-    position_n_str = str(fork_data_obj.position) # position is int in ForkDB
+    position_n_str = str(fork_data_obj.position)  # position is int in ForkDB
     if position_n_str is None:
         typer.echo(
             json.dumps(
@@ -935,13 +936,19 @@ def session_commit(
     ],
     ratings_dir: Annotated[
         Path, typer.Option(help="Directory containing rating CSV files.")
-    ] = Path("ratings"),  # Retained for run_temporal_cascade
+    ] = Path(
+        "ratings"
+    ),  # Retained for run_temporal_cascade
     forking_path_dir: Annotated[
         Path, typer.Option(help="Directory containing forking path CSV files.")
-    ] = Path("forking_path"),  # Retained for _get_successor_hronir_for_fork and cascade
+    ] = Path(
+        "forking_path"
+    ),  # Retained for _get_successor_hronir_for_fork and cascade
     canonical_path_file: Annotated[
         Path, typer.Option(help="Path to the canonical path JSON file.")
-    ] = Path("data/canonical_path.json"),  # Retained for run_temporal_cascade
+    ] = Path(
+        "data/canonical_path.json"
+    ),  # Retained for run_temporal_cascade
     max_cascade_positions: Annotated[
         int, typer.Option(help="Maximum number of positions for temporal cascade calculation.")
     ] = 100,
@@ -1022,9 +1029,9 @@ def session_commit(
     dossier_duels = session_data.get("dossier", {}).get("duels", {})
 
     valid_votes_to_record = []
-    processed_verdicts: dict[
-        str, str
-    ] = {}  # For transaction record: position_str -> winning_fork_uuid
+    processed_verdicts: dict[str, str] = (
+        {}
+    )  # For transaction record: position_str -> winning_fork_uuid
     oldest_voted_position = float("inf")
 
     for pos_str, winning_fork_uuid_verdict in verdicts.items():
@@ -1276,6 +1283,88 @@ def session_commit(
     typer.echo(json.dumps({"message": f"Session {session_id} committed successfully."}, indent=2))
 
 
+def _calculate_fork_status_counts(forking_path_dir: Path) -> dict[str, int]:
+    """Return counts of forks by status by scanning CSV files."""
+    status_counts = {
+        "PENDING": 0,
+        "QUALIFIED": 0,
+        "SPENT": 0,
+        "UNKNOWN": 0,
+    }
+
+    if not forking_path_dir.is_dir():
+        return status_counts
+
+    all_fork_uuids_processed: set[str] = set()
+
+    for csv_file in forking_path_dir.glob("*.csv"):
+        if csv_file.stat().st_size == 0:
+            continue
+        try:
+            df = pd.read_csv(
+                csv_file,
+                usecols=["fork_uuid", "status"],
+                dtype={"fork_uuid": str, "status": str},
+            )
+
+            if "status" not in df.columns:
+                status_counts["UNKNOWN"] += len(df)
+                continue
+
+            for _, row in df.iterrows():
+                fork_uuid = row["fork_uuid"]
+                status = row["status"]
+
+                if pd.isna(fork_uuid) or not str(fork_uuid).strip():
+                    continue
+
+                if fork_uuid not in all_fork_uuids_processed:
+                    if pd.isna(status) or not str(status).strip():
+                        status_counts["UNKNOWN"] += 1
+                    elif status in status_counts:
+                        status_counts[status] += 1
+                    else:
+                        status_counts["UNKNOWN"] += 1
+                    all_fork_uuids_processed.add(fork_uuid)
+        except pd.errors.EmptyDataError:
+            continue
+        except Exception:
+            continue
+
+    return status_counts
+
+
+@app.command("status", help="Show canonical path summary and fork status counts.")
+def status_command(
+    canonical_path_file: Annotated[
+        Path, typer.Option(help="Path to the canonical path JSON file.")
+    ] = Path("data/canonical_path.json"),
+    forking_path_dir: Annotated[
+        Path, typer.Option(help="Directory containing forking path CSV files.")
+    ] = Path("forking_path"),
+):
+    """Display canonical path entries and counts of forks by status."""
+    if not canonical_path_file.exists():
+        typer.echo(f"Canonical path file not found: {canonical_path_file}")
+        raise typer.Exit(code=1)
+
+    with canonical_path_file.open() as f:
+        data = json.load(f)
+
+    path = data.get("path", {})
+    typer.echo(f"Total positions: {len(path)}")
+    for pos in sorted(path.keys(), key=lambda x: int(x)):
+        entry = path[pos]
+        typer.echo(
+            f"Position {pos}: fork {entry.get('fork_uuid')} -> hrönir {entry.get('hrönir_uuid')}"
+        )
+
+    counts = _calculate_fork_status_counts(forking_path_dir)
+    typer.echo("Fork counts by status:")
+    for status_val, count in counts.items():
+        typer.echo(f"  {status_val}: {count}")
+
+
 @app.command("metrics", help="Expose fork status metrics in Prometheus format (TDD 2.6).")
 def metrics_command(
     forking_path_dir: Annotated[
@@ -1286,72 +1375,16 @@ def metrics_command(
     Scans all forking_path/*.csv files and prints the total number of forks
     in each status (PENDING, QUALIFIED, SPENT) in Prometheus exposition format.
     """
-    status_counts = {
-        "PENDING": 0,
-        "QUALIFIED": 0,
-        "SPENT": 0,
-        "UNKNOWN": 0,
-    }  # Add UNKNOWN for robustness
+    status_counts = _calculate_fork_status_counts(forking_path_dir)
 
     if not forking_path_dir.is_dir():
         typer.echo(
-            f"# Metrics generation skipped: Directory not found: {forking_path_dir}", err=True
+            f"# Metrics generation skipped: Directory not found: {forking_path_dir}",
+            err=True,
         )
-        # Output empty metrics if dir not found, or specific error metrics
         for status_val, count in status_counts.items():
             typer.echo(f'hronir_fork_status_total{{status="{status_val.lower()}"}} {count}')
         raise typer.Exit(code=1)
-
-    all_fork_uuids_processed = set()  # To count unique fork_uuids across potentially overlapping CSVs (though ideally they don't overlap by fork_uuid)
-
-    for csv_file in forking_path_dir.glob("*.csv"):
-        if csv_file.stat().st_size == 0:
-            continue
-        try:
-            # Ensure 'status' and 'fork_uuid' columns are read.
-            # storage.audit_forking_csv should ensure 'status' exists, defaulting to PENDING.
-            df = pd.read_csv(
-                csv_file, usecols=["fork_uuid", "status"], dtype={"fork_uuid": str, "status": str}
-            )
-
-            if "status" not in df.columns:  # Should not happen if audit_forking_csv is effective
-                # typer.echo(f"# Warning: 'status' column missing in {csv_file}. Skipping this file for metrics.", err=True)
-                # Or count all as UNKNOWN or PENDING
-                status_counts["UNKNOWN"] += len(df)  # Example: count them as unknown
-                continue
-
-            for index, row in df.iterrows():
-                fork_uuid = row["fork_uuid"]
-                status = row["status"]
-
-                if pd.isna(fork_uuid) or not fork_uuid.strip():  # Skip rows with no fork_uuid
-                    continue
-
-                # Only count unique fork_uuids once, even if they appear in multiple files (defensive)
-                if fork_uuid not in all_fork_uuids_processed:
-                    if (
-                        pd.isna(status) or not status.strip()
-                    ):  # Handle NaN or empty status as UNKNOWN
-                        status_counts["UNKNOWN"] += 1
-                    elif status in status_counts:
-                        status_counts[status] += 1
-                    else:
-                        status_counts["UNKNOWN"] += 1  # Catch any other unexpected status values
-                    all_fork_uuids_processed.add(fork_uuid)
-
-        except pd.errors.EmptyDataError:
-            continue
-        except ValueError as ve:  # e.g. if usecols specifies a col that's not there
-            typer.echo(
-                f"# Warning: Could not process {csv_file} for metrics due to ValueError: {ve}. Skipping.",
-                err=True,
-            )
-            continue
-        except Exception as e:
-            typer.echo(
-                f"# Warning: Error processing {csv_file} for metrics: {e}. Skipping.", err=True
-            )
-            continue
 
     # Print metrics in Prometheus format
     typer.echo("# HELP hronir_fork_status_total Total number of forks by status.")
