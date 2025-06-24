@@ -124,7 +124,7 @@ def test_clean_functions(tmp_path):
         },
     ]
     pd.DataFrame(rows).to_csv(rating_csv, index=False)
-    removed = storage.purge_fake_votes_csv(rating_csv, base=base, fork_dir=fork_dir)
+    removed = storage.purge_fake_votes_csv(rating_csv, base=base)
     assert removed == 2
     df = pd.read_csv(rating_csv)
     assert len(df) == 1

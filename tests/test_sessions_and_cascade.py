@@ -127,8 +127,10 @@ def _create_fork_entry(
     )
 
     storage.append_fork(
-        csv_file, position, prev_hr_uuid, current_hr_uuid, conn=None
-    )  # conn=None for CSV
+        position=position,
+        prev_uuid=prev_hr_uuid,
+        uuid_str=current_hr_uuid,
+    )
 
 
 def _get_fork_uuid(position: int, prev_hr_uuid: str, current_hr_uuid: str) -> str:
