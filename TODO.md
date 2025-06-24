@@ -12,9 +12,10 @@ This document outlines the development roadmap for the **Hrönir Encyclopedia** 
 - [x] **Fix CLI command references** in help text and examples
 
 ### Critical Bug Fixes 🐛
-- [ ] **Path→hrönir mapping issues** in session commit workflow
-- [ ] **Automatic qualification** based on Elo ratings not working
-- [ ] **Integrity validation** for path→hrönir relationships
+- [~] **Stabilize existing test suite (Pytest)** - Actively fixing test failures. Resolved several issues in `test_protocol_v2.py` related to data consistency for CLI subprocesses and corrected argument/UUID handling. Work ongoing for remaining assertion errors.
+- [~] **Path→hrönir mapping issues** in session commit workflow - Some aspects investigated/addressed by test fixes ensuring correct UUID generation (v5 for paths, content-based for hrönirs) and data handling logic, particularly in `test_sessions_and_cascade.py` and `test_protocol_v2.py`.
+- [~] **Automatic qualification** based on Elo ratings not working - Progress made. Test fixes for `initiating_fork_uuid` (ensuring valid UUIDv5) and ensuring data persistence for CLI interactions in `test_protocol_v2.py` are crucial for testing qualification logic. Failures in qualification are still observed in tests like `test_legitimate_promotion_and_mandate_issuance`.
+- [~] **Integrity validation** for path→hrönir relationships - Partially addressed by fixes in test data generation (correct UUID types and sources) and consistency checks for `prev_uuid` / `current_hrönir_uuid` during path construction in tests.
 - [ ] **Error messages** need more context about predecessors
 
 ### Enhanced Data Models 🏗️
