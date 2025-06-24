@@ -235,6 +235,11 @@ uv run hronir list-forks --position 1
 # Check status of a specific fork
 uv run hronir fork-status <fork_uuid>
 
+# Show the current canonical path
+uv run hronir status
+# Include counts of forks by status
+uv run hronir status --counts
+
 # Validate a human-contributed chapter (basic check)
 uv run hronir validate drafts/my_chapter.md
 

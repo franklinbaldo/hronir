@@ -128,6 +128,10 @@ uv run hronir list-forks --position <position>
 # Check status of a specific fork
 uv run hronir fork-status <fork_uuid>
 
+# Show canonical path status
+uv run hronir status
+uv run hronir status --counts
+
 # Get duel information
 uv run hronir get-duel --position <position>
 
