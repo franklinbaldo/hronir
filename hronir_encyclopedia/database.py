@@ -29,11 +29,11 @@ class CsvDatabase:
     def __init__(
         self,
         ratings_dir: Path | str = "ratings",
-        fork_dir: Path | str = "the_garden",
+        path_dir: Path | str = "narrative_paths", # Changed from fork_dir
         filename: str | None = None,
     ) -> None:
         self.ratings_dir = Path(ratings_dir)
-        self.fork_dir = Path(fork_dir)
+        self.path_dir = Path(path_dir) # Changed from fork_dir
         self.filename = filename or ":memory:"
         self._engine: Engine | None = None
         self._mapping: dict[str, Path] = {}
@@ -42,8 +42,8 @@ class CsvDatabase:
         eng = self._engine
         assert eng is not None
         self.ratings_dir.mkdir(exist_ok=True)
-        self.fork_dir.mkdir(exist_ok=True)
-        for csv in list(self.ratings_dir.glob("*.csv")) + list(self.fork_dir.glob("*.csv")):
+        self.path_dir.mkdir(exist_ok=True) # Changed from fork_dir
+        for csv in list(self.ratings_dir.glob("*.csv")) + list(self.path_dir.glob("*.csv")): # Changed from fork_dir
             _load_csv_into(eng, csv)
             self._mapping[csv.stem] = csv
 
@@ -57,7 +57,7 @@ class CsvDatabase:
         _CONNECTION_MAP[id(self._engine)] = {
             "mapping": self._mapping,
             "ratings_dir": self.ratings_dir,
-            "fork_dir": self.fork_dir,
+            "path_dir": self.path_dir, # Changed from fork_dir
         }
         return self._engine
 
@@ -94,7 +94,7 @@ def commit_to_csv(engine: Engine) -> None:
             df = pd.read_sql_table(tbl_name, con)
             csv = mapping.get(tbl_name)
             if not csv:
-                base = info["ratings_dir"] if tbl_name.startswith("position_") else info["fork_dir"]
+                base = info["ratings_dir"] if tbl_name.startswith("position_") else info["path_dir"] # Changed from fork_dir
                 csv = Path(base) / f"{tbl_name}.csv"
             csv.parent.mkdir(parents=True, exist_ok=True)
             df.to_csv(csv, index=False)
@@ -107,11 +107,11 @@ def open_database(
     *,
     temp_file: bool = False,
     ratings_dir: Path | str = "ratings",
-    fork_dir: Path | str = "the_garden",
+    path_dir: Path | str = "narrative_paths", # Changed from fork_dir
 ) -> CsvDatabase:
     """Return CsvDatabase context manager."""
     if temp_file:
         fd, p = tempfile.mkstemp(suffix=".sqlite")
         os.close(fd)
-        return CsvDatabase(ratings_dir, fork_dir, filename=p)
-    return CsvDatabase(ratings_dir, fork_dir, filename=":memory:")
+        return CsvDatabase(ratings_dir, path_dir, filename=p) # Changed from fork_dir
+    return CsvDatabase(ratings_dir, path_dir, filename=":memory:") # Changed from fork_dir
