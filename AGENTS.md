@@ -20,7 +20,7 @@
 cat CLAUDE.md
 
 # Key development commands
-uv sync --all-features    # Install dependencies
+uv sync --all-extras      # Install dependencies
 uv run pytest           # Run tests
 uv run ruff check .      # Lint code
 uv run hronir           # Access CLI

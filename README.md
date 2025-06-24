@@ -53,7 +53,7 @@ graph TD
 
 4. **Create virtual environment and install dependencies:**
    ```bash
-   uv sync --all-groups # Installs main and all optional dependencies (dev, viz)
+   uv sync --all-extras # Installs main and all optional dependencies (dev, viz)
    # Or for just development dependencies:
    # uv sync --group dev
    ```
