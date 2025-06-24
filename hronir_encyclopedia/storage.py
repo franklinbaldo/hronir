@@ -214,8 +214,10 @@ class DataManager:
             # Check existence of the predecessor hrönir (prev_uuid), if applicable
             if path.prev_uuid and not self.hrönir_exists(str(path.prev_uuid)):
                 issues.append(
-                    f"Path {path.path_uuid} (Pos: {path.position}, Prev: {path.prev_uuid}, Curr: {path.uuid}) "
-                    f"references non-existent predecessor hrönir {path.prev_uuid}."
+                    f"Path {path.path_uuid} (Position: {path.position}, Predecessor: {path.prev_uuid}, Current Hrönir: {path.uuid}) "
+                    f"references a non-existent predecessor hrönir '{path.prev_uuid}'. "
+                    f"This breaks the narrative chain for this path. "
+                    f"Please ensure the hrönir file '{path.prev_uuid}.md' exists in 'the_library/' or verify the predecessor UUID."
                 )
 
             # Validate deterministic path_uuid

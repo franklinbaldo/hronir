@@ -62,21 +62,75 @@ class SuperBlock(BaseModel):
 
 # --- Session Models ---
 class SessionDuel(BaseModel):
+    """
+    Represents a single duel within a session dossier.
+    A duel consists of two competing paths at a specific position.
+    path_A_uuid and path_B_uuid store the UUIDs of the paths in the duel.
+    """
     path_A_uuid: UUID5
     path_B_uuid: UUID5
-    entropy: float
+    entropy: float = Field(default=0.0, description="Entropy of the duel, if calculated.")
+
+    class Config:
+        extra = 'forbid'
 
 class SessionDossier(BaseModel):
-    duels: dict[int, SessionDuel] = Field(default_factory=dict)
+    """
+    Represents the dossier for a judgment session.
+    It contains all the duels that need to be judged for prior positions.
+    Duels are keyed by position string (e.g., "0", "1", "2").
+    """
+    duels: dict[str, SessionDuel] = Field(default_factory=dict)
 
-class Session(BaseModel):
-    session_id: uuid.UUID
-    initiating_path_uuid: UUID5
-    mandate_id: MandateID
-    position_n: int
-    dossier: SessionDossier
-    status: str
-    committed_verdicts: dict[int, UUID5] | None = None
+    class Config:
+        extra = 'forbid'
+
+class SessionModel(BaseModel): # Renamed from Session to SessionModel
+    """
+    Represents a judgment session in the Hrönir Encyclopedia.
+    """
+    session_id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    initiating_path_uuid: UUID5 # The QUALIFIED path_uuid that granted the mandate for this session
+    mandate_id: MandateID # The mandate_id from the initiating_path_uuid that was used.
+    position_n: int # The position of the initiating_path_uuid
+
+    dossier: SessionDossier = Field(default_factory=SessionDossier)
+    status: str = Field(default="active", description="Current status of the session (e.g., active, committed, aborted).")
+
+    # Store verdicts as position string to winning path UUID
+    committed_verdicts: dict[str, UUID5] | None = Field(default=None, description="Verdicts committed for this session, mapping position string to winning path UUID.")
+
+    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
+    updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    class Config:
+        extra = 'forbid'
+        # Pydantic v2 handles datetime and UUID serialization well by default.
+        # If specific string formats are needed, json_encoders can be used.
+        # Example:
+        # json_encoders = {
+        #     datetime.datetime: lambda dt: dt.isoformat(),
+        #     uuid.UUID: lambda u: str(u),
+        # }
+        validate_assignment = True # Allows updated_at to be auto-updated on field change via validators if needed
+
+    # Automatically update `updated_at` when relevant fields change.
+    # This is a common pattern, but for simple "touch on save" it's often handled in the manager.
+    # For now, a manual `touch()` method in the manager or before saving is simpler.
+    # Pydantic v2's model_on_setattr or similar could also be explored if auto-update is critical.
+
+    def model_post_init(self, __context: Any) -> None:
+        # Ensure updated_at is also set to created_at initially if factories behave unexpectedly or for older Pydantic versions
+        # For Pydantic v2, default_factory should ensure they are set.
+        # This is more of a safeguard or for specific initialization logic.
+        if self.created_at and self.updated_at and self.updated_at < self.created_at: # Should not happen with factories
+             self.updated_at = self.created_at
+        # Ensure UTC for datetime fields if not already handled by factory
+        if self.created_at.tzinfo is None:
+            self.created_at = self.created_at.replace(tzinfo=datetime.timezone.utc)
+        if self.updated_at.tzinfo is None:
+            self.updated_at = self.updated_at.replace(tzinfo=datetime.timezone.utc)
+
 
 # --- Hrönir Content Model ---
 class Hronir(BaseModel):

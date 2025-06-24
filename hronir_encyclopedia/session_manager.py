@@ -1,151 +1,191 @@
 import json
 import uuid
+import datetime # Added for timestamps
 from pathlib import Path
-from typing import Any
+from typing import Any # Retained for now, may not be needed after full refactor
 
-from . import ratings, storage  # Assuming storage.py has get_canonical_fork_info
+from pydantic import ValidationError # For parsing errors
+
+from . import ratings, storage
+# Import the new Pydantic models
+from .models import SessionModel, SessionDossier, SessionDuel, MandateID
 
 SESSIONS_DIR = Path("data/sessions")
-CONSUMED_FORKS_FILE = SESSIONS_DIR / "consumed_fork_uuids.json"
+# CONSUMED_PATHS_FILE instead of CONSUMED_FORKS_FILE for clarity
+CONSUMED_PATHS_FILE = SESSIONS_DIR / "consumed_path_uuids.json"
 
 
-def _load_consumed_forks() -> dict[str, str]:
-    """Loads the set of consumed fork UUIDs and the session_id they were consumed by."""
+def _load_consumed_paths() -> dict[str, str]:
+    """Loads the set of consumed path UUIDs and the session_id they were consumed by."""
     SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
-    if not CONSUMED_FORKS_FILE.exists():
+    if not CONSUMED_PATHS_FILE.exists():
         return {}
     try:
-        return json.loads(CONSUMED_FORKS_FILE.read_text())
+        return json.loads(CONSUMED_PATHS_FILE.read_text())
     except json.JSONDecodeError:
+        # Consider logging this error
+        print(f"Warning: Could not parse {CONSUMED_PATHS_FILE}, returning empty consumed paths list.")
         return {}
 
 
-def _save_consumed_forks(consumed_forks: dict[str, str]) -> None:
-    """Saves the set of consumed fork UUIDs."""
+def _save_consumed_paths(consumed_paths: dict[str, str]) -> None:
+    """Saves the set of consumed path UUIDs."""
     SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
-    CONSUMED_FORKS_FILE.write_text(json.dumps(consumed_forks, indent=2))
+    CONSUMED_PATHS_FILE.write_text(json.dumps(consumed_paths, indent=2))
 
 
-def is_fork_consumed(fork_uuid: str) -> str | None:
-    """Checks if a fork_uuid has been consumed, returning the session_id if so."""
-    consumed_forks = _load_consumed_forks()
-    return consumed_forks.get(fork_uuid)
+def is_path_consumed(path_uuid: str) -> str | None:
+    """Checks if a path_uuid has been consumed, returning the session_id if so."""
+    consumed_paths = _load_consumed_paths()
+    return consumed_paths.get(path_uuid)
 
 
-def mark_fork_as_consumed(fork_uuid: str, session_id: str) -> None:
-    """Marks a fork_uuid as consumed by a given session_id."""
-    consumed_forks = _load_consumed_forks()
-    consumed_forks[fork_uuid] = session_id
-    _save_consumed_forks(consumed_forks)
+def mark_path_as_consumed(path_uuid: str, session_id: str) -> None:
+    """Marks a path_uuid as consumed by a given session_id."""
+    consumed_paths = _load_consumed_paths()
+    consumed_paths[path_uuid] = session_id
+    _save_consumed_paths(consumed_paths)
 
 
 def create_session(
-    fork_n_uuid: str,
+    path_n_uuid_str: str,
     position_n: int,
-    mandate_id: str,  # Added mandate_id
-    forking_path_dir: Path,
-    ratings_dir: Path,
+    mandate_id_str: str,
     canonical_path_file: Path,
-) -> dict[str, Any]:
+) -> SessionModel:
     """
-    Creates a new session, generates a dossier, and stores session information.
-    Returns the session data including session_id and dossier.
+    Creates a new session, generates a dossier using Pydantic models,
+    and stores session information as a JSON representation of SessionModel.
+    Returns the created SessionModel instance.
     """
-    session_id = str(uuid.uuid4())
     SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
-    session_file = SESSIONS_DIR / f"{session_id}.json"
 
-    dossier_duels: dict[str, dict[str, str]] = {}
-    # Iterate from N-1 down to 0
-    # Example: if position_n (fork's position) is 2, loop for p_idx = 1, then p_idx = 0.
-    # Duels for p_idx=1 need predecessor from p_idx=0.
-    # Duels for p_idx=0 need no predecessor (or predecessor is None).
+    try:
+        # PathModel uses UUID5, SessionModel.initiating_path_uuid is UUID5
+        # MandateID is uuid.UUID
+        initiating_path_uuid_obj = uuid.UUID(path_n_uuid_str)
+        mandate_id_obj = uuid.UUID(mandate_id_str)
+    except ValueError as e:
+        raise ValueError(f"Invalid UUID string provided for path_n_uuid ('{path_n_uuid_str}') or mandate_id ('{mandate_id_str}'): {e}")
+
+    # Dossier generation
+    dossier_duels_models: dict[str, SessionDuel] = {}
     for p_idx in range(position_n - 1, -1, -1):
-        predecessor_hronir_uuid_for_duel: str | None = None
-        # Determine the predecessor for duels at p_idx.
-        # This predecessor is the canonical hrönir from position p_idx - 1.
+        predecessor_hronir_uuid_for_duel_str: str | None = None
         if p_idx > 0:
-            # storage.get_canonical_fork_info expects the position of the canonical entry itself.
-            # So, for duels at p_idx, we need the canonical hrönir from p_idx - 1.
-            canonical_info_for_predecessor = storage.get_canonical_fork_info(
+            canonical_info_for_predecessor = storage.get_canonical_path_info(
                 p_idx - 1, canonical_path_file
             )
             if (
                 not canonical_info_for_predecessor
                 or "hrönir_uuid" not in canonical_info_for_predecessor
             ):
-                # print(f"Warning: Cannot find canonical hrönir at position {p_idx - 1} to serve as predecessor for duels at {p_idx}. Skipping duels for {p_idx}.")
+                print(f"Warning: SessionManager: Cannot find canonical hrönir at position {p_idx - 1} to serve as predecessor for duels at {p_idx}. Skipping duels for {p_idx}.")
                 continue
-            predecessor_hronir_uuid_for_duel = canonical_info_for_predecessor["hrönir_uuid"]
-        # If p_idx is 0, predecessor_hronir_uuid_for_duel remains None, which is correct.
+            predecessor_hronir_uuid_for_duel_str = canonical_info_for_predecessor["hrönir_uuid"]
 
-        # Acquire session for ratings.determine_next_duel_entropy
         db_session_for_duel = storage.get_db_session()
         try:
-            duel_info = ratings.determine_next_duel_entropy(  # Correct function name
-                position=p_idx,  # We are determining duels for this position p_idx
-                predecessor_hronir_uuid=predecessor_hronir_uuid_for_duel,
-                # forking_path_dir and ratings_dir are no longer needed
+            duel_info_dict = ratings.determine_next_duel_entropy(
+                position=p_idx,
+                predecessor_hronir_uuid=predecessor_hronir_uuid_for_duel_str,
                 session=db_session_for_duel,
             )
         finally:
             db_session_for_duel.close()
 
         if (
-            duel_info
-            and "duel_pair" in duel_info
-            and duel_info["duel_pair"].get("fork_A")
-            and duel_info["duel_pair"].get("fork_B")
+            duel_info_dict
+            and "duel_pair" in duel_info_dict
+            and duel_info_dict["duel_pair"].get("path_A")
+            and duel_info_dict["duel_pair"].get("path_B")
         ):
-            dossier_duels[str(p_idx)] = {
-                "fork_A": duel_info["duel_pair"]["fork_A"],
-                "fork_B": duel_info["duel_pair"]["fork_B"],
-                "entropy": duel_info.get("entropy", 0.0),
-            }
+            try:
+                # SessionDuel model expects path_A_uuid, path_B_uuid as UUID5
+                # determine_next_duel_entropy returns path_A, path_B as strings (UUIDs)
+                path_a_uuid = uuid.UUID(duel_info_dict["duel_pair"]["path_A"])
+                path_b_uuid = uuid.UUID(duel_info_dict["duel_pair"]["path_B"])
+                entropy = float(duel_info_dict.get("entropy", 0.0))
 
-    session_data = {
-        "session_id": session_id,
-        "initiating_fork_uuid": fork_n_uuid,
-        "mandate_id": mandate_id,  # Store the mandate_id
-        "position_n": position_n,
-        "dossier": {"duels": dossier_duels},
-        "status": "active",
-    }
+                dossier_duels_models[str(p_idx)] = SessionDuel(
+                    path_A_uuid=path_a_uuid,
+                    path_B_uuid=path_b_uuid,
+                    entropy=entropy,
+                )
+            except (ValueError, TypeError) as e:
+                print(f"Warning: SessionManager: Error creating SessionDuel for position {p_idx} from duel_info {duel_info_dict}: {e}")
+                continue
 
-    session_file.write_text(json.dumps(session_data, indent=2))
-    mark_fork_as_consumed(fork_n_uuid, session_id)  # Mark the fork itself as consumed for a session
+    session_dossier_model = SessionDossier(duels=dossier_duels_models)
 
-    return {
-        "session_id": session_id,
-        "dossier": session_data["dossier"],
-        "mandate_id_used": mandate_id,
-    }
+    session_model_instance = SessionModel(
+        # session_id is generated by default_factory
+        initiating_path_uuid=initiating_path_uuid_obj, # type: ignore
+        mandate_id=mandate_id_obj, # type: ignore
+        position_n=position_n,
+        dossier=session_dossier_model,
+        status="active",
+        # created_at and updated_at are handled by default_factory
+    )
+
+    session_file = SESSIONS_DIR / f"{session_model_instance.session_id}.json"
+    session_file.write_text(session_model_instance.model_dump_json(indent=2))
+
+    mark_path_as_consumed(path_n_uuid_str, str(session_model_instance.session_id))
+
+    return session_model_instance
 
 
-def get_session(session_id: str) -> dict[str, Any] | None:
-    """Loads session data from a session_id."""
+def get_session(session_id_str: str) -> SessionModel | None:
+    """Loads session data from a session_id and parses it into a SessionModel."""
     SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
-    session_file = SESSIONS_DIR / f"{session_id}.json"
+
+    try:
+        # Ensure session_id_str is a valid UUID format before file system access
+        # This doesn't guarantee the file exists, just that the format is okay.
+        uuid.UUID(session_id_str)
+    except ValueError:
+        print(f"Warning: SessionManager: Invalid session_id format: {session_id_str}")
+        return None
+
+    session_file = SESSIONS_DIR / f"{session_id_str}.json"
     if not session_file.exists():
         return None
+
     try:
-        return json.loads(session_file.read_text())
-    except json.JSONDecodeError:
+        json_data = session_file.read_text()
+        session_model_instance = SessionModel.model_validate_json(json_data)
+        return session_model_instance
+    except json.JSONDecodeError as e:
+        print(f"Error: SessionManager: Could not decode JSON from session file {session_file}: {e}")
+        return None
+    except ValidationError as e:
+        print(f"Error: SessionManager: Pydantic validation failed for session file {session_file}: {e}")
         return None
 
 
-def update_session_status(session_id: str, status: str) -> bool:
-    """Updates the status of a session."""
-    session_data = get_session(session_id)
-    if not session_data:
+def update_session_status(session_id_str: str, new_status: str) -> bool:
+    """Updates the status of a session and its updated_at timestamp."""
+    session_model_instance = get_session(session_id_str)
+    if not session_model_instance:
+        return False # get_session already printed a warning/error
+
+    session_model_instance.status = new_status
+    session_model_instance.updated_at = datetime.datetime.now(datetime.timezone.utc)
+
+    session_file = SESSIONS_DIR / f"{session_model_instance.session_id}.json"
+    try:
+        session_file.write_text(session_model_instance.model_dump_json(indent=2))
+        return True
+    except Exception as e:
+        print(f"Error: SessionManager: Could not write updated session file {session_file}: {e}")
         return False
 
-    session_data["status"] = status
-    session_file = SESSIONS_DIR / f"{session_id}.json"
-    session_file.write_text(json.dumps(session_data, indent=2))
-    return True
-
-
-# Placeholder for cleaning up old/expired sessions if needed in the future
-# def cleanup_expired_sessions():
-#     pass
+# Note: The old is_fork_consumed and mark_fork_as_consumed were already aliased
+# to is_path_consumed and mark_path_as_consumed in the previous step's plan.
+# If they are still present with "fork" names, they should be removed or fully replaced.
+# The provided file only had the "fork" versions, so this refactor effectively renames them
+# by defining the "path" versions and how they use _load_consumed_paths and _save_consumed_paths.
+# The global constants CONSUMED_FORKS_FILE should also be CONSUMED_PATHS_FILE.
+# The current overwrite will handle this renaming.
+```
