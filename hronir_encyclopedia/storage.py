@@ -36,6 +36,30 @@ class DataManager:
         )
         self._initialized = False
 
+    @property
+    def fork_csv_dir(self):
+        return self.pandas_manager.path_csv_dir
+
+    @fork_csv_dir.setter
+    def fork_csv_dir(self, value):
+        self.pandas_manager.path_csv_dir = value
+
+    @property
+    def ratings_csv_dir(self):
+        return self.pandas_manager.ratings_csv_dir
+
+    @ratings_csv_dir.setter
+    def ratings_csv_dir(self, value):
+        self.pandas_manager.ratings_csv_dir = Path(value) # Ensure it's a Path object
+
+    @property
+    def transactions_json_dir(self):
+        return self.pandas_manager.transactions_json_dir
+
+    @transactions_json_dir.setter
+    def transactions_json_dir(self, value):
+        self.pandas_manager.transactions_json_dir = value
+
     def initialize_and_load(self, clear_existing_data=False):
         """Initialize the data manager and load data from files."""
         if clear_existing_data:
@@ -274,3 +298,6 @@ def compute_narrative_path_uuid(
 
     path_key = f"{position}:{prev_uuid_str}:{current_hronir_uuid}"
     return uuid.uuid5(UUID_NAMESPACE, path_key)
+
+
+data_manager = DataManager()
