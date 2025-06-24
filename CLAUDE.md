@@ -12,12 +12,6 @@ The Hrönir Encyclopedia is a Python-based literary protocol inspired by Jorge L
 ```bash
 # Install dependencies with uv
 uv sync --all-extras
-
-# Set up pre-commit hooks
-uv run pre-commit install
-
-# If pre-commit issues occur, use the fix script
-bash scripts/fix_hooks.sh
 ```
 
 ### ⚠️ Important: Always Use `uv run`
@@ -77,7 +71,6 @@ uv run repomix .
 # Configuration in repomix.config.json
 # - Ignores: uv.lock, the_library/, test_temp/, dist/
 # - Output: dist/hronir-codebase.md with header and stats
-# - Runs automatically in pre-commit hooks
 ```
 
 ### ⚠️ Code Quality Requirements
@@ -223,7 +216,6 @@ Tests focus on protocol dynamics:
 ### File Validation
 - `audit` command validates all stored content integrity
 - `clean` command removes invalid entries (use `--git` to stage deletions)
-- Pre-commit hooks automatically run validation
 
 ## Development Notes
 
@@ -245,3 +237,62 @@ Tests focus on protocol dynamics:
 - Session commits are atomic and trigger cascading updates
 - Fork qualification uses Elo ratings with configurable thresholds
 - NetworkX ensures narrative graph remains acyclic (no time paradoxes)
+
+## Practical Testing Protocol
+
+### Full System Testing Workflow
+
+For comprehensive testing of the Hrönir Encyclopedia, follow this standardized workflow:
+
+#### 1. Create Test Content (10 Meta Hrönirs)
+```bash
+# Create test content in test_temp/ directory
+# Each hrönir should be meta-commentary about:
+# - Project development journey and technical insights
+# - AI-human collaboration in code development  
+# - System architecture and philosophical implications
+# - Protocol evolution and design decisions
+# - User experience and interface considerations
+```
+
+#### 2. Execute Complete Protocol Testing
+```bash
+# Test the full happy path: store → fork → session → vote
+
+# Store all test hrönirs
+uv run hronir store test_temp/hrönir1.md
+uv run hronir store test_temp/hrönir2.md
+# ... (repeat for all test files)
+
+# Create forking paths
+uv run hronir fork --position N --source <prev_uuid> --target <new_uuid>
+
+# Generate and execute judgment sessions
+uv run hronir session start --fork-uuid <qualified_fork_uuid>
+uv run hronir session commit --session-id <id> --verdicts '{"position": "winning_fork_uuid"}'
+
+# Validate system state
+uv run hronir audit
+uv run hronir status --counts
+```
+
+#### 3. Collect Development Insights
+```bash
+# Document findings in TODO.md with rationale:
+# - Workflow friction points and UX issues
+# - Performance bottlenecks or error conditions  
+# - Missing CLI commands or functionality gaps
+# - Architecture improvements needed
+# - Documentation clarifications required
+```
+
+#### 4. System Validation
+```bash
+# Ensure system integrity after testing
+uv run hronir audit              # Validate all stored content
+uv run hronir clean --git        # Remove any invalid entries
+uv run pytest                    # Run full test suite
+uv run ruff check .              # Verify code quality
+```
+
+**Usage Note**: This testing protocol should be run periodically to validate system stability and identify areas for improvement. Each test session provides valuable data about real-world usage patterns and edge cases.
