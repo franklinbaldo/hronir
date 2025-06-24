@@ -5,7 +5,8 @@ from pathlib import Path
 import pandas as pd
 from pydantic import ValidationError
 
-from .models import Path as PathModel, Transaction, Vote
+from .models import Path as PathModel
+from .models import Transaction, Vote
 
 UUID_NAMESPACE = uuid.NAMESPACE_URL
 
@@ -51,7 +52,9 @@ class PandasDataManager:
         """Load paths from CSV files."""
         path_files = list(self.path_csv_dir.glob("*.csv"))
         if not path_files:
-            self._paths_df = pd.DataFrame(columns=["path_uuid", "position", "prev_uuid", "uuid", "status", "mandate_id"])
+            self._paths_df = pd.DataFrame(
+                columns=["path_uuid", "position", "prev_uuid", "uuid", "status", "mandate_id"]
+            )
             return
 
         dfs = []
@@ -63,7 +66,9 @@ class PandasDataManager:
         if dfs:
             self._paths_df = pd.concat(dfs, ignore_index=True)
         else:
-            self._paths_df = pd.DataFrame(columns=["path_uuid", "position", "prev_uuid", "uuid", "status", "mandate_id"])
+            self._paths_df = pd.DataFrame(
+                columns=["path_uuid", "position", "prev_uuid", "uuid", "status", "mandate_id"]
+            )
 
     def _load_votes(self):
         """Load votes from CSV file."""
@@ -136,7 +141,18 @@ class PandasDataManager:
         paths = []
         for _, row in self._paths_df.iterrows():
             try:
-                path = PathModel(**row.to_dict())
+                row_dict = row.to_dict()
+                # Handle NaN or empty strings for optional fields before Pydantic validation
+                if "prev_uuid" in row_dict and (
+                    pd.isna(row_dict["prev_uuid"]) or row_dict["prev_uuid"] == ""
+                ):
+                    row_dict["prev_uuid"] = None
+                if "mandate_id" in row_dict and (
+                    pd.isna(row_dict["mandate_id"]) or row_dict["mandate_id"] == ""
+                ):
+                    row_dict["mandate_id"] = None
+
+                path = PathModel(**row_dict)
                 paths.append(path)
             except ValidationError as e:
                 print(f"Validation error for path {row.get('path_uuid', 'unknown')}: {e}")
@@ -163,7 +179,9 @@ class PandasDataManager:
     def add_path(self, path: PathModel):
         """Add a new path."""
         if self._paths_df is None:
-            self._paths_df = pd.DataFrame(columns=["path_uuid", "position", "prev_uuid", "uuid", "status", "mandate_id"])
+            self._paths_df = pd.DataFrame(
+                columns=["path_uuid", "position", "prev_uuid", "uuid", "status", "mandate_id"]
+            )
 
         path_data = path.model_dump()
         new_row = pd.DataFrame([path_data])

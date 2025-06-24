@@ -84,36 +84,93 @@ def init_test(
     ),
 ) -> None:
     """Create sample directories, chapters, paths, and a canonical path."""
-    library_dir.mkdir(parents=True, exist_ok=True)
-    narrative_paths_dir.mkdir(parents=True, exist_ok=True)
-    ratings_dir.mkdir(parents=True, exist_ok=True)
-    (data_dir / "sessions").mkdir(parents=True, exist_ok=True)
-    (data_dir / "transactions").mkdir(parents=True, exist_ok=True)
+    import shutil  # Import shutil for rmtree
+
+    def clear_or_create_dir(dir_path: Path):
+        if dir_path.exists():
+            for item in dir_path.iterdir():
+                if item.is_dir():
+                    shutil.rmtree(item)
+                else:
+                    item.unlink()  # For files directly in the dir
+        else:
+            dir_path.mkdir(parents=True, exist_ok=True)  # exist_ok still good
+
+    clear_or_create_dir(library_dir)
+    clear_or_create_dir(narrative_paths_dir)
+    clear_or_create_dir(ratings_dir)
+
+    sessions_dir = data_dir / "sessions"
+    transactions_dir = data_dir / "transactions"
+
+    # For nested dirs like data/sessions, ensure data_dir itself exists first
+    if not data_dir.exists():
+        data_dir.mkdir(parents=True, exist_ok=True)
+
+    clear_or_create_dir(sessions_dir)
+    clear_or_create_dir(transactions_dir)
+
+    # Ensure canonical_path.json is removed if it exists, as it's directly in data_dir
+    canonical_file_path = data_dir / "canonical_path.json"
+    if canonical_file_path.exists():
+        canonical_file_path.unlink()
 
     h0_uuid = storage.store_chapter_text("Example Hr\u00f6nir 0", base=library_dir)
     h1_uuid = storage.store_chapter_text("Example Hr\u00f6nir 1", base=library_dir)
 
-    p0_uuid = storage.append_path(0, "", h0_uuid)
-    p1_uuid = storage.append_path(1, h0_uuid, h1_uuid)
+    # Must import PathModel here or at top of file
+    from .models import Path as PathModel
+
+    data_manager = storage.DataManager()
+    # data_manager.initialize_and_load() # Already called by main_callback
+
+    # Path for H0 at position 0
+    p0_path_uuid_val = storage.compute_narrative_path_uuid(0, "", h0_uuid)
+    path0 = PathModel(
+        path_uuid=p0_path_uuid_val,
+        position=0,
+        prev_uuid=None,  # Or "" if required by model/logic, but None is more Pydantic-idiomatic for optional UUID
+        uuid=h0_uuid,
+        status="PENDING",  # Initial status
+    )
+    data_manager.add_path(path0)
+
+    # Path for H1 at position 1, from H0
+    p1_path_uuid_val = storage.compute_narrative_path_uuid(1, h0_uuid, h1_uuid)
+    path1 = PathModel(
+        path_uuid=p1_path_uuid_val,
+        position=1,
+        prev_uuid=h0_uuid,
+        uuid=h1_uuid,
+        status="PENDING",  # Initial status
+    )
+    data_manager.add_path(path1)
+
+    # Use the generated path UUIDs for the canonical path
+    p0_uuid_str = str(p0_path_uuid_val)
+    p1_uuid_str = str(p1_path_uuid_val)
+    h0_uuid_str = str(h0_uuid)
+    h1_uuid_str = str(h1_uuid)
 
     canonical = {
         "title": "The Hr\u00f6nir Encyclopedia - Canonical Path",
         "path": {
-            "0": {"path_uuid": p0_uuid, "hr\u00f6nir_uuid": h0_uuid},
-            "1": {"path_uuid": p1_uuid, "hr\u00f6nir_uuid": h1_uuid},
+            "0": {"path_uuid": p0_uuid_str, "hrönir_uuid": h0_uuid_str},
+            "1": {"path_uuid": p1_uuid_str, "hrönir_uuid": h1_uuid_str},
         },
     }
     canonical_file = data_dir / "canonical_path.json"
     canonical_file.write_text(json.dumps(canonical, indent=2))
 
-    data_manager = storage.DataManager()
+    # data_manager instance already exists due to main_callback and is a singleton.
+    # No need to call storage.DataManager() again.
     data_manager.save_all_data_to_csvs()
 
     typer.echo("Sample data initialized:")
-    typer.echo(f"  Position 0 hr\u00f6nir UUID: {h0_uuid}")
-    typer.echo(f"  Position 0 path UUID: {p0_uuid}")
-    typer.echo(f"  Position 1 hr\u00f6nir UUID: {h1_uuid}")
-    typer.echo(f"  Position 1 path UUID: {p1_uuid}")
+    typer.echo(f"  Position 0 hrönir UUID: {h0_uuid_str}")
+    typer.echo(f"  Position 0 path UUID: {p0_uuid_str}")
+    typer.echo(f"  Position 1 hrönir UUID: {h1_uuid_str}")
+    typer.echo(f"  Position 1 path UUID: {p1_uuid_str}")
 
 
 # Command `export` and `tree` removed as they depended on the old book structure.
@@ -191,13 +248,13 @@ def path(
 
     # Validate hrönir UUIDs exist in library
     library_dir = Path("the_library")
-    target_path_lib = library_dir / target # Renamed to avoid conflict
+    target_path_lib = library_dir / target  # Renamed to avoid conflict
     if not target_path_lib.exists():
         typer.echo(f"Error: Target hrönir {target} not found in library")
         raise typer.Exit(1)
 
     if source:
-        source_path_lib = library_dir / source # Renamed to avoid conflict
+        source_path_lib = library_dir / source  # Renamed to avoid conflict
         if not source_path_lib.exists():
             typer.echo(f"Error: Source hrönir {source} not found in library")
             raise typer.Exit(1)
@@ -298,7 +355,7 @@ def list_paths(
 @app.command(help="Show status details for a specific path.")
 def path_status(path_uuid: str) -> None:
     """Display status information for the given path UUID."""
-    path_data = storage.get_path_data(path_uuid)
+    path_data = storage.DataManager().get_path_by_uuid(path_uuid)
     if not path_data:
         typer.echo(f"Error: path_uuid {path_uuid} not found.")
         raise typer.Exit(code=1)
@@ -319,9 +376,9 @@ def path_status(path_uuid: str) -> None:
 def _get_successor_hronir_for_path(path_uuid_to_find: str) -> str | None:
     """Return the hrönir UUID (PathDB.uuid) that a path points to by querying the database."""
     # narrative_paths_dir parameter is removed as this function now uses the DB.
-    path_data_obj = storage.get_path_data(path_uuid_to_find)
+    path_data_obj = storage.DataManager().get_path_by_uuid(path_uuid_to_find)
     if path_data_obj:
-        return path_data_obj.uuid  # PathDB.uuid stores the hrönir_uuid
+        return str(path_data_obj.uuid)  # PathDB.uuid stores the hrönir_uuid
     return None
 
 
@@ -350,7 +407,7 @@ def _calculate_status_counts(narrative_paths_dir: Path) -> dict[str, int]:
 
         for _, row in df.iterrows():
             path_uuid = str(row.get("path_uuid", "")).strip()
-            status_val = str(row.get("status", "")).strip() # Renamed to avoid conflict
+            status_val = str(row.get("status", "")).strip()  # Renamed to avoid conflict
             if not path_uuid or path_uuid in all_path_uuids_processed:
                 continue
             if not status_val:
@@ -453,7 +510,9 @@ def audit():
 @app.command(help="Generate competing chapters from a predecessor and record an initial vote.")
 def synthesize(
     position: Annotated[int, typer.Option(help="Chapter position for the new hrönirs.")],
-    prev: Annotated[str, typer.Option(help="UUID of the predecessor chapter to create a path from.")],
+    prev: Annotated[
+        str, typer.Option(help="UUID of the predecessor chapter to create a path from.")
+    ],
 ):
     """
     Synthesizes two new hrönirs from a predecessor for a given position
@@ -698,8 +757,8 @@ def session_start(
     path_uuid: Annotated[
         str,
         typer.Option(
-            "--path-uuid", # Changed from --fork-uuid
-            "-p", # Changed from -f
+            "--path-uuid",  # Changed from --fork-uuid
+            "-p",  # Changed from -f
             help="The QUALIFIED path_uuid granting the mandate for this session.",
         ),
     ],
@@ -744,7 +803,7 @@ def session_start(
 
     # Validate the path_uuid - it must exist in the database
     # path_data = storage.get_path_file_and_data(path_uuid, path_dir_base=narrative_paths_dir) # Legacy
-    path_data_obj = storage.get_path_data(path_uuid)  # DB query
+    path_data_obj = storage.DataManager().get_path_by_uuid(path_uuid)  # DB query
 
     if not path_data_obj:
         typer.echo(
@@ -855,7 +914,7 @@ def session_start(
     #     )
     #     raise typer.Exit(code=1)
 
-    path_status_val = path_data_obj.status # Renamed to avoid conflict
+    path_status_val = path_data_obj.status  # Renamed to avoid conflict
     if path_status_val != "QUALIFIED":
         typer.echo(
             json.dumps(
@@ -1256,8 +1315,8 @@ def session_commit(
             )
             continue
 
-        path_a = duel_for_pos["path_A"] # Changed from fork_A
-        path_b = duel_for_pos["path_B"] # Changed from fork_B
+        path_a = duel_for_pos["path_A"]  # Changed from fork_A
+        path_b = duel_for_pos["path_B"]  # Changed from fork_B
 
         if winning_path_uuid_verdict not in [path_a, path_b]:
             typer.echo(
