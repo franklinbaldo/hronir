@@ -136,20 +136,21 @@ uv run hronir recover-canon
 
 ## Architecture
 
-### Hybrid Storage Architecture
+### Streamlined Storage Architecture
 
-**CRITICAL PRINCIPLE**: The system uses a hybrid approach for transparency and performance:
+**CRITICAL PRINCIPLE**: The system uses a pure pandas + Pydantic approach for simplicity and transparency:
 
-- **Runtime**: SQLAlchemy ORM + NetworkX for fast queries and graph analysis
+- **Runtime**: Pandas DataFrames for fast data operations and analysis
 - **Persistence**: CSV files as canonical storage for git transparency
-- **In-Memory SQLite**: Temporary database loaded from CSV on startup
 - **Validation**: Pydantic models ensure data integrity throughout
+- **Graph Operations**: NetworkX for narrative consistency validation
 
 **Why this approach:**
 - CSV files remain human-readable and git-friendly
-- ORM provides transactional safety during runtime
-- NetworkX enables narrative consistency validation
-- No persistent database files in repository
+- Pandas provides powerful data manipulation without ORM complexity
+- Direct CSV operations eliminate unnecessary database layers
+- Pydantic ensures type safety and validation
+- No database dependencies or integrity constraint errors
 
 ### Core System Flow
 The system follows a Protocol v2 architecture with these key phases:
@@ -162,8 +163,9 @@ The system follows a Protocol v2 architecture with these key phases:
 
 #### `hronir_encyclopedia/` Package
 - **`cli.py`**: Main CLI interface with Typer commands for all user interactions
-- **`storage.py`**: Core data persistence, UUID management, and file validation
-- **`models.py`**: Pydantic models and SQLAlchemy ORM definitions
+- **`storage.py`**: Core data persistence, UUID management, and file validation using pandas
+- **`pandas_data_manager.py`**: Pure pandas-based data access layer for CSV operations
+- **`models.py`**: Pure Pydantic models for data validation and business logic
 - **`graph_logic.py`**: NetworkX-based narrative consistency validation
 - **`session_manager.py`**: Manages judgment sessions and dossier generation
 - **`transaction_manager.py`**: Immutable ledger for session commits and fork promotions
@@ -223,15 +225,15 @@ Tests focus on protocol dynamics:
 
 **CRITICAL**: Always maintain CSV-first approach for repository transparency:
 
-- **Read**: Load CSV data into in-memory SQLite on startup
-- **Process**: Use ORM models and NetworkX for runtime operations  
-- **Write**: Save all changes back to CSV files before exit
+- **Read**: Load CSV data directly into pandas DataFrames
+- **Process**: Use pandas for data operations and Pydantic for validation
+- **Write**: Save all changes back to CSV files using pandas
 - **Validate**: Use NetworkX to check narrative consistency
 - **Never commit**: Database files (.db, .sqlite) to repository
 
 ### Core Principles
 
-- The system uses CSV files as canonical storage with SQLAlchemy for runtime performance
+- The system uses CSV files as canonical storage with pandas for runtime performance
 - All UUIDs are deterministic and content-addressed
 - The canonical path is emergent, not predetermined
 - Session commits are atomic and trigger cascading updates

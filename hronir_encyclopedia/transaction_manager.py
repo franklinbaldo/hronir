@@ -7,11 +7,9 @@ from typing import Any
 
 import blake3
 import pandas as pd
-from sqlalchemy.orm import Session
 
 from hronir_encyclopedia import ratings, storage
-
-from .models import TransactionDB
+from .models import Transaction
 
 TRANSACTIONS_DIR = Path("data/transactions")
 HEAD_FILE = TRANSACTIONS_DIR / "HEAD"
