@@ -234,13 +234,66 @@ def list_forks(
     typer.echo(combined_df[available_cols].to_string(index=False))
 
 
+@app.command("init-test", help="Create a minimal test dataset with sample forks.")
+def init_test():
+    """Generate sample chapters, forks, and canonical path for quick experiments."""
+    library_dir = Path("the_library")
+    forking_dir = Path("forking_path")
+    ratings_dir = Path("ratings")
+    data_dir = Path("data")
+
+    for d in [library_dir, forking_dir, ratings_dir, data_dir]:
+        d.mkdir(parents=True, exist_ok=True)
+
+    # Create sample chapters
+    root_uuid = storage.store_chapter_text(f"Root chapter {uuid.uuid4()}")
+    child_a_uuid = storage.store_chapter_text(f"Child A {uuid.uuid4()}")
+    child_b_uuid = storage.store_chapter_text(f"Child B {uuid.uuid4()}")
+
+    # Register forks
+    csv0 = forking_dir / "position_000.csv"
+    if not csv0.exists():
+        csv0.write_text("position,prev_uuid,uuid,fork_uuid,status\n")
+    fork0_uuid = storage.compute_forking_uuid(0, "", root_uuid)
+    with csv0.open("a") as f:
+        f.write(f"0,,{root_uuid},{fork0_uuid},PENDING\n")
+
+    csv1 = forking_dir / "position_001.csv"
+    if not csv1.exists():
+        csv1.write_text("position,prev_uuid,uuid,fork_uuid,status\n")
+    fork1a_uuid = storage.compute_forking_uuid(1, root_uuid, child_a_uuid)
+    with csv1.open("a") as f:
+        f.write(f"1,{root_uuid},{child_a_uuid},{fork1a_uuid},PENDING\n")
+    fork1b_uuid = storage.compute_forking_uuid(1, root_uuid, child_b_uuid)
+    with csv1.open("a") as f:
+        f.write(f"1,{root_uuid},{child_b_uuid},{fork1b_uuid},PENDING\n")
+
+    canonical = {
+        "title": "The Hrönir Encyclopedia - Canonical Path",
+        "path": {
+            "0": {"fork_uuid": fork0_uuid, "hrönir_uuid": root_uuid},
+            "1": {"fork_uuid": fork1a_uuid, "hrönir_uuid": child_a_uuid},
+        },
+    }
+    canonical_file = data_dir / "canonical_path.json"
+    canonical_file.write_text(json.dumps(canonical, indent=2))
+
+    typer.echo("Test data initialized.")
+    typer.echo(f"Position 0 fork_uuid: {fork0_uuid}")
+    typer.echo(f"  hrönir_uuid: {root_uuid}")
+    typer.echo(f"Position 1 canonical fork: {fork1a_uuid}")
+    typer.echo(f"  hrönir_uuid: {child_a_uuid}")
+    typer.echo(f"Alternate fork: {fork1b_uuid}")
+    typer.echo(f"  hrönir_uuid: {child_b_uuid}")
+
+
 # Helper function to find successor hrönir_uuid for a given fork_uuid
 def _get_successor_hronir_for_fork(fork_uuid_to_find: str) -> str | None:
     """Return the hrönir UUID (ForkDB.uuid) that a fork points to by querying the database."""
     # forking_path_dir parameter is removed as this function now uses the DB.
     fork_data_obj = storage.get_fork_data(fork_uuid_to_find)
     if fork_data_obj:
-        return fork_data_obj.uuid # ForkDB.uuid stores the hrönir_uuid
+        return fork_data_obj.uuid  # ForkDB.uuid stores the hrönir_uuid
     return None
 
 
@@ -387,9 +440,7 @@ def get_duel(
     db_session = storage.get_db_session()
     try:
         duel_info = ratings.determine_next_duel_entropy(
-            position=position,
-            predecessor_hronir_uuid=predecessor_hronir_uuid,
-            session=db_session
+            position=position, predecessor_hronir_uuid=predecessor_hronir_uuid, session=db_session
         )
     finally:
         db_session.close()
@@ -496,6 +547,7 @@ def clean(
 # def submit_cmd():
 #     typer.echo("Submit command is in development.")
 
+
 @app.callback()
 def main_callback(ctx: typer.Context):
     """Initializes DataManager before any command."""
@@ -505,9 +557,11 @@ def main_callback(ctx: typer.Context):
         typer.secho(f"Fatal: DataManager initialization failed: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
 
+
 def main(argv: list[str] | None = None):
     """CLI entry point."""
     app(args=argv)
+
 
 # New session management commands
 session_app = typer.Typer(help="Manage Hrönir judgment sessions.", no_args_is_help=True)
@@ -570,7 +624,7 @@ def session_start(
 
     # Validate the fork_uuid - it must exist in the database
     # fork_data = storage.get_fork_file_and_data(fork_uuid, fork_dir_base=forking_path_dir) # Legacy
-    fork_data_obj = storage.get_fork_data(fork_uuid) # DB query
+    fork_data_obj = storage.get_fork_data(fork_uuid)  # DB query
 
     if not fork_data_obj:
         typer.echo(
@@ -584,7 +638,7 @@ def session_start(
         raise typer.Exit(code=1)
 
     # Get position N from the fork_data_obj
-    position_n_str = str(fork_data_obj.position) # position is int in ForkDB
+    position_n_str = str(fork_data_obj.position)  # position is int in ForkDB
     if position_n_str is None:
         typer.echo(
             json.dumps(
@@ -935,13 +989,19 @@ def session_commit(
     ],
     ratings_dir: Annotated[
         Path, typer.Option(help="Directory containing rating CSV files.")
-    ] = Path("ratings"),  # Retained for run_temporal_cascade
+    ] = Path(
+        "ratings"
+    ),  # Retained for run_temporal_cascade
     forking_path_dir: Annotated[
         Path, typer.Option(help="Directory containing forking path CSV files.")
-    ] = Path("forking_path"),  # Retained for _get_successor_hronir_for_fork and cascade
+    ] = Path(
+        "forking_path"
+    ),  # Retained for _get_successor_hronir_for_fork and cascade
     canonical_path_file: Annotated[
         Path, typer.Option(help="Path to the canonical path JSON file.")
-    ] = Path("data/canonical_path.json"),  # Retained for run_temporal_cascade
+    ] = Path(
+        "data/canonical_path.json"
+    ),  # Retained for run_temporal_cascade
     max_cascade_positions: Annotated[
         int, typer.Option(help="Maximum number of positions for temporal cascade calculation.")
     ] = 100,
@@ -1022,9 +1082,9 @@ def session_commit(
     dossier_duels = session_data.get("dossier", {}).get("duels", {})
 
     valid_votes_to_record = []
-    processed_verdicts: dict[
-        str, str
-    ] = {}  # For transaction record: position_str -> winning_fork_uuid
+    processed_verdicts: dict[str, str] = (
+        {}
+    )  # For transaction record: position_str -> winning_fork_uuid
     oldest_voted_position = float("inf")
 
     for pos_str, winning_fork_uuid_verdict in verdicts.items():
@@ -1302,7 +1362,9 @@ def metrics_command(
             typer.echo(f'hronir_fork_status_total{{status="{status_val.lower()}"}} {count}')
         raise typer.Exit(code=1)
 
-    all_fork_uuids_processed = set()  # To count unique fork_uuids across potentially overlapping CSVs (though ideally they don't overlap by fork_uuid)
+    all_fork_uuids_processed = (
+        set()
+    )  # To count unique fork_uuids across potentially overlapping CSVs (though ideally they don't overlap by fork_uuid)
 
     for csv_file in forking_path_dir.glob("*.csv"):
         if csv_file.stat().st_size == 0:

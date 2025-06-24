@@ -251,6 +251,9 @@ uv run hronir metrics
 # to trigger this cascade from the very beginning (position 0), useful for initialization,
 # full recalculations, or recovery.
 uv run hronir recover-canon
+
+# Quickly create a small sample narrative
+uv run hronir init-test
 ```
 
 ## 🔏 Proof-of-Work (Mandate for Judgment)
