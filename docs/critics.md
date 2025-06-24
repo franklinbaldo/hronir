@@ -8,7 +8,7 @@ Ideia genial, execução ainda manca. O protocolo é um brinquedo borgiano fasci
 | Área                   | Por que impressiona                                                                                                                                                                   |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Visão**              | A fusão de Borges + game theory + blockchain mental cria um produto único – ninguém mais está tentando fazer uma “Biblioteca de Babel autocuradora”. O README deixa isso cristalino . |
-| **Infra de qualidade** | CI com `uv`, Ruff, Black, Pytest – zero tolerância a lint – já impede lixeira de entrar no main .                                                                                     |
+| **Infra de qualidade** | CI com `uv`, Ruff, Pytest – zero tolerância a lint – já impede lixeira de entrar no main .                                                                                     |
 | **Camada de dados**    | Pydantic + SQLAlchemy + NetworkX é o stack certo: valida, persiste, analisa grafo sem rein­ventar roda .                                                                              |
 | **Testes**             | Existe suíte cobrindo Elo, cascata temporal, consistência de DAG  – não é só “hello-world-test”.                                                                                      |
 | **Documentação**       | Há spec meticulosa do protocolo (court\_of\_the\_future.md) e plano de bibliotecas futuras – o porquê está sempre escrito .                                                           |

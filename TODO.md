@@ -35,7 +35,7 @@ This document outlines the development roadmap for the **Hrönir Encyclopedia** 
 - [x] **Test Suite**: Comprehensive protocol testing
 - [x] **Validation Logic**: Fake content detection and removal
 - [x] **Pre-commit Hooks**: Automated validation and cleanup
-- [x] **Linting**: Ruff and Black code formatting
+- [x] **Linting**: Ruff code formatting
 
 ---
 

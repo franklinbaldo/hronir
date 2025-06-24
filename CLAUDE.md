@@ -54,7 +54,7 @@ uv run ruff check .
 uv run ruff check --fix .
 
 # Format code
-uv run black .
+uv run ruff format .
 
 # Run specific test
 uv run pytest tests/test_specific_file.py
@@ -87,7 +87,7 @@ uv run repomix .
 ```bash
 # 1. Always run linting and formatting before committing
 uv run ruff check .        # Must pass with 0 issues
-uv run black .             # Auto-format all code
+uv run ruff format .       # Auto-format all code
 
 # 2. Run tests to ensure functionality
 uv run pytest             # All tests must pass
@@ -96,9 +96,8 @@ uv run pytest             # All tests must pass
 # DO NOT commit code with linting issues or failing tests
 ```
 
-**Code Quality Standards:**
 - **Zero tolerance** for linting issues - all `ruff check` errors must be fixed
-- Code must be formatted with `black` before committing
+- Code must be formatted with `ruff format` before committing
 - All tests must pass before committing
 - Use `uv run ruff check --fix .` to auto-fix common issues
 - Manual fixes required for complex linting issues (unused variables, etc.)

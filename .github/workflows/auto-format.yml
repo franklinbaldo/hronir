@@ -1,0 +1,37 @@
+name: Auto Format & Lint
+
+on:
+  push:
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v1
+        with:
+          uv-version: "latest"
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+      - name: Install dependencies
+        run: uv sync --frozen --all-extras
+      - name: Run ruff and format
+        run: |
+          uv run ruff check --fix .
+          uv run ruff format .
+      - name: Commit changes
+        run: |
+          if [[ -n $(git status --porcelain) ]]; then
+            git config user.name "GitHub Actions"
+            git config user.email "actions@github.com"
+            git commit -am "style: format & lint fix"
+            git push
+          else
+            echo "No formatting changes"
+          fi
