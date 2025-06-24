@@ -106,7 +106,8 @@ def init_test(
     canonical_file = data_dir / "canonical_path.json"
     canonical_file.write_text(json.dumps(canonical, indent=2))
 
-    storage.data_manager.serialize_db_to_files()
+    data_manager = storage.DataManager()
+    data_manager.save_all_data_to_csvs()
 
     typer.echo("Sample data initialized:")
     typer.echo(f"  Position 0 hr\u00f6nir UUID: {h0_uuid}")
@@ -669,7 +670,8 @@ def clean(
 def main_callback(ctx: typer.Context):
     """Initializes DataManager before any command."""
     try:
-        storage.data_manager.initialize_and_load()
+        data_manager = storage.DataManager()
+        data_manager.initialize_and_load()
     except Exception as e:
         typer.secho(
             f"Fatal: DataManager initialization failed: {e}",

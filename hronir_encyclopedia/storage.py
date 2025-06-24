@@ -1,8 +1,6 @@
-import json
 import shutil
 import uuid
 from pathlib import Path
-from typing import List, Optional
 
 from .models import Fork, Transaction, Vote
 from .pandas_data_manager import PandasDataManager
@@ -13,7 +11,7 @@ UUID_NAMESPACE = uuid.NAMESPACE_URL
 # --- Global Data Manager ---
 class DataManager:
     """Simplified DataManager using pandas instead of SQLAlchemy."""
-    
+
     _instance = None
 
     def __new__(cls, *args, **kwargs):
@@ -41,7 +39,7 @@ class DataManager:
         """Initialize the data manager and load data from files."""
         if clear_existing_data:
             self.clear_in_memory_data()
-        
+
         self.pandas_manager.load_all_data()
         self._initialized = True
 
@@ -56,12 +54,12 @@ class DataManager:
         self.pandas_manager.save_all_data()
 
     # --- Fork operations ---
-    def get_all_forks(self) -> List[Fork]:
+    def get_all_forks(self) -> list[Fork]:
         """Get all forks."""
         self.pandas_manager.initialize_if_needed()
         return self.pandas_manager.get_all_forks()
 
-    def get_forks_by_position(self, position: int) -> List[Fork]:
+    def get_forks_by_position(self, position: int) -> list[Fork]:
         """Get forks at a specific position."""
         self.pandas_manager.initialize_if_needed()
         return self.pandas_manager.get_forks_by_position(position)
@@ -76,7 +74,7 @@ class DataManager:
         self.pandas_manager.initialize_if_needed()
         self.pandas_manager.update_fork_status(fork_uuid, status)
 
-    def get_fork_by_uuid(self, fork_uuid: str) -> Optional[Fork]:
+    def get_fork_by_uuid(self, fork_uuid: str) -> Fork | None:
         """Get a specific fork by UUID."""
         self.pandas_manager.initialize_if_needed()
         forks = self.pandas_manager.get_all_forks()
@@ -86,7 +84,7 @@ class DataManager:
         return None
 
     # --- Vote operations ---
-    def get_all_votes(self) -> List[Vote]:
+    def get_all_votes(self) -> list[Vote]:
         """Get all votes."""
         self.pandas_manager.initialize_if_needed()
         return self.pandas_manager.get_all_votes()
@@ -96,13 +94,13 @@ class DataManager:
         self.pandas_manager.initialize_if_needed()
         self.pandas_manager.add_vote(vote)
 
-    def get_votes_by_position(self, position: int) -> List[Vote]:
+    def get_votes_by_position(self, position: int) -> list[Vote]:
         """Get votes for a specific position."""
         self.pandas_manager.initialize_if_needed()
         return self.pandas_manager.get_votes_by_position(position)
 
     # --- Transaction operations ---
-    def get_all_transactions(self) -> List[Transaction]:
+    def get_all_transactions(self) -> list[Transaction]:
         """Get all transactions."""
         self.pandas_manager.initialize_if_needed()
         return self.pandas_manager.get_all_transactions()
@@ -112,7 +110,7 @@ class DataManager:
         self.pandas_manager.initialize_if_needed()
         self.pandas_manager.add_transaction(transaction)
 
-    def get_transaction(self, tx_uuid: str) -> Optional[Transaction]:
+    def get_transaction(self, tx_uuid: str) -> Transaction | None:
         """Get a specific transaction."""
         self.pandas_manager.initialize_if_needed()
         return self.pandas_manager.get_transaction(tx_uuid)
@@ -121,7 +119,7 @@ class DataManager:
     def store_hrönir(self, file_path: Path) -> str:
         """Store a hrönir file and return its UUID."""
         # Read the file content
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             content = f.read()
 
         # Generate UUID from content
@@ -145,36 +143,36 @@ class DataManager:
         """Check if a hrönir exists."""
         return self.get_hrönir_path(content_uuid).exists()
 
-    def get_hrönir_content(self, content_uuid: str) -> Optional[str]:
+    def get_hrönir_content(self, content_uuid: str) -> str | None:
         """Get the content of a hrönir."""
         hrönir_path = self.get_hrönir_path(content_uuid)
         if hrönir_path.exists():
-            with open(hrönir_path, "r", encoding="utf-8") as f:
+            with open(hrönir_path, encoding="utf-8") as f:
                 return f.read()
         return None
 
     # --- Utility methods ---
-    def validate_data_integrity(self) -> List[str]:
+    def validate_data_integrity(self) -> list[str]:
         """Validate data integrity and return list of issues."""
         issues = []
-        
+
         # Check that all referenced hrönirs exist
         forks = self.get_all_forks()
         for fork in forks:
             if not self.hrönir_exists(str(fork.uuid)):
                 issues.append(f"Fork {fork.fork_uuid} references non-existent hrönir {fork.uuid}")
-        
+
         return issues
 
-    def clean_invalid_data(self) -> List[str]:
+    def clean_invalid_data(self) -> list[str]:
         """Remove invalid data and return list of cleaned items."""
         cleaned = []
         issues = self.validate_data_integrity()
-        
+
         if issues:
             # For now, just report issues - actual cleaning would need more sophisticated logic
             cleaned.extend(issues)
-        
+
         return cleaned
 
     # --- Context manager support ---
@@ -187,3 +185,24 @@ class DataManager:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit - save data."""
         self.save_all_data_to_csvs()
+
+
+# Legacy compatibility functions for CLI
+def store_chapter(chapter_file: Path, base: Path | str = "the_library") -> str:
+    """Store a chapter file - compatibility wrapper."""
+    data_manager = DataManager()
+    return data_manager.store_hrönir(chapter_file)
+
+
+def store_chapter_text(text: str, base: Path | str = "the_library") -> str:
+    """Store chapter text - compatibility wrapper."""
+    import tempfile
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+        f.write(text)
+        temp_path = Path(f.name)
+
+    try:
+        data_manager = DataManager()
+        return data_manager.store_hrönir(temp_path)
+    finally:
+        temp_path.unlink()  # Clean up temp file

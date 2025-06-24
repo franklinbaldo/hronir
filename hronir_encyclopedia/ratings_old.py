@@ -4,7 +4,6 @@ import math
 import pandas as pd
 
 from . import storage  # To get DataManager
-from .models import Fork, Vote
 
 
 def _calculate_elo_probability(elo_a: float, elo_b: float) -> float:
