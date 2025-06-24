@@ -120,6 +120,12 @@ uv run hronir session commit --session-id <id> --verdicts '{"position": "winning
 # View rankings
 uv run hronir ranking <position>
 
+# List forks (optional --position to filter)
+uv run hronir list-forks --position <position>
+
+# Check status of a specific fork
+uv run hronir fork-status <fork_uuid>
+
 # Get duel information
 uv run hronir get-duel --position <position>
 
