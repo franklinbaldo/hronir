@@ -113,7 +113,7 @@ This document outlines the development roadmap for the **Hrönir Encyclopedia** 
 ## 🐛 Known Issues & Technical Debt
 
 ### Development Environment
-- [x] **Code Quality Standards**: Zero-tolerance linting with ruff and black ✅ COMPLETED
+- [x] **Code Quality Standards**: Zero-tolerance linting and formatting with ruff ✅ COMPLETED
 - [x] **Documentation Accuracy**: Fixed CLI parameter inconsistencies ✅ COMPLETED  
 - [ ] **Pre-commit Resolution**: Fix `core.hooksPath` conflicts for clean setup
 - [ ] **Error Handling**: Improve robustness of file operations

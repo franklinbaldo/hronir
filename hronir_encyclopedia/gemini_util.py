@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 
 import google.generativeai as genai
 
@@ -53,7 +52,9 @@ def generate_chapter(prompt: str, prev_uuid: str | None = None) -> str:
 
 
 def auto_vote(
-    position: int, prev_uuid: str, voter: str # conn parameter removed
+    position: int,
+    prev_uuid: str,
+    voter: str,  # conn parameter removed
 ) -> str:
     """Generate winner and loser chapters, create forks, and record a vote using global DataManager."""
     winner_uuid = generate_chapter(f"Winner for position {position}", prev_uuid)
@@ -66,13 +67,13 @@ def auto_vote(
     storage.append_fork(
         position=position,
         prev_uuid=prev_uuid,
-        uuid_str=winner_uuid
+        uuid_str=winner_uuid,
         # status="AUTO_GENERATED" # Could add a specific status if desired
     )
     storage.append_fork(
         position=position,
         prev_uuid=prev_uuid,
-        uuid_str=loser_uuid
+        uuid_str=loser_uuid,
         # status="AUTO_GENERATED"
     )
 

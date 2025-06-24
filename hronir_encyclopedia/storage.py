@@ -1,24 +1,22 @@
+import datetime  # For TransactionDB
+import fcntl  # For file locking
 import json
 import shutil
 import uuid
 from pathlib import Path
-from typing import Any
-import fcntl # For file locking
-import datetime # For TransactionDB
 
 import pandas as pd
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import Session as SQLAlchemySession # Renamed to avoid conflict
+from sqlalchemy.orm import Session as SQLAlchemySession  # Renamed to avoid conflict
 
 from .models import (
     ForkDB,
-    VoteDB,
     TransactionDB,
-    SuperBlockDB, # Assuming SuperBlock might also be needed later
-    engine as in_memory_engine, # Import the global engine
-    SessionLocal as InMemorySessionLocal, # Import the global SessionLocal
-    create_db_and_tables
+    VoteDB,
+    create_db_and_tables,
 )
+from .models import SessionLocal as InMemorySessionLocal  # Import the global SessionLocal
+from .models import engine as in_memory_engine  # Import the global engine
 
 UUID_NAMESPACE = uuid.NAMESPACE_URL
 
@@ -29,17 +27,22 @@ class DataManager:
 
     def __new__(cls, *args, **kwargs):
         if not cls._instance:
-            cls._instance = super(DataManager, cls).__new__(cls)
+            cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, fork_csv_dir="forking_path", ratings_csv_dir="ratings", transactions_json_dir="data/transactions"):
-        if hasattr(self, '_initialized') and self._initialized:
+    def __init__(
+        self,
+        fork_csv_dir="forking_path",
+        ratings_csv_dir="ratings",
+        transactions_json_dir="data/transactions",
+    ):
+        if hasattr(self, "_initialized") and self._initialized:
             return
 
         self.engine = in_memory_engine
-        create_db_and_tables(self.engine) # Create tables in the in-memory DB
+        create_db_and_tables(self.engine)  # Create tables in the in-memory DB
         self.SessionLocal = InMemorySessionLocal
-        self._initialized = False # Will be set to True after initial load
+        self._initialized = False  # Will be set to True after initial load
         self.fork_csv_dir = Path(fork_csv_dir)
         self.ratings_csv_dir = Path(ratings_csv_dir)
         self.transactions_json_dir = Path(transactions_json_dir)
@@ -63,17 +66,17 @@ class DataManager:
             # Add other tables here if they also need clearing, e.g., SuperBlockDB
             # session.query(SuperBlockDB).delete()
             session.commit()
-            print("DataManager: Cleared in-memory database tables.") # For debug
+            print("DataManager: Cleared in-memory database tables.")  # For debug
         except Exception as e:
             session.rollback()
-            print(f"DataManager: Error clearing in-memory database: {e}") # For debug
+            print(f"DataManager: Error clearing in-memory database: {e}")  # For debug
             raise
         finally:
             session.close()
 
     def initialize_and_load(self, clear_existing_data=False):
         if not self._initialized:
-            if clear_existing_data: # Typically True for a fresh test setup
+            if clear_existing_data:  # Typically True for a fresh test setup
                 self.clear_in_memory_data()
             self.load_all_data_from_csvs()
             self._initialized = True
@@ -91,27 +94,25 @@ class DataManager:
                 # print("DataManager: Already initialized.", file=sys.stderr) # For debug
                 pass
 
-
     def _load_with_lock(self, file_path: Path, load_func):
         """Acquires a shared lock and calls load_func."""
         if not file_path.exists() or file_path.stat().st_size == 0:
             # print(f"File {file_path} is empty or does not exist. Skipping.") # Debug
             return
         try:
-            with open(file_path, 'rb') as f: # Open in binary for fcntl
-                fcntl.flock(f.fileno(), fcntl.LOCK_SH) # Shared lock for reading
+            with open(file_path, "rb") as f:  # Open in binary for fcntl
+                fcntl.flock(f.fileno(), fcntl.LOCK_SH)  # Shared lock for reading
                 # print(f"Acquired lock for {file_path}") # Debug
                 try:
                     load_func(f)
                 finally:
-                    fcntl.flock(f.fileno(), fcntl.LOCK_UN) # Release lock
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)  # Release lock
                     # print(f"Released lock for {file_path}") # Debug
         except FileNotFoundError:
             # print(f"File not found during locking: {file_path}. Skipping.") # Debug
-            pass # File might have been deleted between exists check and open
+            pass  # File might have been deleted between exists check and open
         except Exception as e:
             print(f"Error during locked read of {file_path}: {e}")
-
 
     def load_all_data_from_csvs(self):
         """Loads all data from CSVs into the in-memory SQLite database."""
@@ -119,7 +120,8 @@ class DataManager:
         try:
             # Load Forks
             for csv_file in self.fork_csv_dir.glob("*.csv"):
-                def load_forks(file_handle): # file_handle is already open
+
+                def load_forks(file_handle):  # file_handle is already open
                     # Use file_handle.name to get path for pandas
                     df = pd.read_csv(file_handle.name)
                     for _, row in df.iterrows():
@@ -134,26 +136,32 @@ class DataManager:
                             mandate_id_val = None
 
                         uuid_val = row.get("uuid")
-                        if pd.isna(uuid_val): # Should not happen for 'uuid' normally but good practice
+                        if pd.isna(
+                            uuid_val
+                        ):  # Should not happen for 'uuid' normally but good practice
                             # Decide handling: skip row, error, or default.
                             # For now, assuming 'uuid' and 'fork_uuid' are critical.
                             # If 'uuid' can be NaN and that's invalid, this check should be stricter.
-                            print(f"Warning: NaN found for 'uuid' in fork {row.get('fork_uuid')}. Skipping row or using None.")
+                            print(
+                                f"Warning: NaN found for 'uuid' in fork {row.get('fork_uuid')}. Skipping row or using None."
+                            )
                             # Potentially skip this record: continue
 
                         fork = ForkDB(
-                            fork_uuid=row["fork_uuid"], # This should always be present and valid
+                            fork_uuid=row["fork_uuid"],  # This should always be present and valid
                             position=int(row.get("position", 0)),
                             prev_uuid=prev_uuid_val,
-                            uuid=uuid_val, # Assuming 'uuid' is the hrönir_uuid
+                            uuid=uuid_val,  # Assuming 'uuid' is the hrönir_uuid
                             status=row.get("status", "PENDING"),
                             mandate_id=mandate_id_val,
                         )
-                        session.merge(fork) # Use merge to avoid duplicates if re-loading
+                        session.merge(fork)  # Use merge to avoid duplicates if re-loading
+
                 self._load_with_lock(csv_file, load_forks)
 
             # Load Ratings
             for csv_file in self.ratings_csv_dir.glob("position_*.csv"):
+
                 def load_ratings(file_handle):
                     pos_str = csv_file.stem.split("_")[-1]
                     if not pos_str.isdigit():
@@ -168,14 +176,16 @@ class DataManager:
                             winner=row.get("winner"),
                             loser=row.get("loser"),
                         )
-                        session.add(vote) # Votes might have auto-increment ID, so add
+                        session.add(vote)  # Votes might have auto-increment ID, so add
+
                 self._load_with_lock(csv_file, load_ratings)
 
             # Load Transactions (from JSON files)
             if self.transactions_json_dir.exists():
                 for json_file in self.transactions_json_dir.glob("*.json"):
+
                     def load_transactions(file_handle):
-                        data = json.load(file_handle) # Read from file handle
+                        data = json.load(file_handle)  # Read from file handle
                         ts_str = data.get("timestamp", "")
                         # Ensure timestamp is valid ISO format, handling potential 'Z'
                         if ts_str.endswith("Z"):
@@ -187,12 +197,13 @@ class DataManager:
                             ts = datetime.datetime.utcnow()
 
                         tx = TransactionDB(
-                            uuid=data["transaction_uuid"], # Assuming this key from migrate script
+                            uuid=data["transaction_uuid"],  # Assuming this key from migrate script
                             timestamp=ts,
-                            prev_uuid=data.get("previous_transaction_uuid"), # Assuming this key
-                            content=data, # Store the whole JSON content
+                            prev_uuid=data.get("previous_transaction_uuid"),  # Assuming this key
+                            content=data,  # Store the whole JSON content
                         )
                         session.merge(tx)
+
                     # JSON files are also text, can use similar locking if desired,
                     # but typically are written atomically. For consistency:
                     self._load_with_lock(json_file, load_transactions)
@@ -200,7 +211,7 @@ class DataManager:
             session.commit()
         except Exception as e:
             session.rollback()
-            print(f"Error loading data from CSVs/JSON: {e}") # Critical error
+            print(f"Error loading data from CSVs/JSON: {e}")  # Critical error
             raise
         finally:
             session.close()
@@ -209,8 +220,10 @@ class DataManager:
         """Acquires an exclusive lock and calls write_func."""
         file_path.parent.mkdir(parents=True, exist_ok=True)
         try:
-            with open(file_path, 'wb') as f: # Open in binary write for fcntl, also creates/truncates
-                fcntl.flock(f.fileno(), fcntl.LOCK_EX) # Exclusive lock for writing
+            with open(
+                file_path, "wb"
+            ) as f:  # Open in binary write for fcntl, also creates/truncates
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX)  # Exclusive lock for writing
                 # print(f"Acquired EX lock for {file_path}") # Debug
                 try:
                     # write_func needs to handle writing to this open file handle 'f'
@@ -222,13 +235,12 @@ class DataManager:
                     # However, pandas to_csv doesn't directly take a binary file handle well for text.
                     # So, we lock, then pandas writes to path, then unlock.
                     # This means the lock acquisition and release are critical.
-                    write_func(file_path) # Pass path to the write function
+                    write_func(file_path)  # Pass path to the write function
                 finally:
-                    fcntl.flock(f.fileno(), fcntl.LOCK_UN) # Release lock
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)  # Release lock
                     # print(f"Released EX lock for {file_path}") # Debug
         except Exception as e:
             print(f"Error during locked write to {file_path}: {e}")
-
 
     def serialize_db_to_files(self):
         """Serializes the in-memory database content back to CSV/JSON files."""
@@ -243,8 +255,8 @@ class DataManager:
             if all_forks_db:
                 forks_df = pd.DataFrame([f.__dict__ for f in all_forks_db])
                 # Remove SQLAlchemy internal state column if present
-                if '_sa_instance_state' in forks_df.columns:
-                    forks_df = forks_df.drop(columns=['_sa_instance_state'])
+                if "_sa_instance_state" in forks_df.columns:
+                    forks_df = forks_df.drop(columns=["_sa_instance_state"])
 
                 # Define target CSV file for all forks
                 # Using a new name to avoid conflicts with potentially existing varied CSVs
@@ -260,21 +272,23 @@ class DataManager:
             all_votes_db = session.query(VoteDB).all()
             if all_votes_db:
                 votes_df = pd.DataFrame([v.__dict__ for v in all_votes_db])
-                if '_sa_instance_state' in votes_df.columns:
-                    votes_df = votes_df.drop(columns=['_sa_instance_state'])
+                if "_sa_instance_state" in votes_df.columns:
+                    votes_df = votes_df.drop(columns=["_sa_instance_state"])
 
-                for position, group in votes_df.groupby('position'):
+                for position, group in votes_df.groupby("position"):
                     pos_csv_file = self.ratings_csv_dir / f"position_{int(position):03d}.csv"
                     # Select only relevant columns for vote CSVs (usually voter, winner, loser)
                     # The VoteDB model has id, position, voter, winner, loser.
                     # Original CSVs might only have voter, winner, loser per position file.
                     # For now, writing all columns from DB.
-                    columns_to_write = ['voter', 'winner', 'loser'] # Or all: group.columns
-                    if 'id' in group.columns: # Keep id if present from DB model
-                        columns_to_write = ['id'] + columns_to_write
+                    columns_to_write = ["voter", "winner", "loser"]  # Or all: group.columns
+                    if "id" in group.columns:  # Keep id if present from DB model
+                        columns_to_write = ["id"] + columns_to_write
 
                     # Filter group to only existing columns to avoid errors
-                    group_filtered = group[[col for col in columns_to_write if col in group.columns]]
+                    group_filtered = group[
+                        [col for col in columns_to_write if col in group.columns]
+                    ]
 
                     def write_ratings_df(path):
                         group_filtered.to_csv(path, index=False)
@@ -285,10 +299,10 @@ class DataManager:
             # Serialize Transactions to individual JSON files
             all_transactions_db = session.query(TransactionDB).all()
             if all_transactions_db:
-                self.transactions_json_dir.mkdir(parents=True, exist_ok=True) # Ensure dir exists
+                self.transactions_json_dir.mkdir(parents=True, exist_ok=True)  # Ensure dir exists
                 for tx_db in all_transactions_db:
                     tx_uuid = tx_db.uuid
-                    tx_data_to_serialize = tx_db.content # Content is already the JSON data
+                    tx_data_to_serialize = tx_db.content  # Content is already the JSON data
 
                     # Reconstruct original timestamp format if needed, or save as ISO
                     # tx_data_to_serialize['timestamp'] = tx_db.timestamp.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
@@ -296,7 +310,7 @@ class DataManager:
                     target_tx_json = self.transactions_json_dir / f"{tx_uuid}.json"
 
                     def write_tx_json(path):
-                        with open(path, 'w') as json_f:
+                        with open(path, "w") as json_f:
                             json.dump(tx_data_to_serialize, json_f, indent=2)
 
                     # Using a text-based lock for JSON, fcntl still works on the descriptor
@@ -305,7 +319,7 @@ class DataManager:
 
             # print("DB serialization to files complete.") # Debug
 
-        except Exception as e:
+        except Exception:
             # print(f"Error during DB serialization: {e}") # Debug
             # No rollback needed for reads, but important to log error
             raise
@@ -318,6 +332,7 @@ class DataManager:
 # For now, it will be initialized on first import/use.
 # A dedicated app setup function should call data_manager.initialize_and_load()
 data_manager = DataManager()
+
 
 # Helper function to get a session, ensures data_manager is initialized
 def get_db_session() -> SQLAlchemySession:
@@ -439,7 +454,9 @@ def validate_or_move(chapter_file: Path, base: Path | str = "the_library") -> st
     return chapter_uuid
 
 
-def audit_forking_data_in_db(base_library_path: Path | str = "the_library", session: SQLAlchemySession | None = None) -> int:
+def audit_forking_data_in_db(
+    base_library_path: Path | str = "the_library", session: SQLAlchemySession | None = None
+) -> int:
     """
     Validates all forking path entries in the in-memory database.
     - Ensures fork_uuid is correct based on position, prev_uuid, and uuid.
@@ -468,8 +485,10 @@ def audit_forking_data_in_db(base_library_path: Path | str = "the_library", sess
             # Need to handle potential None for prev_uuid if it's the root
             expected_fork_uuid = compute_forking_uuid(
                 fork_entry.position,
-                fork_entry.prev_uuid if fork_entry.prev_uuid else "None", # compute_forking_uuid expects strings
-                fork_entry.uuid
+                fork_entry.prev_uuid
+                if fork_entry.prev_uuid
+                else "None",  # compute_forking_uuid expects strings
+                fork_entry.uuid,
             )
             if fork_entry.fork_uuid != expected_fork_uuid:
                 # This is serious, indicates potential corruption or miscalculation earlier.
@@ -477,20 +496,22 @@ def audit_forking_data_in_db(base_library_path: Path | str = "the_library", sess
                 # if the existing fork_uuid is referenced elsewhere.
                 # For now, let's assume we correct it if it's wrong.
                 # print(f"Correcting fork_uuid for {fork_entry.fork_uuid} to {expected_fork_uuid}") # Debug
-                fork_entry.fork_uuid = expected_fork_uuid # This could be problematic if PK constraint
+                fork_entry.fork_uuid = (
+                    expected_fork_uuid  # This could be problematic if PK constraint
+                )
                 changed_in_entry = True
-
 
             # Validate chapter existence
             # The ForkDB model stores prev_uuid as String, can be nullable.
             # chapter_exists expects a valid UUID string.
-            prev_chapter_valid = True # Assume valid if no prev_uuid (e.g. root)
             if fork_entry.prev_uuid:
-                 prev_chapter_valid = is_valid_uuid_v5(str(fork_entry.prev_uuid)) and \
-                                      chapter_exists(str(fork_entry.prev_uuid), base_library_path)
+                _ = is_valid_uuid_v5(str(fork_entry.prev_uuid)) and chapter_exists(
+                    str(fork_entry.prev_uuid), base_library_path
+                )
 
-            current_chapter_valid = is_valid_uuid_v5(str(fork_entry.uuid)) and \
-                                    chapter_exists(str(fork_entry.uuid), base_library_path)
+            _ = is_valid_uuid_v5(str(fork_entry.uuid)) and chapter_exists(
+                str(fork_entry.uuid), base_library_path
+            )
 
             # The 'undiscovered' field is not in ForkDB model.
             # This logic would require adding it to models.py:
@@ -514,7 +535,7 @@ def audit_forking_data_in_db(base_library_path: Path | str = "the_library", sess
         if modified_count > 0:
             session.commit()
             # print(f"Audit: Committed {modified_count} changes to ForkDB.") # Debug
-    except Exception as e:
+    except Exception:
         if session:
             session.rollback()
         # print(f"Error during DB fork audit: {e}") # Debug
@@ -525,7 +546,9 @@ def audit_forking_data_in_db(base_library_path: Path | str = "the_library", sess
     return modified_count
 
 
-def purge_invalid_forks_from_db(base_library_path: Path | str = "the_library", session: SQLAlchemySession | None = None) -> int:
+def purge_invalid_forks_from_db(
+    base_library_path: Path | str = "the_library", session: SQLAlchemySession | None = None
+) -> int:
     """
     Removes invalid forking path entries from the in-memory database.
     An entry is invalid if:
@@ -551,20 +574,24 @@ def purge_invalid_forks_from_db(base_library_path: Path | str = "the_library", s
             expected_fork_uuid = compute_forking_uuid(
                 fork_entry.position,
                 fork_entry.prev_uuid if fork_entry.prev_uuid else "None",
-                fork_entry.uuid
+                fork_entry.uuid,
             )
             if fork_entry.fork_uuid != expected_fork_uuid:
                 is_invalid = True
 
             # Check chapter existence and validity
-            if not is_invalid and fork_entry.prev_uuid: # Only check if not already invalid
-                if not (is_valid_uuid_v5(str(fork_entry.prev_uuid)) and \
-                        chapter_exists(str(fork_entry.prev_uuid), base_library_path)):
+            if not is_invalid and fork_entry.prev_uuid:  # Only check if not already invalid
+                if not (
+                    is_valid_uuid_v5(str(fork_entry.prev_uuid))
+                    and chapter_exists(str(fork_entry.prev_uuid), base_library_path)
+                ):
                     is_invalid = True
 
-            if not is_invalid: # Only check if not already invalid
-                if not (is_valid_uuid_v5(str(fork_entry.uuid)) and \
-                        chapter_exists(str(fork_entry.uuid), base_library_path)):
+            if not is_invalid:  # Only check if not already invalid
+                if not (
+                    is_valid_uuid_v5(str(fork_entry.uuid))
+                    and chapter_exists(str(fork_entry.uuid), base_library_path)
+                ):
                     is_invalid = True
 
             if is_invalid:
@@ -577,7 +604,7 @@ def purge_invalid_forks_from_db(base_library_path: Path | str = "the_library", s
             deleted_count = len(forks_to_delete)
             # print(f"Purge: Committed deletion of {deleted_count} invalid forks from ForkDB.") # Debug
 
-    except Exception as e:
+    except Exception:
         if session:
             session.rollback()
         # print(f"Error during DB fork purge: {e}") # Debug
@@ -589,8 +616,7 @@ def purge_invalid_forks_from_db(base_library_path: Path | str = "the_library", s
 
 
 def purge_invalid_votes_from_db(
-    base_library_path: Path | str = "the_library",
-    session: SQLAlchemySession | None = None
+    base_library_path: Path | str = "the_library", session: SQLAlchemySession | None = None
 ) -> int:
     """
     Removes invalid vote entries from the in-memory database (VoteDB).
@@ -608,7 +634,7 @@ def purge_invalid_votes_from_db(
 
     deleted_count = 0
     try:
-        all_votes = session.query(VoteDB).order_by(VoteDB.id).all() # Process in consistent order
+        all_votes = session.query(VoteDB).order_by(VoteDB.id).all()  # Process in consistent order
 
         votes_to_delete = []
         # For duplicate checking: (voter_fork_uuid, position)
@@ -633,14 +659,18 @@ def purge_invalid_votes_from_db(
 
             # Check winner chapter existence
             if not is_invalid:
-                if not (is_valid_uuid_v5(str(vote_entry.winner)) and \
-                        chapter_exists(str(vote_entry.winner), base_library_path)):
+                if not (
+                    is_valid_uuid_v5(str(vote_entry.winner))
+                    and chapter_exists(str(vote_entry.winner), base_library_path)
+                ):
                     is_invalid = True
 
             # Check loser chapter existence
             if not is_invalid:
-                if not (is_valid_uuid_v5(str(vote_entry.loser)) and \
-                        chapter_exists(str(vote_entry.loser), base_library_path)):
+                if not (
+                    is_valid_uuid_v5(str(vote_entry.loser))
+                    and chapter_exists(str(vote_entry.loser), base_library_path)
+                ):
                     is_invalid = True
 
             if is_invalid:
@@ -653,7 +683,7 @@ def purge_invalid_votes_from_db(
             deleted_count = len(votes_to_delete)
             # print(f"Purge: Committed deletion of {deleted_count} invalid votes from VoteDB.") # Debug
 
-    except Exception as e:
+    except Exception:
         if session:
             session.rollback()
         # print(f"Error during DB vote purge: {e}") # Debug
@@ -753,7 +783,7 @@ def append_fork(
     # csv_file parameter is removed as it's not directly used for DB op.
     # conn parameter is removed.
     session: SQLAlchemySession | None = None,
-    status: str = "PENDING", # Allow status to be set
+    status: str = "PENDING",  # Allow status to be set
 ) -> str:
     """
     Appends a new fork entry to the in-memory database.
@@ -778,7 +808,7 @@ def append_fork(
         fork = ForkDB(
             fork_uuid=fork_uuid,
             position=position,
-            prev_uuid=prev_uuid or None, # Ensure None if prev_uuid is empty string
+            prev_uuid=prev_uuid or None,  # Ensure None if prev_uuid is empty string
             uuid=uuid_str,
             status=status,
             # mandate_id is not set during initial append by default
@@ -786,11 +816,11 @@ def append_fork(
         session.add(fork)
         session.commit()
         return fork_uuid
-    except Exception as e:
-        if session: # Check if session was successfully obtained
+    except Exception:
+        if session:  # Check if session was successfully obtained
             session.rollback()
         # print(f"Error appending fork {fork_uuid}: {e}") # Debug
-        raise # Re-raise the exception to allow higher-level handling
+        raise  # Re-raise the exception to allow higher-level handling
     finally:
         if close_session_locally and session is not None:
             session.close()
@@ -909,7 +939,9 @@ def purge_fake_votes_csv(
     return removed
 
 
-def get_fork_data(fork_uuid_to_find: str, session: SQLAlchemySession | None = None) -> ForkDB | None:
+def get_fork_data(
+    fork_uuid_to_find: str, session: SQLAlchemySession | None = None
+) -> ForkDB | None:
     """
     Retrieves a fork by its fork_uuid from the in-memory database.
 
@@ -966,15 +998,15 @@ def update_fork_status(
             # this might need adjustment. For now, direct attribute assignment.
             fork.mandate_id = mandate_id
 
-        session.add(fork) # Add to session before commit, good practice even for updates
+        session.add(fork)  # Add to session before commit, good practice even for updates
         session.commit()
         return True
-    except Exception as e:
+    except Exception:
         if session:
             session.rollback()
         # print(f"Error updating fork status for {fork_uuid_to_update}: {e}") # Debug
         # Depending on desired error handling, you might want to log 'e' or raise it
-        return False # Indicate update failure
+        return False  # Indicate update failure
     finally:
         if close_session_locally and session is not None:
             session.close()

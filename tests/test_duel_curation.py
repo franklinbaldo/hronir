@@ -1,5 +1,4 @@
 import uuid
-from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -83,7 +82,7 @@ def mock_ratings_get_ranking(monkeypatch):
     def _mock_get_ranking(
         position: int,
         predecessor_hronir_uuid: str | None,
-        session = None, # Added session, made optional for mock
+        session=None,  # Added session, made optional for mock
     ):
         # Os parâmetros extras não são usados pelo mock, pois os dados são definidos diretamente.
         return df_to_return_holder[0].copy()
@@ -129,10 +128,10 @@ class TestDetermineNextDuelPurelyEntropic:
         ratings_dir = tmp_path / "ratings"  # Adicionado para consistência
         ratings_dir.mkdir()
 
-        duel_info = ratings.determine_next_duel_entropy( # Changed function name
+        duel_info = ratings.determine_next_duel_entropy(  # Changed function name
             position=1,
             predecessor_hronir_uuid="any-pred-uuid",
-            session=None # Added session, paths removed
+            session=None,  # Added session, paths removed
         )
 
         assert duel_info is not None
@@ -176,10 +175,10 @@ class TestDetermineNextDuelPurelyEntropic:
         forking_dir.mkdir()
         ratings_dir = tmp_path / "ratings"
         ratings_dir.mkdir()
-        duel_info = ratings.determine_next_duel_entropy( # Changed function name
+        duel_info = ratings.determine_next_duel_entropy(  # Changed function name
             position=1,
             predecessor_hronir_uuid="any-pred-uuid",
-            session=None # Added session, paths removed
+            session=None,  # Added session, paths removed
         )
 
         assert duel_info is not None
@@ -193,10 +192,10 @@ class TestDetermineNextDuelPurelyEntropic:
         forking_dir.mkdir()
         ratings_dir = tmp_path / "ratings"
         ratings_dir.mkdir()
-        duel_info = ratings.determine_next_duel_entropy( # Changed function name
+        duel_info = ratings.determine_next_duel_entropy(  # Changed function name
             position=1,
             predecessor_hronir_uuid="any-pred-uuid",
-            session=None # Added session, paths removed
+            session=None,  # Added session, paths removed
         )
         assert duel_info is None
 
@@ -207,10 +206,10 @@ class TestDetermineNextDuelPurelyEntropic:
         forking_dir.mkdir()
         ratings_dir = tmp_path / "ratings"
         ratings_dir.mkdir()
-        duel_info = ratings.determine_next_duel_entropy( # Changed function name
+        duel_info = ratings.determine_next_duel_entropy(  # Changed function name
             position=1,
             predecessor_hronir_uuid="any-pred-uuid",
-            session=None # Added session, paths removed
+            session=None,  # Added session, paths removed
         )
         assert duel_info is None
 
@@ -230,10 +229,10 @@ class TestDetermineNextDuelPurelyEntropic:
         forking_dir.mkdir()
         ratings_dir = tmp_path / "ratings"
         ratings_dir.mkdir()
-        duel_info = ratings.determine_next_duel_entropy( # Changed function name
+        duel_info = ratings.determine_next_duel_entropy(  # Changed function name
             position=1,
             predecessor_hronir_uuid="any-pred-uuid",
-            session=None # Added session, paths removed
+            session=None,  # Added session, paths removed
         )
 
         assert duel_info is not None
@@ -291,13 +290,13 @@ class TestDetermineNextDuelPurelyEntropic:
         forking_dir.mkdir()
         ratings_dir = tmp_path / "ratings"
         ratings_dir.mkdir()
-        duel_info = ratings.determine_next_duel_entropy( # Changed function name
+        duel_info = ratings.determine_next_duel_entropy(  # Changed function name
             position=1,
             predecessor_hronir_uuid="any-pred-uuid",
-            session=None # Added session, paths removed
+            session=None,  # Added session, paths removed
         )
         assert duel_info is not None
-        assert duel_info["strategy"] == "max_shannon_entropy" # Strategy name updated
+        assert duel_info["strategy"] == "max_shannon_entropy"  # Strategy name updated
         assert set(duel_info["duel_pair"].values()) == set([h1_uuid, h2_uuid])
 
     def test_entropy_calculation_is_correct_for_known_pair(

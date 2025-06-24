@@ -1,6 +1,6 @@
 import datetime
 import json
-import sys # Moved import sys to the top
+import sys  # Moved import sys to the top
 import uuid
 from pathlib import Path
 from typing import Any
@@ -78,7 +78,7 @@ def _get_fork_details_by_hrönir_uuid(
                 "fork_uuid": fork_db_entry.fork_uuid,
                 "position": fork_db_entry.position,
                 "prev_uuid": fork_db_entry.prev_uuid,
-                "uuid": fork_db_entry.uuid, # This is the hrönir_uuid
+                "uuid": fork_db_entry.uuid,  # This is the hrönir_uuid
                 "status": fork_db_entry.status,
                 "mandate_id": fork_db_entry.mandate_id,
                 # 'csv_filepath' is no longer relevant as we are reading from DB
@@ -105,17 +105,19 @@ def _get_all_forks_at_position(
     try:
         query = session.query(storage.ForkDB).filter(storage.ForkDB.position == position_num)
 
-        if predecessor_uuid is None: # Position 0 case
+        if predecessor_uuid is None:  # Position 0 case
             if position_num == 0:
                 query = query.filter(
-                    (storage.ForkDB.prev_uuid == None) | (storage.ForkDB.prev_uuid == "") # noqa E711
+                    (storage.ForkDB.prev_uuid == None) | (storage.ForkDB.prev_uuid == "")  # noqa E711
                 )
             else:
                 # For positions > 0, a predecessor_uuid should generally be specified.
                 # If not, it implies no forks should match, or logic needs clarification.
                 # For now, returning empty DataFrame if predecessor_uuid is None for pos > 0.
-                return pd.DataFrame(columns=["fork_uuid", "uuid", "prev_uuid", "position", "status"])
-        else: # Position > 0, predecessor_uuid is specified
+                return pd.DataFrame(
+                    columns=["fork_uuid", "uuid", "prev_uuid", "position", "status"]
+                )
+        else:  # Position > 0, predecessor_uuid is specified
             query = query.filter(storage.ForkDB.prev_uuid == predecessor_uuid)
 
         fork_db_entries = query.all()
@@ -127,7 +129,7 @@ def _get_all_forks_at_position(
         fork_data_list = [
             {
                 "fork_uuid": f.fork_uuid,
-                "uuid": f.uuid, # This is the hrönir_uuid
+                "uuid": f.uuid,  # This is the hrönir_uuid
                 "prev_uuid": f.prev_uuid,
                 "position": f.position,
                 "status": f.status,
@@ -213,7 +215,7 @@ def record_transaction(
     promotions_granted: list[dict[str, str]] = []
     oldest_voted_position = -1
     processed_verdicts_for_log = []
-    hrönirs_to_check_for_qualification = set() # Collect (hrönir_uuid, position) tuples
+    hrönirs_to_check_for_qualification = set()  # Collect (hrönir_uuid, position) tuples
 
     # Loop 1: Record all votes
     for vote_action in session_verdicts:
@@ -244,11 +246,14 @@ def record_transaction(
         fork_details = _get_fork_details_by_hrönir_uuid(
             hrönir_uuid_to_find=hrönir_involved_uuid,
             at_position=position,
-            session=session, # Pass the session
+            session=session,  # Pass the session
         )
 
         if not fork_details:
-            print(f"DEBUG TM: (Loop 2) Warning: Could not find fork details for hrönir {hrönir_involved_uuid} at pos {position}", file=sys.stderr)
+            print(
+                f"DEBUG TM: (Loop 2) Warning: Could not find fork details for hrönir {hrönir_involved_uuid} at pos {position}",
+                file=sys.stderr,
+            )
             continue
 
         fork_to_check_uuid = fork_details["fork_uuid"]
@@ -257,7 +262,10 @@ def record_transaction(
         # More importantly, this ensures we get the status *after all votes are in*.
         current_fork_obj = storage.get_fork_data(fork_to_check_uuid, session=session)
         if not current_fork_obj:
-            print(f"DEBUG TM: (Loop 2) Warning: Could not refetch fork data for {fork_to_check_uuid}. Skipping.", file=sys.stderr)
+            print(
+                f"DEBUG TM: (Loop 2) Warning: Could not refetch fork data for {fork_to_check_uuid}. Skipping.",
+                file=sys.stderr,
+            )
             continue
         current_fork_status = current_fork_obj.status
 
@@ -271,7 +279,9 @@ def record_transaction(
             # print(f"DEBUG TM: (Loop 2) Fork {fork_to_check_uuid} is PENDING, proceeding to check qualification.", file=sys.stderr)
             # ---- END DEBUG PRINTS (Loop 2) ----
 
-            predecessor_for_ranking = fork_details.get("prev_uuid") # prev_uuid from initial fetch of this fork's details
+            predecessor_for_ranking = fork_details.get(
+                "prev_uuid"
+            )  # prev_uuid from initial fetch of this fork's details
             if pd.isna(predecessor_for_ranking) or predecessor_for_ranking == "nan":
                 predecessor_for_ranking = None
 
@@ -323,9 +333,9 @@ def record_transaction(
                             "qualified_in_tx_with_prev_hash": last_tx_hash,
                         }
                     )
-                else: # Should not happen if DB update is robust
+                else:  # Should not happen if DB update is robust
                     # print(f"DEBUG TM: (Loop 2) Warning: Failed to update status for qualified fork {fork_to_check_uuid}", file=sys.stderr)
-                    pass # Silently continue if update failed, or add more robust error handling
+                    pass  # Silently continue if update failed, or add more robust error handling
 
     # --- Prepare data for the transaction block ---
     timestamp_dt = datetime.datetime.utcnow()
