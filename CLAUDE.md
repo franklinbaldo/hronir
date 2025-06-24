@@ -11,7 +11,7 @@ The Hrönir Encyclopedia is a Python-based literary protocol inspired by Jorge L
 ### Environment Setup
 ```bash
 # Install dependencies with uv
-uv sync --all-features
+uv sync --all-extras
 
 # Set up pre-commit hooks
 uv run pre-commit install
