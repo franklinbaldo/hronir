@@ -127,12 +127,12 @@ def test_clean_functions(tmp_path):
 
     # Setup DataManager to use the correct fork_dir for this test part
     original_fork_csv_dir = storage.data_manager.fork_csv_dir
-    original_ratings_csv_dir = storage.data_manager.ratings_csv_dir # Save to restore
+    original_ratings_csv_dir = storage.data_manager.ratings_csv_dir  # Save to restore
     original_initialized = storage.data_manager._initialized
     db_cleared_by_this_run = False
 
     try:
-        storage.data_manager.fork_csv_dir = fork_dir # Point to tmp_path / "forking_path"
+        storage.data_manager.fork_csv_dir = fork_dir  # Point to tmp_path / "forking_path"
         # Set ratings_dir to a dummy path as it's not directly used by forking_path_exists
         # but DataManager initialization might expect it.
         dummy_ratings_dir_for_purge_test = tmp_path / "dummy_ratings_for_purge"
@@ -140,9 +140,9 @@ def test_clean_functions(tmp_path):
         storage.data_manager.ratings_csv_dir = dummy_ratings_dir_for_purge_test
 
         storage.data_manager._initialized = False
-        storage.data_manager.clear_in_memory_data() # Clear before loading specific test data
+        storage.data_manager.clear_in_memory_data()  # Clear before loading specific test data
         db_cleared_by_this_run = True
-        storage.data_manager.initialize_and_load(clear_existing_data=False) # Load from fork_dir
+        storage.data_manager.initialize_and_load(clear_existing_data=False)  # Load from fork_dir
 
         removed = storage.purge_fake_votes_csv(rating_csv, base=base)
     finally:

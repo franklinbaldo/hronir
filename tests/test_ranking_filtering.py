@@ -4,8 +4,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from hronir_encyclopedia import storage  # Added for DataManager
 from hronir_encyclopedia.ratings import get_ranking
-from hronir_encyclopedia import storage # Added for DataManager
 
 
 # Helper para criar UUIDs de teste
@@ -41,23 +41,25 @@ def _call_get_ranking_with_setup(position, predecessor_hronir_uuid, forking_dir,
         # Force DataManager to re-evaluate initialization state
         # and clear any data from previous test runs or states.
         storage.data_manager._initialized = False
-        storage.data_manager.clear_in_memory_data() # Explicitly clear before load
+        storage.data_manager.clear_in_memory_data()  # Explicitly clear before load
         db_cleared_by_this_run = True
 
         # Load data from the CSVs prepared by the test function
-        storage.data_manager.initialize_and_load(clear_existing_data=False) # False because we just cleared
+        storage.data_manager.initialize_and_load(
+            clear_existing_data=False
+        )  # False because we just cleared
 
         # Get a new session for this specific call to get_ranking
         # This ensures the session is fresh and uses the just-loaded data.
-        db_session = storage.get_db_session() # get_db_session will use the overridden paths
+        db_session = storage.get_db_session()  # get_db_session will use the overridden paths
         try:
             df = get_ranking(
                 position=position,
                 predecessor_hronir_uuid=predecessor_hronir_uuid,
-                session=db_session
+                session=db_session,
             )
         finally:
-            db_session.close() # Ensure session is closed after use
+            db_session.close()  # Ensure session is closed after use
         return df
     finally:
         # Restore original DataManager paths and state
@@ -68,7 +70,7 @@ def _call_get_ranking_with_setup(position, predecessor_hronir_uuid, forking_dir,
         # If this test run specifically cleared the DB, ensure it's cleared again
         # to prevent state leakage to subsequent tests, especially if the original_initialized was True.
         if db_cleared_by_this_run and storage.data_manager._initialized:
-             storage.data_manager.clear_in_memory_data()
+            storage.data_manager.clear_in_memory_data()
 
 
 # Hrönirs
@@ -204,7 +206,9 @@ def test_get_ranking_filters_by_canonical_predecessor(temp_data_dir):
 
     assert h1b_data["wins"] == 1
     assert h1b_data["losses"] == 2
-    assert h1b_data["elo_rating"] == 1485  # Adjusted expectation from 1488 to 1485 (1515-1485 = 30, 1512-1488=24. Diff is 3)
+    assert (
+        h1b_data["elo_rating"] == 1485
+    )  # Adjusted expectation from 1488 to 1485 (1515-1485 = 30, 1512-1488=24. Diff is 3)
 
     assert h1c_data["wins"] == 0
     assert h1c_data["losses"] == 0

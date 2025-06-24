@@ -31,7 +31,7 @@ class DataManager:
 
     def __init__(
         self,
-        fork_csv_dir="forking_path",
+        fork_csv_dir="the_garden",
         ratings_csv_dir="ratings",
         transactions_json_dir="data/transactions",
     ):
@@ -42,7 +42,7 @@ class DataManager:
         create_db_and_tables(self.engine)  # Create tables in the in-memory DB
         self.SessionLocal = InMemorySessionLocal
         self._initialized = False  # Will be set to True after initial load
-        self.fork_csv_dir = Path(fork_csv_dir)
+        self.fork_csv_dir = Path(fork_csv_dir)  # Now the_garden/
         self.ratings_csv_dir = Path(ratings_csv_dir)
         self.transactions_json_dir = Path(transactions_json_dir)
 
@@ -117,8 +117,9 @@ class DataManager:
         """Loads all data from CSVs into the in-memory SQLite database."""
         session = self.get_session()
         try:
-            # Load Forks
-            for csv_file in self.fork_csv_dir.glob("*.csv"):
+            # Load Forks from consolidated forking_paths.csv
+            forking_paths_csv = self.fork_csv_dir / "forking_paths.csv"
+            if forking_paths_csv.exists():
 
                 def load_forks(file_handle):  # file_handle is already open
                     # Use file_handle.name to get path for pandas
@@ -146,38 +147,36 @@ class DataManager:
                             )
                             # Potentially skip this record: continue
 
+                        # Status is calculated dynamically, not stored in CSV
+                        # Default to PENDING; actual status will be computed by business logic
                         fork = ForkDB(
                             fork_uuid=row["fork_uuid"],  # This should always be present and valid
                             position=int(row.get("position", 0)),
                             prev_uuid=prev_uuid_val,
                             uuid=uuid_val,  # Assuming 'uuid' is the hrönir_uuid
-                            status=row.get("status", "PENDING"),
+                            status="PENDING",  # Default status; will be calculated dynamically
                             mandate_id=mandate_id_val,
                         )
                         session.merge(fork)  # Use merge to avoid duplicates if re-loading
 
-                self._load_with_lock(csv_file, load_forks)
+                self._load_with_lock(forking_paths_csv, load_forks)
 
-            # Load Ratings
-            for csv_file in self.ratings_csv_dir.glob("position_*.csv"):
+            # Load Ratings from consolidated votes.csv
+            votes_csv_file = self.ratings_csv_dir / "votes.csv"
+            if votes_csv_file.exists():
 
                 def load_ratings(file_handle):
-                    pos_str = csv_file.stem.split("_")[-1]
-                    if not pos_str.isdigit():
-                        # print(f"Skipping ratings file with invalid position: {csv_file}") # Debug
-                        return
-                    pos = int(pos_str)
                     df = pd.read_csv(file_handle.name)
                     for _, row in df.iterrows():
                         vote = VoteDB(
-                            position=pos,
+                            position=row.get("position"),
                             voter=row.get("voter"),
                             winner=row.get("winner"),
                             loser=row.get("loser"),
                         )
                         session.add(vote)  # Votes might have auto-increment ID, so add
 
-                self._load_with_lock(csv_file, load_ratings)
+                self._load_with_lock(votes_csv_file, load_ratings)
 
             # Load Transactions (from JSON files)
             if self.transactions_json_dir.exists():
@@ -249,7 +248,7 @@ class DataManager:
 
         session = self.get_session()
         try:
-            # Serialize Forks to a single CSV
+            # Serialize Forks to consolidated forking_paths.csv
             all_forks_db = session.query(ForkDB).all()
             if all_forks_db:
                 forks_df = pd.DataFrame([f.__dict__ for f in all_forks_db])
@@ -258,8 +257,12 @@ class DataManager:
                     forks_df = forks_df.drop(columns=["_sa_instance_state"])
 
                 # Define target CSV file for all forks
-                # Using a new name to avoid conflicts with potentially existing varied CSVs
-                target_fork_csv = self.fork_csv_dir / "all_db_forks.csv"
+                target_fork_csv = self.fork_csv_dir / "forking_paths.csv"
+
+                # Ensure column order with fork_uuid first (as primary key)
+                # Exclude status column as it's calculated dynamically, not stored
+                column_order = ["fork_uuid", "position", "prev_uuid", "uuid", "mandate_id"]
+                forks_df = forks_df[[col for col in column_order if col in forks_df.columns]]
 
                 def write_forks_df(path):
                     forks_df.to_csv(path, index=False)
@@ -267,33 +270,30 @@ class DataManager:
                 self._write_with_lock(target_fork_csv, write_forks_df)
                 # print(f"Serialized {len(all_forks_db)} forks to {target_fork_csv}") # Debug
 
-            # Serialize Votes to multiple CSVs (grouped by position)
+            # Serialize Votes to consolidated votes.csv
             all_votes_db = session.query(VoteDB).all()
             if all_votes_db:
                 votes_df = pd.DataFrame([v.__dict__ for v in all_votes_db])
                 if "_sa_instance_state" in votes_df.columns:
                     votes_df = votes_df.drop(columns=["_sa_instance_state"])
 
-                for position, group in votes_df.groupby("position"):
-                    pos_csv_file = self.ratings_csv_dir / f"position_{int(position):03d}.csv"
-                    # Select only relevant columns for vote CSVs (usually voter, winner, loser)
-                    # The VoteDB model has id, position, voter, winner, loser.
-                    # Original CSVs might only have voter, winner, loser per position file.
-                    # For now, writing all columns from DB.
-                    columns_to_write = ["voter", "winner", "loser"]  # Or all: group.columns
-                    if "id" in group.columns:  # Keep id if present from DB model
-                        columns_to_write = ["id"] + columns_to_write
+                votes_csv_file = self.ratings_csv_dir / "votes.csv"
+                # Select columns for consolidated CSV: uuid, position, voter, winner, loser
+                columns_to_write = ["position", "voter", "winner", "loser"]
+                if "id" in votes_df.columns:  # Use id as uuid if present from DB model
+                    columns_to_write = ["id"] + columns_to_write
+                    votes_df = votes_df.rename(columns={"id": "uuid"})
+                    columns_to_write[0] = "uuid"
 
-                    # Filter group to only existing columns to avoid errors
-                    group_filtered = group[
-                        [col for col in columns_to_write if col in group.columns]
-                    ]
+                # Filter to only existing columns to avoid errors
+                votes_filtered = votes_df[
+                    [col for col in columns_to_write if col in votes_df.columns]
+                ]
 
-                    def write_ratings_df(path):
-                        group_filtered.to_csv(path, index=False)
+                def write_votes_df(path):
+                    votes_filtered.to_csv(path, index=False)
 
-                    self._write_with_lock(pos_csv_file, write_ratings_df)
-                    # print(f"Serialized votes for position {position} to {pos_csv_file}") # Debug
+                self._write_with_lock(votes_csv_file, write_votes_df)
 
             # Serialize Transactions to individual JSON files
             all_transactions_db = session.query(TransactionDB).all()

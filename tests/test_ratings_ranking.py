@@ -2,8 +2,11 @@ from pathlib import Path  # Necessário para Path operations
 
 import pandas as pd  # Necessário para criar DataFrames para CSVs
 
-from hronir_encyclopedia import ratings
-from hronir_encyclopedia import storage # Added for DataManager
+from hronir_encyclopedia import (
+    ratings,
+    storage,  # Added for DataManager
+)
+
 
 # Helper function to manage DataManager and call get_ranking
 # This is identical to the one in test_ranking_filtering.py
@@ -27,7 +30,7 @@ def _call_get_ranking_with_setup(position, predecessor_hronir_uuid, forking_dir,
             df = ratings.get_ranking(
                 position=position,
                 predecessor_hronir_uuid=predecessor_hronir_uuid,
-                session=db_session
+                session=db_session,
             )
         finally:
             db_session.close()
@@ -37,7 +40,8 @@ def _call_get_ranking_with_setup(position, predecessor_hronir_uuid, forking_dir,
         storage.data_manager.ratings_csv_dir = original_ratings_csv_dir
         storage.data_manager._initialized = original_initialized
         if db_cleared_by_this_run and storage.data_manager._initialized:
-             storage.data_manager.clear_in_memory_data()
+            storage.data_manager.clear_in_memory_data()
+
 
 # Definir UUIDs de teste de forma consistente
 UUID_A = "hr-a"

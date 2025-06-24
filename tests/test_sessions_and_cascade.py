@@ -1,9 +1,7 @@
 import json
 import os
-import json
-import os
 import shutil
-import uuid # Added for _qualify_fork helper
+import uuid  # Added for _qualify_fork helper
 from pathlib import Path
 
 import pandas as pd
@@ -11,7 +9,7 @@ import pytest
 from typer.testing import CliRunner
 
 from hronir_encyclopedia import cli as hronir_cli
-from hronir_encyclopedia import ratings, storage, transaction_manager, models # Added models
+from hronir_encyclopedia import models, ratings, storage, transaction_manager  # Added models
 
 # Instantiate a runner
 runner = CliRunner()
@@ -216,10 +214,12 @@ def _get_ratings_df(position: int) -> pd.DataFrame | None:
     return pd.read_csv(ratings_file)
 
 
-def _qualify_fork(fork_to_qualify_uuid: str,
-                  hr_to_qualify_uuid: str,
-                  position: int,
-                  predecessor_hr_uuid: str | None): # Allow None for predecessor_hr_uuid for pos 0
+def _qualify_fork(
+    fork_to_qualify_uuid: str,
+    hr_to_qualify_uuid: str,
+    position: int,
+    predecessor_hr_uuid: str | None,
+):  # Allow None for predecessor_hr_uuid for pos 0
     """Helper to make a fork QUALIFIED by simulating duels."""
     # Create a dummy opponent
     # Use a more unique name for the dummy opponent to avoid collisions if called multiple times
@@ -227,11 +227,18 @@ def _qualify_fork(fork_to_qualify_uuid: str,
     dummy_opponent_hr_uuid = storage.compute_uuid(dummy_opponent_content)
     _create_hronir(dummy_opponent_hr_uuid, dummy_opponent_content, predecessor_hr_uuid)
 
-    dummy_opponent_fork_uuid = _get_fork_uuid(position, predecessor_hr_uuid if predecessor_hr_uuid else "", dummy_opponent_hr_uuid)
-    _create_fork_entry(position, predecessor_hr_uuid if predecessor_hr_uuid else "", dummy_opponent_hr_uuid, dummy_opponent_fork_uuid)
+    dummy_opponent_fork_uuid = _get_fork_uuid(
+        position, predecessor_hr_uuid if predecessor_hr_uuid else "", dummy_opponent_hr_uuid
+    )
+    _create_fork_entry(
+        position,
+        predecessor_hr_uuid if predecessor_hr_uuid else "",
+        dummy_opponent_hr_uuid,
+        dummy_opponent_fork_uuid,
+    )
 
     votes_to_qualify = []
-    for _ in range(4): # 4 wins typically grants enough Elo
+    for _ in range(4):  # 4 wins typically grants enough Elo
         votes_to_qualify.append(
             {
                 "position": position,
@@ -246,57 +253,70 @@ def _qualify_fork(fork_to_qualify_uuid: str,
     # If initiating_fork_uuid is the voter, it will be the same for all votes in one tx.
     # So, we need 4 separate transactions, each with a unique initiating_fork_uuid for the voter.
     for i in range(4):
-        single_vote_verdict = [{
-            "position": position,
-            "winner_hrönir_uuid": hr_to_qualify_uuid,
-            "loser_hrönir_uuid": dummy_opponent_hr_uuid,
-        }]
+        single_vote_verdict = [
+            {
+                "position": position,
+                "winner_hrönir_uuid": hr_to_qualify_uuid,
+                "loser_hrönir_uuid": dummy_opponent_hr_uuid,
+            }
+        ]
         tx_result = transaction_manager.record_transaction(
             session_id=str(uuid.uuid4()),
-            initiating_fork_uuid=f"dummy_qualifier_agent_fork_vote_{i}_{str(uuid.uuid4())}", # Ensure unique voter for each tx
+            initiating_fork_uuid=f"dummy_qualifier_agent_fork_vote_{i}_{str(uuid.uuid4())}",  # Ensure unique voter for each tx
             session_verdicts=single_vote_verdict,
         )
-        assert tx_result is not None, f"Transaction {i+1} for qualification of {fork_to_qualify_uuid} failed"
+        assert tx_result is not None, (
+            f"Transaction {i + 1} for qualification of {fork_to_qualify_uuid} failed"
+        )
 
     qualified_fork_data = storage.get_fork_data(fork_to_qualify_uuid)
-    assert qualified_fork_data is not None, f"Fork {fork_to_qualify_uuid} not found after qualification attempt."
+    assert qualified_fork_data is not None, (
+        f"Fork {fork_to_qualify_uuid} not found after qualification attempt."
+    )
 
     # Fetch Elo to include in assertion message if qualification fails
     elo_rating_msg = "N/A"
     db_session_for_elo_check = storage.get_db_session()
     try:
-        ranking_for_elo_check = ratings.get_ranking(position, predecessor_hr_uuid, session=db_session_for_elo_check)
+        ranking_for_elo_check = ratings.get_ranking(
+            position, predecessor_hr_uuid, session=db_session_for_elo_check
+        )
         if not ranking_for_elo_check.empty:
-            fork_in_ranking = ranking_for_elo_check[ranking_for_elo_check['fork_uuid'] == fork_to_qualify_uuid]
+            fork_in_ranking = ranking_for_elo_check[
+                ranking_for_elo_check["fork_uuid"] == fork_to_qualify_uuid
+            ]
             if not fork_in_ranking.empty:
-                elo_rating_msg = str(fork_in_ranking.iloc[0]['elo_rating'])
+                elo_rating_msg = str(fork_in_ranking.iloc[0]["elo_rating"])
     finally:
         db_session_for_elo_check.close()
 
-    assert qualified_fork_data.status == "QUALIFIED", \
+    assert qualified_fork_data.status == "QUALIFIED", (
         f"Fork {fork_to_qualify_uuid} did not reach QUALIFIED status. Current status: {qualified_fork_data.status}, Elo: {elo_rating_msg}"
-    assert qualified_fork_data.mandate_id is not None, f"Fork {fork_to_qualify_uuid} is QUALIFIED but has no mandate_id."
+    )
+    assert qualified_fork_data.mandate_id is not None, (
+        f"Fork {fork_to_qualify_uuid} is QUALIFIED but has no mandate_id."
+    )
 
 
 # --- Pytest Fixture for Test Environment Setup/Teardown ---
 
 
 @pytest.fixture(autouse=True)
-def test_environment(monkeypatch): # Added monkeypatch
+def test_environment(monkeypatch):  # Added monkeypatch
     """Sets up a clean test environment before each test and cleans up after."""
     if TEST_ROOT.exists():
         shutil.rmtree(TEST_ROOT)
     # These are absolute paths based on where pytest runs + TEST_ROOT constant
     TEST_ROOT.mkdir(parents=True)
     LIBRARY_DIR.mkdir(parents=True, exist_ok=True)
-    FORKING_PATH_DIR.mkdir(parents=True, exist_ok=True) # TEST_ROOT/forking_path
-    RATINGS_DIR.mkdir(parents=True, exist_ok=True)     # TEST_ROOT/ratings
-    DATA_DIR.mkdir(parents=True, exist_ok=True)        # TEST_ROOT/data
-    SESSIONS_DIR_fixture.mkdir(parents=True, exist_ok=True) # TEST_ROOT/data/sessions
-    TRANSACTIONS_DIR_fixture.mkdir(parents=True, exist_ok=True) # TEST_ROOT/data/transactions
+    FORKING_PATH_DIR.mkdir(parents=True, exist_ok=True)  # TEST_ROOT/forking_path
+    RATINGS_DIR.mkdir(parents=True, exist_ok=True)  # TEST_ROOT/ratings
+    DATA_DIR.mkdir(parents=True, exist_ok=True)  # TEST_ROOT/data
+    SESSIONS_DIR_fixture.mkdir(parents=True, exist_ok=True)  # TEST_ROOT/data/sessions
+    TRANSACTIONS_DIR_fixture.mkdir(parents=True, exist_ok=True)  # TEST_ROOT/data/transactions
 
     original_cwd = Path.cwd()
-    os.chdir(TEST_ROOT) # CWD is now TEST_ROOT
+    os.chdir(TEST_ROOT)  # CWD is now TEST_ROOT
 
     # Store original attributes of the data_manager singleton
     original_fork_dir = storage.data_manager.fork_csv_dir
@@ -310,13 +330,15 @@ def test_environment(monkeypatch): # Added monkeypatch
     storage.data_manager.transactions_json_dir = TRANSACTIONS_DIR_fixture.resolve()
 
     # Force recreation of the in-memory DB and tables for maximum isolation
-    if hasattr(storage.data_manager, 'engine') and storage.data_manager.engine is not None:
-        models.Base.metadata.drop_all(storage.data_manager.engine) # Use models.Base
-    models.create_db_and_tables(storage.data_manager.engine) # Use models.create_db_and_tables
+    if hasattr(storage.data_manager, "engine") and storage.data_manager.engine is not None:
+        models.Base.metadata.drop_all(storage.data_manager.engine)  # Use models.Base
+    models.create_db_and_tables(storage.data_manager.engine)  # Use models.create_db_and_tables
 
     storage.data_manager._initialized = False
     # This will load from the (empty at start of test) temp CSV dirs into fresh tables
-    storage.data_manager.initialize_and_load(clear_existing_data=False) # False, as tables are already empty
+    storage.data_manager.initialize_and_load(
+        clear_existing_data=False
+    )  # False, as tables are already empty
 
     yield  # This is where the test runs
 
@@ -329,7 +351,7 @@ def test_environment(monkeypatch): # Added monkeypatch
     storage.data_manager._initialized = original_initialized
 
     # Clean up DB state if it was initialized by the test run
-    if storage.data_manager._initialized: # Check the instance's current state
+    if storage.data_manager._initialized:  # Check the instance's current state
         storage.data_manager.clear_in_memory_data()
 
     shutil.rmtree(TEST_ROOT)
@@ -485,14 +507,19 @@ class TestSessionWorkflow:
         # Check ratings for position 0 (now checking DB directly)
         db_session_check = storage.get_db_session()
         try:
-            recorded_vote_in_db = db_session_check.query(storage.VoteDB).filter_by(
-                position=0,
-                voter=f2_judge_fork_uuid, # This was the initiating_fork_uuid for the session
-                winner=h0b_uuid,          # This was the winning hrönir in the verdict
-                loser=h0a_uuid            # This was the losing hrönir
-            ).first()
-            assert recorded_vote_in_db is not None, \
+            recorded_vote_in_db = (
+                db_session_check.query(storage.VoteDB)
+                .filter_by(
+                    position=0,
+                    voter=f2_judge_fork_uuid,  # This was the initiating_fork_uuid for the session
+                    winner=h0b_uuid,  # This was the winning hrönir in the verdict
+                    loser=h0a_uuid,  # This was the losing hrönir
+                )
+                .first()
+            )
+            assert recorded_vote_in_db is not None, (
                 f"Expected vote (pos 0, voter {f2_judge_fork_uuid}, winner {h0b_uuid}, loser {h0a_uuid}) not found in DB"
+            )
         finally:
             db_session_check.close()
 
@@ -510,7 +537,9 @@ class TestSessionWorkflow:
         assert tx_data is not None
         assert tx_data["session_id"] == session_id
         assert tx_data["initiating_fork_uuid"] == f2_judge_fork_uuid
-        expected_verdicts_in_tx = [{'position': 0, 'winner_hrönir_uuid': h0b_uuid, 'loser_hrönir_uuid': h0a_uuid}]
+        expected_verdicts_in_tx = [
+            {"position": 0, "winner_hrönir_uuid": h0b_uuid, "loser_hrönir_uuid": h0a_uuid}
+        ]
         assert tx_data["verdicts"] == expected_verdicts_in_tx
         # previous_transaction_uuid should be None if this is the first one
 
@@ -621,12 +650,12 @@ class TestSessionWorkflow:
         # And ensure no other pos 0 forks exist.
         # All other initial votes are for positions > 0 or for non-canonical paths initially.
         # Make f0a slightly different from f0b for dossier selection, ensure they are primary.
-        _create_vote_entry(0, "voter_init_elo_adjust", h0a_uuid, h0b_uuid) # f0a wins once -> f0a:1516, f0b:1484
+        _create_vote_entry(
+            0, "voter_init_elo_adjust", h0a_uuid, h0b_uuid
+        )  # f0a wins once -> f0a:1516, f0b:1484
 
         # Let's make f1a_from_0a stronger than f1b_from_0a (initial canonical path)
-        _create_vote_entry(
-            1, "voter_init3", h1a_from_0a_uuid, h1b_from_0a_uuid
-        )
+        _create_vote_entry(1, "voter_init3", h1a_from_0a_uuid, h1b_from_0a_uuid)
         # Let's make f2a_from_1a stronger than h2b_from_1a (initial canonical path)
         _create_vote_entry(2, "voter_init4", h2a_from_1a_uuid, h2b_from_1a_uuid)
 
@@ -673,7 +702,9 @@ class TestSessionWorkflow:
         pos0_duel_data = dossier["duels"]["0"]
         actual_pos0_fork_A = pos0_duel_data["fork_A"]
         actual_pos0_fork_B = pos0_duel_data["fork_B"]
-        print(f"DEBUG_TEST: Scenario 2, Pos 0 Dossier: fork_A={actual_pos0_fork_A}, fork_B={actual_pos0_fork_B}")
+        print(
+            f"DEBUG_TEST: Scenario 2, Pos 0 Dossier: fork_A={actual_pos0_fork_A}, fork_B={actual_pos0_fork_B}"
+        )
         print(f"DEBUG_TEST: Expected f0a={f0a_uuid}, f0b={f0b_uuid}")
         # Temporarily make this assertion more about structure than specific UUIDs if it keeps failing.
         # For now, keeping the specific check to see if previous fixes helped.
@@ -683,7 +714,9 @@ class TestSessionWorkflow:
         assert {actual_pos0_fork_A, actual_pos0_fork_B} == {
             f0a_uuid,
             f0b_uuid,
-        }, f"Dossier duel for Pos 0 is not f0a vs f0b. Got ({actual_pos0_fork_A} vs {actual_pos0_fork_B}), expected ({f0a_uuid} vs {f0b_uuid})"
+        }, (
+            f"Dossier duel for Pos 0 is not f0a vs f0b. Got ({actual_pos0_fork_A} vs {actual_pos0_fork_B}), expected ({f0a_uuid} vs {f0b_uuid})"
+        )
 
         # Commit: Vote for f0b to win at Position 0. This should trigger the cascade.
         # Give enough votes to f0b to overcome f0a's initial Elo advantage.
@@ -842,8 +875,8 @@ class TestSessionWorkflow:
         # Votes to make f0b win over f0a during session commit.
         _create_vote_entry(0, "cascade_voter1", h0b_uuid, h0a_uuid)
         _create_vote_entry(0, "cascade_voter2", h0b_uuid, h0a_uuid)
-        _create_vote_entry(0, "cascade_voter3_s3", h0b_uuid, h0a_uuid) # Extra vote for f0b
-        _create_vote_entry(0, "cascade_voter4_s3", h0b_uuid, h0a_uuid) # Extra vote for f0b
+        _create_vote_entry(0, "cascade_voter3_s3", h0b_uuid, h0a_uuid)  # Extra vote for f0b
+        _create_vote_entry(0, "cascade_voter4_s3", h0b_uuid, h0a_uuid)  # Extra vote for f0b
         # f0b now has 4 wins (2 here + 1 from session commit + 1 from earlier cascade_voter1/2 if logic is cumulative for this test)
         # f0a has 0 wins from this block. (Removed its initial win earlier)
 

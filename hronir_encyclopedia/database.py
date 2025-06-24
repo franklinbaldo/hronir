@@ -29,7 +29,7 @@ class CsvDatabase:
     def __init__(
         self,
         ratings_dir: Path | str = "ratings",
-        fork_dir: Path | str = "forking_path",
+        fork_dir: Path | str = "the_garden",
         filename: str | None = None,
     ) -> None:
         self.ratings_dir = Path(ratings_dir)
@@ -107,7 +107,7 @@ def open_database(
     *,
     temp_file: bool = False,
     ratings_dir: Path | str = "ratings",
-    fork_dir: Path | str = "forking_path",
+    fork_dir: Path | str = "the_garden",
 ) -> CsvDatabase:
     """Return CsvDatabase context manager."""
     if temp_file:

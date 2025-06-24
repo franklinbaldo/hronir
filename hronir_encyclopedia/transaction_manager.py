@@ -44,7 +44,7 @@ def _compute_transaction_uuid(content: dict[str, Any]) -> str:
 
 
 # Define default paths, these could be configurable
-FORKING_PATH_DIR = Path("forking_path")
+FORKING_PATH_DIR = Path("the_garden")
 RATINGS_DIR = Path("ratings")
 CHAPTER_BASE_DIR = Path("the_library")
 
@@ -208,7 +208,7 @@ def record_transaction(
 
     base_dir = TRANSACTIONS_DIR.parent.parent
     if forking_path_dir is None:
-        forking_path_dir = base_dir / "forking_path"
+        forking_path_dir = base_dir / "the_garden"
     if ratings_dir is None:
         ratings_dir = base_dir / "ratings"
 

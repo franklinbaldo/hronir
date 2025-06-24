@@ -40,7 +40,7 @@ def recover_canon(
     ] = Path("ratings"),
     forking_path_dir: Annotated[
         Path, typer.Option(help="Directory containing forking path CSV files.")
-    ] = Path("forking_path"),
+    ] = Path("the_garden"),
     canonical_path_file: Annotated[
         Path, typer.Option(help="Path to the canonical path JSON file.")
     ] = Path("data/canonical_path.json"),
@@ -205,7 +205,7 @@ def fork(
     fork_uuid = storage.compute_forking_uuid(position, source, target)
 
     # Create forking path entry
-    forking_path_dir = Path("forking_path")
+    forking_path_dir = Path("the_garden")
     forking_path_dir.mkdir(exist_ok=True)
 
     # Use position-based CSV file naming
@@ -251,7 +251,7 @@ def list_forks(
 
     import pandas as pd
 
-    forking_path_dir = Path("forking_path")
+    forking_path_dir = Path("the_garden")
     if not forking_path_dir.exists():
         typer.echo("No forking path directory found.")
         return
@@ -378,7 +378,7 @@ def status(
     forking_path_dir: Annotated[
         Path,
         typer.Option(help="Directory containing forking path CSV files (for --counts)."),
-    ] = Path("forking_path"),
+    ] = Path("the_garden"),
 ) -> None:
     """Show canonical path entries and optional fork status counts."""
     try:
@@ -433,7 +433,7 @@ def audit():
     )
     # No direct action on library_dir here, purge_fake_hronirs in 'clean' is more comprehensive.
 
-    fork_dir = Path("forking_path")
+    fork_dir = Path("the_garden")
     if fork_dir.exists():
         typer.echo(f"Auditing forking path directory: {fork_dir}...")
         for csv_file in fork_dir.glob("*.csv"):
@@ -511,7 +511,7 @@ def get_duel(
     forking_path_dir: Annotated[
         Path,
         typer.Option(help="Diretório contendo arquivos CSV de caminhos de bifurcação."),
-    ] = Path("forking_path"),
+    ] = Path("the_garden"),
     canonical_path_file: Annotated[
         Path, typer.Option(help="Caminho para o arquivo JSON do caminho canônico.")
     ] = Path("data/canonical_path.json"),
@@ -635,7 +635,7 @@ def clean(
     typer.echo("Starting cleanup process...")
     storage.purge_fake_hronirs()  # Assumes this function prints its actions
 
-    fork_dir = Path("forking_path")
+    fork_dir = Path("the_garden")
     if fork_dir.exists():
         typer.echo(f"Cleaning fake forking CSVs in {fork_dir}...")
         for csv_file in fork_dir.glob("*.csv"):
@@ -706,7 +706,7 @@ def session_start(
     ] = Path("ratings"),
     forking_path_dir: Annotated[
         Path, typer.Option(help="Directory containing forking path CSV files.")
-    ] = Path("forking_path"),
+    ] = Path("the_garden"),
     canonical_path_file: Annotated[
         Path, typer.Option(help="Path to the canonical path JSON file.")
     ] = Path("data/canonical_path.json"),
@@ -1121,7 +1121,7 @@ def session_commit(
     ] = Path("ratings"),  # Retained for run_temporal_cascade
     forking_path_dir: Annotated[
         Path, typer.Option(help="Directory containing forking path CSV files.")
-    ] = Path("forking_path"),  # Retained for _get_successor_hronir_for_fork and cascade
+    ] = Path("the_garden"),  # Retained for _get_successor_hronir_for_fork and cascade
     canonical_path_file: Annotated[
         Path, typer.Option(help="Path to the canonical path JSON file.")
     ] = Path("data/canonical_path.json"),  # Retained for run_temporal_cascade
@@ -1471,7 +1471,7 @@ def session_commit(
 def metrics_command(
     forking_path_dir: Annotated[
         Path, typer.Option(help="Directory containing forking path CSV files.")
-    ] = Path("forking_path"),
+    ] = Path("the_garden"),
 ):
     """
     Scans all forking_path/*.csv files and prints the total number of forks

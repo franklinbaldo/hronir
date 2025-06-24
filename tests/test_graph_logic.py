@@ -2,14 +2,18 @@ from pathlib import Path
 
 import pandas as pd
 
-from hronir_encyclopedia import graph_logic
-from hronir_encyclopedia import storage # Added for DataManager setup
+from hronir_encyclopedia import (
+    graph_logic,
+    storage,  # Added for DataManager setup
+)
 
 
 def _setup_data_manager_and_check_consistency(fork_dir_path: Path):
     """Helper to setup DataManager, load data, and check consistency."""
     original_fork_csv_dir = storage.data_manager.fork_csv_dir
-    original_ratings_csv_dir = storage.data_manager.ratings_csv_dir # Though not used by graph_logic
+    original_ratings_csv_dir = (
+        storage.data_manager.ratings_csv_dir
+    )  # Though not used by graph_logic
     original_initialized = storage.data_manager._initialized
     db_cleared_by_this_run = False
 
@@ -32,7 +36,7 @@ def _setup_data_manager_and_check_consistency(fork_dir_path: Path):
         storage.data_manager.ratings_csv_dir = original_ratings_csv_dir
         storage.data_manager._initialized = original_initialized
         if db_cleared_by_this_run and storage.data_manager._initialized:
-             storage.data_manager.clear_in_memory_data()
+            storage.data_manager.clear_in_memory_data()
 
 
 def test_is_narrative_consistent(tmp_path: Path):
@@ -56,10 +60,34 @@ def test_is_narrative_consistent(tmp_path: Path):
     # Test 2: Graph with a cycle
     df_cycle_nodes = pd.DataFrame(
         [
-            {"position": 0, "prev_uuid": "", "uuid": "A", "fork_uuid": "fA_cycle", "status": "PENDING"},
-            {"position": 1, "prev_uuid": "A", "uuid": "B", "fork_uuid": "fB_cycle", "status": "PENDING"},
-            {"position": 2, "prev_uuid": "B", "uuid": "C", "fork_uuid": "fC_cycle", "status": "PENDING"},
-            {"position": 3, "prev_uuid": "C", "uuid": "A", "fork_uuid": "fX_cycle_back_to_A", "status": "PENDING"}, # Cycle C -> A
+            {
+                "position": 0,
+                "prev_uuid": "",
+                "uuid": "A",
+                "fork_uuid": "fA_cycle",
+                "status": "PENDING",
+            },
+            {
+                "position": 1,
+                "prev_uuid": "A",
+                "uuid": "B",
+                "fork_uuid": "fB_cycle",
+                "status": "PENDING",
+            },
+            {
+                "position": 2,
+                "prev_uuid": "B",
+                "uuid": "C",
+                "fork_uuid": "fC_cycle",
+                "status": "PENDING",
+            },
+            {
+                "position": 3,
+                "prev_uuid": "C",
+                "uuid": "A",
+                "fork_uuid": "fX_cycle_back_to_A",
+                "status": "PENDING",
+            },  # Cycle C -> A
         ]
     )
     df_cycle_nodes.to_csv(fork_dir / "path_cycle.csv", index=False)

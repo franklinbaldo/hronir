@@ -1,20 +1,22 @@
 import uuid
-from pathlib import Path # Import Path
+from pathlib import Path  # Import Path
 
 import pandas as pd
 import pytest
 
-from hronir_encyclopedia import ratings, storage # ratings.py and storage for DataManager
+from hronir_encyclopedia import ratings, storage  # ratings.py and storage for DataManager
 
 
 # Helper function to manage DataManager and call determine_next_duel_entropy
-def _call_determine_next_duel_entropy_with_setup(position, predecessor_hronir_uuid, forking_dir, ratings_dir):
+def _call_determine_next_duel_entropy_with_setup(
+    position, predecessor_hronir_uuid, forking_dir, ratings_dir
+):
     # Store original values from the singleton
     original_fork_dir_attr = storage.data_manager.fork_csv_dir
     original_ratings_dir_attr = storage.data_manager.ratings_csv_dir
     original_initialized_attr = storage.data_manager._initialized
-    original_cwd = Path.cwd() # Store current CWD
-    import os # Make sure os is imported
+    original_cwd = Path.cwd()  # Store current CWD
+    import os  # Make sure os is imported
 
     try:
         # Change CWD to the parent of the temp directory structure for this test
@@ -36,7 +38,7 @@ def _call_determine_next_duel_entropy_with_setup(position, predecessor_hronir_uu
         duel_info = ratings.determine_next_duel_entropy(
             position=position,
             predecessor_hronir_uuid=predecessor_hronir_uuid,
-            session=None  # Will get its own session, using current DataManager state
+            session=None,  # Will get its own session, using current DataManager state
         )
         return duel_info
     finally:
@@ -44,7 +46,7 @@ def _call_determine_next_duel_entropy_with_setup(position, predecessor_hronir_uu
         storage.data_manager.fork_csv_dir = original_fork_dir_attr
         storage.data_manager.ratings_csv_dir = original_ratings_dir_attr
         storage.data_manager._initialized = original_initialized_attr
-        os.chdir(original_cwd) # Restore CWD
+        os.chdir(original_cwd)  # Restore CWD
 
         # Clean up any data loaded/created by this test from the DB
         # Check _initialized on the instance, not the potentially restored original_initialized_attr
@@ -179,11 +181,11 @@ class TestDetermineNextDuelPurelyEntropic:
             position=1,
             predecessor_hronir_uuid="any-pred-uuid",
             forking_dir=forking_dir,
-            ratings_dir=ratings_dir
+            ratings_dir=ratings_dir,
         )
 
         assert duel_info is not None
-        assert duel_info["strategy"] == "max_shannon_entropy" # Strategy name updated
+        assert duel_info["strategy"] == "max_shannon_entropy"  # Strategy name updated
         # The determine_next_duel now returns fork_uuids in "duel_pair"
         # Assuming the mock_ratings_get_ranking returns 'uuid' as fork_uuid for simplicity here
         assert set(duel_info["duel_pair"].values()) == set([h1, h2])
@@ -228,11 +230,11 @@ class TestDetermineNextDuelPurelyEntropic:
             position=1,
             predecessor_hronir_uuid="any-pred-uuid",
             forking_dir=forking_dir,
-            ratings_dir=ratings_dir
+            ratings_dir=ratings_dir,
         )
 
         assert duel_info is not None
-        assert duel_info["strategy"] == "max_shannon_entropy" # Strategy name updated
+        assert duel_info["strategy"] == "max_shannon_entropy"  # Strategy name updated
         assert set(duel_info["duel_pair"].values()) == set([h1, h2])
 
     def test_edge_case_no_hronirs(self, tmp_path, mock_ratings_get_ranking):
@@ -246,7 +248,7 @@ class TestDetermineNextDuelPurelyEntropic:
             position=1,
             predecessor_hronir_uuid="any-pred-uuid",
             forking_dir=forking_dir,
-            ratings_dir=ratings_dir
+            ratings_dir=ratings_dir,
         )
         assert duel_info is None
 
@@ -261,7 +263,7 @@ class TestDetermineNextDuelPurelyEntropic:
             position=1,
             predecessor_hronir_uuid="any-pred-uuid",
             forking_dir=forking_dir,
-            ratings_dir=ratings_dir
+            ratings_dir=ratings_dir,
         )
         assert duel_info is None
 
@@ -285,7 +287,7 @@ class TestDetermineNextDuelPurelyEntropic:
             position=1,
             predecessor_hronir_uuid="any-pred-uuid",
             forking_dir=forking_dir,
-            ratings_dir=ratings_dir
+            ratings_dir=ratings_dir,
         )
 
         assert duel_info is not None
@@ -347,7 +349,7 @@ class TestDetermineNextDuelPurelyEntropic:
             position=1,
             predecessor_hronir_uuid="any-pred-uuid",
             forking_dir=forking_dir,
-            ratings_dir=ratings_dir
+            ratings_dir=ratings_dir,
         )
         assert duel_info is not None
         assert duel_info["strategy"] == "max_shannon_entropy"  # Strategy name updated
@@ -373,11 +375,11 @@ class TestDetermineNextDuelPurelyEntropic:
         forking_dir.mkdir()
         ratings_dir = tmp_path / "ratings"
         ratings_dir.mkdir()
-        duel_info = _call_determine_next_duel_entropy_with_setup( # Call helper
+        duel_info = _call_determine_next_duel_entropy_with_setup(  # Call helper
             position=1,
             predecessor_hronir_uuid="any-pred-uuid",
             forking_dir=forking_dir,
-            ratings_dir=ratings_dir
+            ratings_dir=ratings_dir,
         )
         assert duel_info is not None
         assert duel_info["strategy"] == "max_shannon_entropy"
@@ -398,11 +400,11 @@ class TestDetermineNextDuelPurelyEntropic:
         forking_dir.mkdir()
         ratings_dir = tmp_path / "ratings"
         ratings_dir.mkdir()
-        duel_info = _call_determine_next_duel_entropy_with_setup( # Call helper
+        duel_info = _call_determine_next_duel_entropy_with_setup(  # Call helper
             position=1,
             predecessor_hronir_uuid="any-pred-uuid",
             forking_dir=forking_dir,
-            ratings_dir=ratings_dir
+            ratings_dir=ratings_dir,
         )
         assert duel_info is not None
         assert duel_info["strategy"] == "max_shannon_entropy"
