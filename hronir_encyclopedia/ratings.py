@@ -1,4 +1,5 @@
 import math
+import sys # For debug prints
 import uuid
 from pathlib import Path # Kept for potential future use
 import itertools
@@ -109,7 +110,7 @@ def get_ranking(
             eligible_fork_df.fork_uuid.values, index=eligible_fork_df.hrönir_uuid
         ).to_dict()
 
-        ELO_BASE = 1500
+        ELO_BASE = 1500.0 # Initialize with a float
         ranking_list = [
             {
                 "fork_uuid": fork_info["fork_uuid"],
@@ -125,9 +126,17 @@ def get_ranking(
 
         votes_at_position = session.query(VoteDB).filter(VoteDB.position == position).all()
 
+        # ---- START DEBUG PRINTS ----
+        # # import sys # Moved to top
+        # print(f"DEBUG Ratings: get_ranking for pos {position}, pred_hrönir {predecessor_hronir_uuid}", file=sys.stderr)
+        # print(f"DEBUG Ratings: eligible_fork_df:\n{eligible_fork_df.to_string()}", file=sys.stderr)
+        # print(f"DEBUG Ratings: hronir_to_eligible_fork_map:\n{hronir_to_eligible_fork_map}", file=sys.stderr)
+        # print(f"DEBUG Ratings: Found {len(votes_at_position)} votes in DB for position {position}.", file=sys.stderr)
+        # ---- END DEBUG PRINTS ----
+
         if votes_at_position:
             votes_data = [
-                {"winner": v.winner, "loser": v.loser, "voter": v.voter}
+                {"winner": v.winner, "loser": v.loser, "voter": v.voter} # Removed "id": v.id from debug
                 for v in votes_at_position
             ]
             df_votes = pd.DataFrame(votes_data)

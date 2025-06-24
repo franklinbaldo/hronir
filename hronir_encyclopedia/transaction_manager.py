@@ -1,5 +1,6 @@
 import datetime
 import json
+import sys # Moved import sys to the top
 import uuid
 from pathlib import Path
 from typing import Any
@@ -49,108 +50,95 @@ CHAPTER_BASE_DIR = Path("the_library")
 
 
 def _get_fork_details_by_hrönir_uuid(
-    hrönir_uuid_to_find: str, at_position: int, fork_dir_base: Path = FORKING_PATH_DIR
+    hrönir_uuid_to_find: str, at_position: int, session: Session | None = None
 ) -> dict[str, Any] | None:
     """
-    Finds the fork_uuid and other details for a given hrönir_uuid (chapter uuid)
-    at a specific position by scanning forking_path CSVs.
-    The hrönir_uuid corresponds to the 'uuid' column in the forking path CSVs.
+    Finds the fork_uuid and other details for a given hrönir_uuid (ForkDB.uuid)
+    at a specific position from the database.
+    Returns a dictionary representation of the ForkDB object if found, else None.
     """
-    if not fork_dir_base.is_dir():
-        return None
+    close_session_locally = False
+    if session is None:
+        session = storage.get_db_session()
+        close_session_locally = True
 
-    for csv_filepath in fork_dir_base.glob("*.csv"):
-        if csv_filepath.stat().st_size == 0:
-            continue
-        try:
-            df = pd.read_csv(
-                csv_filepath,
-                dtype={
-                    "position": str,
-                    "uuid": str,
-                    "fork_uuid": str,
-                    "prev_uuid": str,
-                    "status": str,
-                },
+    try:
+        fork_db_entry = (
+            session.query(storage.ForkDB)
+            .filter(
+                storage.ForkDB.uuid == hrönir_uuid_to_find,
+                storage.ForkDB.position == at_position,
             )
-            # Ensure position is treated as int for comparison after reading as str
-            df["position"] = pd.to_numeric(df["position"], errors="coerce")
+            .first()
+        )
 
-            # Filter by position and the hrönir_uuid (which is 'uuid' column)
-            # Make sure to handle potential NaN from coerce if position column is bad
-            fork_row_df = df[
-                (df["uuid"] == hrönir_uuid_to_find)
-                & (df["position"] == at_position)
-                & (df["position"].notna())
-            ]
-
-            if not fork_row_df.empty:
-                fork_data = fork_row_df.iloc[0].to_dict()
-                fork_data["csv_filepath"] = csv_filepath  # Store for potential direct access later
-                return fork_data
-        except pd.errors.EmptyDataError:
-            continue
-        except Exception:
-            # print(f"Error reading or processing {csv_filepath}: {e}") # Optional logging
-            continue
-    return None
+        if fork_db_entry:
+            # Convert ForkDB object to dict to match expected return type by caller
+            return {
+                "fork_uuid": fork_db_entry.fork_uuid,
+                "position": fork_db_entry.position,
+                "prev_uuid": fork_db_entry.prev_uuid,
+                "uuid": fork_db_entry.uuid, # This is the hrönir_uuid
+                "status": fork_db_entry.status,
+                "mandate_id": fork_db_entry.mandate_id,
+                # 'csv_filepath' is no longer relevant as we are reading from DB
+            }
+        return None
+    finally:
+        if close_session_locally and session is not None:
+            session.close()
 
 
 def _get_all_forks_at_position(
-    position_num: int, predecessor_uuid: str | None, fork_dir_base: Path = FORKING_PATH_DIR
+    position_num: int, predecessor_uuid: str | None, session: Session | None = None
 ) -> pd.DataFrame:
     """
-    Loads all forks from all CSV files in fork_dir_base that are at the given position
+    Loads all forks from the database that are at the given position
     and optionally match the predecessor_uuid.
+    Returns a Pandas DataFrame.
     """
-    all_forks_list = []
-    if not fork_dir_base.is_dir():
-        return pd.DataFrame()
+    close_session_locally = False
+    if session is None:
+        session = storage.get_db_session()
+        close_session_locally = True
 
-    for csv_file in fork_dir_base.glob("*.csv"):
-        if csv_file.stat().st_size == 0:
-            continue
-        try:
-            df_forks = pd.read_csv(
-                csv_file,
-                dtype={
-                    "position": str,
-                    "prev_uuid": str,
-                    "uuid": str,
-                    "fork_uuid": str,
-                    "status": str,
-                },
-            )
-            df_forks["position"] = pd.to_numeric(df_forks["position"], errors="coerce")
+    try:
+        query = session.query(storage.ForkDB).filter(storage.ForkDB.position == position_num)
 
-            selected_forks_at_pos = df_forks[df_forks["position"] == position_num]
+        if predecessor_uuid is None: # Position 0 case
+            if position_num == 0:
+                query = query.filter(
+                    (storage.ForkDB.prev_uuid == None) | (storage.ForkDB.prev_uuid == "") # noqa E711
+                )
+            else:
+                # For positions > 0, a predecessor_uuid should generally be specified.
+                # If not, it implies no forks should match, or logic needs clarification.
+                # For now, returning empty DataFrame if predecessor_uuid is None for pos > 0.
+                return pd.DataFrame(columns=["fork_uuid", "uuid", "prev_uuid", "position", "status"])
+        else: # Position > 0, predecessor_uuid is specified
+            query = query.filter(storage.ForkDB.prev_uuid == predecessor_uuid)
 
-            if predecessor_uuid is None:  # Position 0 case
-                if position_num == 0:
-                    selected_forks = selected_forks_at_pos[
-                        selected_forks_at_pos["prev_uuid"].fillna("").isin(["", "nan", "None"])
-                    ]
-                else:  # Should not happen if predecessor_uuid is correctly passed for pos > 0
-                    selected_forks = pd.DataFrame()  # Empty
-            else:  # Position > 0, predecessor_uuid is specified
-                selected_forks = selected_forks_at_pos[
-                    selected_forks_at_pos["prev_uuid"] == predecessor_uuid
-                ]
+        fork_db_entries = query.all()
 
-            if not selected_forks.empty:
-                all_forks_list.append(selected_forks)
-        except pd.errors.EmptyDataError:
-            continue
-        except Exception:  # Other read errors
-            continue
+        if not fork_db_entries:
+            return pd.DataFrame(columns=["fork_uuid", "uuid", "prev_uuid", "position", "status"])
 
-    if not all_forks_list:
-        return pd.DataFrame(
-            columns=["fork_uuid", "uuid", "prev_uuid", "position", "status"]
-        )  # Ensure schema
-
-    combined_df = pd.concat(all_forks_list, ignore_index=True)
-    return combined_df
+        # Convert list of ForkDB objects to DataFrame
+        fork_data_list = [
+            {
+                "fork_uuid": f.fork_uuid,
+                "uuid": f.uuid, # This is the hrönir_uuid
+                "prev_uuid": f.prev_uuid,
+                "position": f.position,
+                "status": f.status,
+                "mandate_id": f.mandate_id,
+            }
+            for f in fork_db_entries
+        ]
+        return pd.DataFrame(fork_data_list)
+    finally:
+        if close_session_locally and session is not None:
+            session.close()
 
 
 def record_transaction(
@@ -224,21 +212,20 @@ def record_transaction(
 
     promotions_granted: list[dict[str, str]] = []
     oldest_voted_position = -1
-
     processed_verdicts_for_log = []
+    hrönirs_to_check_for_qualification = set() # Collect (hrönir_uuid, position) tuples
 
+    # Loop 1: Record all votes
     for vote_action in session_verdicts:
         position = vote_action["position"]
         winner_hrönir_uuid = vote_action["winner_hrönir_uuid"]
         loser_hrönir_uuid = vote_action["loser_hrönir_uuid"]
 
-        # Record the vote using the initiating_fork_uuid as the voter
         ratings.record_vote(
             position,
             voter=initiating_fork_uuid,
-            winner=winner_hrönir_uuid,  # winner is a hrönir (chapter) UUID
-            loser=loser_hrönir_uuid,  # loser is a hrönir (chapter) UUID
-            base=ratings_dir,
+            winner=winner_hrönir_uuid,
+            loser=loser_hrönir_uuid,
             session=session,
         )
         processed_verdicts_for_log.append(vote_action)
@@ -246,79 +233,101 @@ def record_transaction(
         if oldest_voted_position == -1 or position < oldest_voted_position:
             oldest_voted_position = position
 
-        # Check qualification for forks that produced winner_hrönir_uuid and loser_hrönir_uuid
-        for hrönir_involved_uuid in [winner_hrönir_uuid, loser_hrönir_uuid]:
-            fork_details = _get_fork_details_by_hrönir_uuid(
-                hrönir_uuid_to_find=hrönir_involved_uuid,
-                at_position=position,
-                fork_dir_base=forking_path_dir,
+        # Add involved hrönirs to a set for later qualification check
+        hrönirs_to_check_for_qualification.add((winner_hrönir_uuid, position))
+        hrönirs_to_check_for_qualification.add((loser_hrönir_uuid, position))
+
+    # Loop 2: Check qualifications for all uniquely involved hrönirs
+    # This loop executes *after* all votes from the current session_verdicts are recorded.
+    for hrönir_involved_uuid, position in hrönirs_to_check_for_qualification:
+        # Use the refactored helper, passing the session
+        fork_details = _get_fork_details_by_hrönir_uuid(
+            hrönir_uuid_to_find=hrönir_involved_uuid,
+            at_position=position,
+            session=session, # Pass the session
+        )
+
+        if not fork_details:
+            print(f"DEBUG TM: (Loop 2) Warning: Could not find fork details for hrönir {hrönir_involved_uuid} at pos {position}", file=sys.stderr)
+            continue
+
+        fork_to_check_uuid = fork_details["fork_uuid"]
+        # Fetch current status from DB again, as it might have been updated by a previous iteration
+        # if a hrönir was part of multiple duels (though less likely with current set logic, good practice).
+        # More importantly, this ensures we get the status *after all votes are in*.
+        current_fork_obj = storage.get_fork_data(fork_to_check_uuid, session=session)
+        if not current_fork_obj:
+            print(f"DEBUG TM: (Loop 2) Warning: Could not refetch fork data for {fork_to_check_uuid}. Skipping.", file=sys.stderr)
+            continue
+        current_fork_status = current_fork_obj.status
+
+        # ---- START DEBUG PRINTS (Loop 2) ----
+        # print(f"DEBUG TM: (Loop 2) Checking fork {fork_to_check_uuid} at pos {position} (hrönir {hrönir_involved_uuid})", file=sys.stderr)
+        # print(f"DEBUG TM: (Loop 2) Current status from DB: {current_fork_status}", file=sys.stderr)
+        # ---- END DEBUG PRINTS (Loop 2) ----
+
+        if current_fork_status == "PENDING":
+            # ---- START DEBUG PRINTS (Loop 2) ----
+            # print(f"DEBUG TM: (Loop 2) Fork {fork_to_check_uuid} is PENDING, proceeding to check qualification.", file=sys.stderr)
+            # ---- END DEBUG PRINTS (Loop 2) ----
+
+            predecessor_for_ranking = fork_details.get("prev_uuid") # prev_uuid from initial fetch of this fork's details
+            if pd.isna(predecessor_for_ranking) or predecessor_for_ranking == "nan":
+                predecessor_for_ranking = None
+
+            # ratings.get_ranking will now see all votes committed from Loop 1.
+            current_pos_ratings_df = ratings.get_ranking(
+                position=position,
+                predecessor_hronir_uuid=predecessor_for_ranking,
+                session=session,
             )
 
-            if not fork_details:
-                # print(f"Warning: Could not find fork details for hrönir {hrönir_involved_uuid} at pos {position}")
-                continue
+            all_forks_in_same_segment_df = _get_all_forks_at_position(
+                position_num=position,
+                predecessor_uuid=predecessor_for_ranking,
+                session=session,
+            )
 
-            fork_to_check_uuid = fork_details["fork_uuid"]
-            current_fork_status = fork_details.get(
-                "status", "PENDING"
-            )  # Default to PENDING if status missing
+            is_qualified = ratings.check_fork_qualification(
+                fork_uuid=fork_to_check_uuid,
+                ratings_df=current_pos_ratings_df,
+                all_forks_in_position_df=all_forks_in_same_segment_df,
+            )
 
-            if current_fork_status == "PENDING":
-                # Get ranking for the position of the fork being checked
-                # The predecessor_uuid for get_ranking is fork_details["prev_uuid"]
-                # This prev_uuid is the hrönir_uuid of the *canonical* fork from the previous position,
-                # or None if position is 0.
-                # For now, we assume fork_details["prev_uuid"] is the correct one to use.
-                # A more robust way might be to get canonical path info.
-                predecessor_for_ranking = fork_details.get("prev_uuid")
-                if pd.isna(predecessor_for_ranking) or predecessor_for_ranking == "nan":
-                    predecessor_for_ranking = None
+            # ---- START DEBUG PRINTS (Loop 2) ----
+            # print(f"DEBUG TM: (Loop 2) Fork {fork_to_check_uuid} - predecessor_for_ranking: {predecessor_for_ranking}", file=sys.stderr)
+            # print(f"DEBUG TM: (Loop 2) Fork {fork_to_check_uuid} - current_pos_ratings_df (empty: {current_pos_ratings_df.empty}):\n{current_pos_ratings_df.to_string()}", file=sys.stderr)
+            # print(f"DEBUG TM: (Loop 2) Fork {fork_to_check_uuid} - all_forks_in_same_segment_df (empty: {all_forks_in_same_segment_df.empty}):\n{all_forks_in_same_segment_df.to_string()}", file=sys.stderr)
+            # print(f"DEBUG TM: (Loop 2) Fork {fork_to_check_uuid} - is_qualified: {is_qualified}", file=sys.stderr)
+            # ---- END DEBUG PRINTS (Loop 2) ----
 
-                current_pos_ratings_df = ratings.get_ranking(
-                    position=position,
-                    predecessor_hronir_uuid=predecessor_for_ranking,  # from the fork's own record
-                    forking_path_dir=forking_path_dir,
-                    ratings_dir=ratings_dir,
+            if is_qualified:
+                # ---- START DEBUG PRINTS (Loop 2) ----
+                # print(f"DEBUG TM: (Loop 2) Fork {fork_to_check_uuid} IS NOW QUALIFIED. Attempting to update status.", file=sys.stderr)
+                # ---- END DEBUG PRINTS (Loop 2) ----
+                mandate_id_str = blake3.blake3(
+                    (fork_to_check_uuid + last_tx_hash).encode("utf-8")
+                ).hexdigest()[:16]
+
+                update_success = storage.update_fork_status(
+                    fork_uuid_to_update=fork_to_check_uuid,
+                    new_status="QUALIFIED",
+                    mandate_id=mandate_id_str,
+                    session=session,
                 )
-
-                # Get all forks competing in the same position to calculate N
-                # This also needs the correct predecessor_uuid for context.
-                all_forks_in_same_segment_df = _get_all_forks_at_position(
-                    position_num=position,
-                    predecessor_uuid=predecessor_for_ranking,  # from the fork's own record
-                    fork_dir_base=forking_path_dir,
-                )
-
-                is_qualified = ratings.check_fork_qualification(
-                    fork_uuid=fork_to_check_uuid,
-                    ratings_df=current_pos_ratings_df,
-                    all_forks_in_position_df=all_forks_in_same_segment_df,
-                )
-
-                if is_qualified:
-                    mandate_id_str = blake3.blake3(
-                        (fork_to_check_uuid + last_tx_hash).encode("utf-8")
-                    ).hexdigest()[:16]
-
-                    update_success = storage.update_fork_status(
-                        fork_uuid_to_update=fork_to_check_uuid,
-                        new_status="QUALIFIED",
-                        mandate_id=mandate_id_str,
-                        fork_dir_base=forking_path_dir,
-                        session=session,
+                if update_success:
+                    promotions_granted.append(
+                        {
+                            "fork_uuid": fork_to_check_uuid,
+                            "mandate_id": mandate_id_str,
+                            "qualified_in_tx_with_prev_hash": last_tx_hash,
+                        }
                     )
-                    if update_success:
-                        promotions_granted.append(
-                            {
-                                "fork_uuid": fork_to_check_uuid,
-                                "mandate_id": mandate_id_str,
-                                "qualified_in_tx_with_prev_hash": last_tx_hash,
-                            }
-                        )
-                    # else:
-                    # print(f"Warning: Failed to update status for qualified fork {fork_to_check_uuid}")
+                else: # Should not happen if DB update is robust
+                    # print(f"DEBUG TM: (Loop 2) Warning: Failed to update status for qualified fork {fork_to_check_uuid}", file=sys.stderr)
+                    pass # Silently continue if update failed, or add more robust error handling
 
-    # --- Prepare data for the transaction block (Task 2.2 will handle actual saving) ---
+    # --- Prepare data for the transaction block ---
     timestamp_dt = datetime.datetime.utcnow()
     timestamp = timestamp_dt.isoformat() + "Z"
 

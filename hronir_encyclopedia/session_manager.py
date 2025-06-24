@@ -79,12 +79,18 @@ def create_session(
             predecessor_hronir_uuid_for_duel = canonical_info_for_predecessor["hrönir_uuid"]
         # If p_idx is 0, predecessor_hronir_uuid_for_duel remains None, which is correct.
 
-        duel_info = ratings.determine_next_duel(
-            position=p_idx,  # We are determining duels for this position p_idx
-            predecessor_hronir_uuid=predecessor_hronir_uuid_for_duel,
-            forking_path_dir=forking_path_dir,
-            ratings_dir=ratings_dir,
-        )
+        # Acquire session for ratings.determine_next_duel_entropy
+        db_session_for_duel = storage.get_db_session()
+        try:
+            duel_info = ratings.determine_next_duel_entropy( # Correct function name
+                position=p_idx,  # We are determining duels for this position p_idx
+                predecessor_hronir_uuid=predecessor_hronir_uuid_for_duel,
+                # forking_path_dir and ratings_dir are no longer needed
+                session=db_session_for_duel,
+            )
+        finally:
+            db_session_for_duel.close()
+
         if (
             duel_info
             and "duel_pair" in duel_info

@@ -50,13 +50,46 @@ class DataManager:
     def get_session(self) -> SQLAlchemySession:
         return self.SessionLocal()
 
-    def initialize_and_load(self):
+    def clear_in_memory_data(self):
+        """Clears data from tables in the in-memory database."""
+        session = self.get_session()
+        try:
+            # Order of deletion might matter if there are foreign key constraints,
+            # though for these tables, it's likely okay.
+            # Start with tables that might have FKs to others, or be less critical.
+            session.query(VoteDB).delete()
+            session.query(ForkDB).delete()
+            session.query(TransactionDB).delete()
+            # Add other tables here if they also need clearing, e.g., SuperBlockDB
+            # session.query(SuperBlockDB).delete()
+            session.commit()
+            print("DataManager: Cleared in-memory database tables.") # For debug
+        except Exception as e:
+            session.rollback()
+            print(f"DataManager: Error clearing in-memory database: {e}") # For debug
+            raise
+        finally:
+            session.close()
+
+    def initialize_and_load(self, clear_existing_data=False):
         if not self._initialized:
+            if clear_existing_data: # Typically True for a fresh test setup
+                self.clear_in_memory_data()
             self.load_all_data_from_csvs()
             self._initialized = True
-            print("DataManager: In-memory database initialized and loaded from CSVs.") # For debug
+            # print("DataManager: In-memory database initialized and loaded from CSVs.", file=sys.stderr) # For debug
         else:
-            print("DataManager: Already initialized.")
+            if clear_existing_data:
+                # If already initialized but asked to clear and reload
+                # print("DataManager: Re-initializing. Clearing existing data and reloading...", file=sys.stderr) # For debug
+                self.clear_in_memory_data()
+                self.load_all_data_from_csvs()
+                # print("DataManager: Re-initialization complete.", file=sys.stderr) # For debug
+            else:
+                # This is the message causing issues with JSON stdout in tests if not redirected.
+                # For now, commenting out. Proper logging should be used.
+                # print("DataManager: Already initialized.", file=sys.stderr) # For debug
+                pass
 
 
     def _load_with_lock(self, file_path: Path, load_func):
@@ -91,13 +124,30 @@ class DataManager:
                     df = pd.read_csv(file_handle.name)
                     for _, row in df.iterrows():
                         # Ensure all fields are present, providing defaults if necessary
+                        # Handle potential NaN values from pandas for nullable fields
+                        prev_uuid_val = row.get("prev_uuid")
+                        if pd.isna(prev_uuid_val):
+                            prev_uuid_val = None
+
+                        mandate_id_val = row.get("mandate_id")
+                        if pd.isna(mandate_id_val):
+                            mandate_id_val = None
+
+                        uuid_val = row.get("uuid")
+                        if pd.isna(uuid_val): # Should not happen for 'uuid' normally but good practice
+                            # Decide handling: skip row, error, or default.
+                            # For now, assuming 'uuid' and 'fork_uuid' are critical.
+                            # If 'uuid' can be NaN and that's invalid, this check should be stricter.
+                            print(f"Warning: NaN found for 'uuid' in fork {row.get('fork_uuid')}. Skipping row or using None.")
+                            # Potentially skip this record: continue
+
                         fork = ForkDB(
-                            fork_uuid=row["fork_uuid"],
+                            fork_uuid=row["fork_uuid"], # This should always be present and valid
                             position=int(row.get("position", 0)),
-                            prev_uuid=row.get("prev_uuid"),
-                            uuid=row.get("uuid"),
+                            prev_uuid=prev_uuid_val,
+                            uuid=uuid_val, # Assuming 'uuid' is the hrönir_uuid
                             status=row.get("status", "PENDING"),
-                            mandate_id=row.get("mandate_id"),
+                            mandate_id=mandate_id_val,
                         )
                         session.merge(fork) # Use merge to avoid duplicates if re-loading
                 self._load_with_lock(csv_file, load_forks)

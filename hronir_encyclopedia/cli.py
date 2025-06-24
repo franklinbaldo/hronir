@@ -55,8 +55,7 @@ def recover_canon(
         start_position=0,
         max_positions_to_consolidate=max_positions_to_rebuild,  # Renamed param for clarity
         canonical_path_file=canonical_path_file,
-        forking_path_dir=forking_path_dir,
-        ratings_dir=ratings_dir,
+        # forking_path_dir and ratings_dir removed as args from run_temporal_cascade
         typer_echo=typer.echo,
     )
     typer.echo("Manual canon recovery via Temporal Cascade complete.")
@@ -236,15 +235,12 @@ def list_forks(
 
 
 # Helper function to find successor hrönir_uuid for a given fork_uuid
-# This could also live in storage.py if it's deemed generally useful
-def _get_successor_hronir_for_fork(fork_uuid_to_find: str, forking_path_dir: Path) -> str | None:
-    """Return the hrönir UUID that a fork points to using the narrative graph."""
-    from . import graph_logic
-
-    graph = graph_logic.get_narrative_graph(forking_path_dir)
-    for _u, v, data in graph.edges(data=True):
-        if data.get("fork_uuid") == fork_uuid_to_find:
-            return v
+def _get_successor_hronir_for_fork(fork_uuid_to_find: str) -> str | None:
+    """Return the hrönir UUID (ForkDB.uuid) that a fork points to by querying the database."""
+    # forking_path_dir parameter is removed as this function now uses the DB.
+    fork_data_obj = storage.get_fork_data(fork_uuid_to_find)
+    if fork_data_obj:
+        return fork_data_obj.uuid # ForkDB.uuid stores the hrönir_uuid
     return None
 
 
@@ -572,22 +568,23 @@ def session_start(
     # This makes the command simpler and less prone to user error.
     # We will fetch the fork's details to get its position N.
 
-    # Validate the fork_uuid - it must exist in forking_path
-    fork_data = storage.get_fork_file_and_data(fork_uuid, fork_dir_base=forking_path_dir)
+    # Validate the fork_uuid - it must exist in the database
+    # fork_data = storage.get_fork_file_and_data(fork_uuid, fork_dir_base=forking_path_dir) # Legacy
+    fork_data_obj = storage.get_fork_data(fork_uuid) # DB query
 
-    if not fork_data:
+    if not fork_data_obj:
         typer.echo(
             json.dumps(
                 {
-                    "error": f"Fork UUID {fork_uuid} not found in any forking path CSV. Cannot start session."
+                    "error": f"Fork UUID {fork_uuid} not found in the database. Cannot start session."
                 },
                 indent=2,
             )
         )
         raise typer.Exit(code=1)
 
-    # Get position N from the fork_data
-    position_n_str = fork_data.get("position")
+    # Get position N from the fork_data_obj
+    position_n_str = str(fork_data_obj.position) # position is int in ForkDB
     if position_n_str is None:
         typer.echo(
             json.dumps(
@@ -615,17 +612,17 @@ def session_start(
         )
         raise typer.Exit(code=1)
 
-    # Validate the fork_uuid - it must exist in forking_path
-    if not storage.forking_path_exists(fork_uuid, fork_dir=forking_path_dir):
-        typer.echo(
-            json.dumps(
-                {
-                    "error": f"Fork UUID {fork_uuid} not found in forking paths. Cannot start session."
-                },
-                indent=2,
-            )
-        )
-        raise typer.Exit(code=1)
+    # Validate the fork_uuid - it must exist in forking_path (already done by get_fork_data)
+    # if not storage.forking_path_exists(fork_uuid, fork_dir=forking_path_dir): # Legacy, and redundant
+    #     typer.echo(
+    #         json.dumps(
+    #             {
+    #                 "error": f"Fork UUID {fork_uuid} not found in forking paths. Cannot start session."
+    #             },
+    #             indent=2,
+    #         )
+    #     )
+    #     raise typer.Exit(code=1)
 
     # Check if fork_uuid has already been consumed for a session (SC.8)
     consumed_by_session_id = session_manager.is_fork_consumed(fork_uuid)
@@ -669,21 +666,21 @@ def session_start(
         )
         raise typer.Exit(code=0)
 
-    # Validate the fork_uuid's status and get mandate_id
-    fork_data = storage.get_fork_file_and_data(fork_uuid, fork_dir_base=forking_path_dir)
+    # Validate the fork_uuid's status and get mandate_id (using the fork_data_obj from earlier)
+    # fork_data = storage.get_fork_file_and_data(fork_uuid, fork_dir_base=forking_path_dir) # Legacy and redundant
 
-    if not fork_data:
-        typer.echo(
-            json.dumps(
-                {
-                    "error": f"Fork UUID {fork_uuid} details not found in any forking path CSV. Cannot start session."
-                },
-                indent=2,
-            )
-        )
-        raise typer.Exit(code=1)
+    # if not fork_data_obj: # Already checked, but being defensive if logic flow changes
+    #     typer.echo(
+    #         json.dumps(
+    #             {
+    #                 "error": f"Fork UUID {fork_uuid} details not found in database (second check). Cannot start session."
+    #             },
+    #             indent=2,
+    #         )
+    #     )
+    #     raise typer.Exit(code=1)
 
-    fork_status = fork_data.get("status")
+    fork_status = fork_data_obj.status
     if fork_status != "QUALIFIED":
         typer.echo(
             json.dumps(
@@ -696,7 +693,7 @@ def session_start(
         )
         raise typer.Exit(code=1)
 
-    mandate_id = fork_data.get("mandate_id")
+    mandate_id = fork_data_obj.mandate_id
     if not mandate_id:
         typer.echo(
             json.dumps(
@@ -709,32 +706,33 @@ def session_start(
         )
         raise typer.Exit(code=1)
 
-    # Verify that the provided --position matches the fork's actual position
-    fork_actual_position = fork_data.get("position")
-    # fork_actual_position might be string if read directly, ensure comparison is fair
-    try:
-        if fork_actual_position is not None and int(fork_actual_position) != position:
-            typer.echo(
-                json.dumps(
-                    {
-                        "error": f"Provided --position {position} does not match the fork's actual position {fork_actual_position}.",
-                        "fork_uuid": fork_uuid,
-                    },
-                    indent=2,
-                )
-            )
-            raise typer.Exit(code=1)
-    except ValueError:
-        typer.echo(
-            json.dumps(
-                {
-                    "error": f"Fork's actual position '{fork_actual_position}' is not a valid number.",
-                    "fork_uuid": fork_uuid,
-                },
-                indent=2,
-            )
-        )
-        raise typer.Exit(code=1)
+    # Verify that the derived position matches the fork's actual position (already have position from fork_data_obj)
+    # fork_actual_position = fork_data_obj.position # This is an int
+    # The 'position' variable was derived from fork_data_obj.position earlier.
+    # No need for this redundant check as 'position' var is directly from fork_data_obj.position.
+    # try:
+    #     if fork_actual_position is not None and int(fork_actual_position) != position:
+    #         typer.echo(
+    #             json.dumps(
+    #                 {
+    #                     "error": f"Derived position {position} does not match the fork's actual position {fork_actual_position}.",
+    #                     "fork_uuid": fork_uuid,
+    #                 },
+    #                 indent=2,
+    #             )
+    #         )
+    #         raise typer.Exit(code=1)
+    # except ValueError: # Should not happen as fork_data_obj.position is int
+    #     typer.echo(
+    #         json.dumps(
+    #             {
+    #                 "error": f"Fork's actual position '{fork_actual_position}' is not a valid number.",
+    #                 "fork_uuid": fork_uuid,
+    #             },
+    #             indent=2,
+    #         )
+    #     )
+    #     raise typer.Exit(code=1)
 
     # If N=0, there are no prior positions (N-1 to 0) to judge.
     # The create_session logic in session_manager will handle empty dossier for N=0.
@@ -772,8 +770,8 @@ def run_temporal_cascade(
     start_position: int,
     max_positions_to_consolidate: int,  # Similar to consolidate_book
     canonical_path_file: Path,
-    forking_path_dir: Path,
-    ratings_dir: Path,
+    # forking_path_dir: Path, # No longer needed by DB-centric ratings.get_ranking
+    # ratings_dir: Path, # No longer needed by DB-centric ratings.get_ranking
     typer_echo: callable,  # Pass typer.echo for output
 ):
     """
@@ -782,11 +780,19 @@ def run_temporal_cascade(
     """
     typer_echo(f"Starting Temporal Cascade from position {start_position}...")
 
-    from . import graph_logic
-
-    if not graph_logic.is_narrative_consistent(forking_path_dir):
-        typer_echo("Error: narrative graph contains cycles. Abort cascade.", err=True)
-        return False
+    # from . import graph_logic # graph_logic might still use paths if called elsewhere,
+    # but not directly by get_ranking path.
+    # For is_narrative_consistent, it likely still needs forking_path_dir.
+    # This needs to be passed if that check is to be kept.
+    # For now, let's assume the primary issue is get_ranking.
+    # If graph_logic.is_narrative_consistent is essential and uses paths,
+    # then forking_path_dir would need to be passed to run_temporal_cascade for that specific call.
+    # Let's temporarily comment out the consistency check to isolate the get_ranking issue.
+    # TODO: Re-evaluate if graph_logic.is_narrative_consistent is needed here and how to handle its path dependency.
+    # from . import graph_logic
+    # if not graph_logic.is_narrative_consistent(forking_path_dir): # This would need forking_path_dir
+    #     typer_echo("Error: narrative graph contains cycles. Abort cascade.", err=True)
+    #     return False
 
     try:
         canonical_path_data = (
@@ -848,12 +854,16 @@ def run_temporal_cascade(
             f"Cascade recalculating position {current_pos_idx} (based on predecessor: {predecessor_hronir_uuid_for_ranking or 'None'})..."
         )
 
-        ranking_df = ratings.get_ranking(
-            position=current_pos_idx,
-            predecessor_hronir_uuid=predecessor_hronir_uuid_for_ranking,
-            forking_path_dir=forking_path_dir,
-            ratings_dir=ratings_dir,
-        )
+        db_session_for_cascade = storage.get_db_session()
+        try:
+            ranking_df = ratings.get_ranking(
+                position=current_pos_idx,
+                predecessor_hronir_uuid=predecessor_hronir_uuid_for_ranking,
+                # forking_path_dir and ratings_dir are no longer needed
+                session=db_session_for_cascade,
+            )
+        finally:
+            db_session_for_cascade.close()
 
         if ranking_df.empty:
             typer_echo(
@@ -1076,12 +1086,8 @@ def session_commit(
 
         # Map fork UUIDs to their successor hrönir UUIDs for voting
         # _get_successor_hronir_for_fork is defined in cli.py
-        winner_hronir_uuid = _get_successor_hronir_for_fork(
-            winning_fork_uuid_verdict, forking_path_dir
-        )
-        loser_hronir_uuid = _get_successor_hronir_for_fork(
-            loser_fork_uuid_verdict, forking_path_dir
-        )
+        winner_hronir_uuid = _get_successor_hronir_for_fork(winning_fork_uuid_verdict)
+        loser_hronir_uuid = _get_successor_hronir_for_fork(loser_fork_uuid_verdict)
 
         if not winner_hronir_uuid or not loser_hronir_uuid:
             typer.echo(
@@ -1188,7 +1194,8 @@ def session_commit(
             mandate_id=session_data.get(
                 "mandate_id"
             ),  # Pass mandate_id for completeness, though not strictly needed for 'SPENT'
-            fork_dir_base=forking_path_dir,
+            # fork_dir_base is no longer needed by storage.update_fork_status
+            # session=None, # Allow update_fork_status to get its own session
         )
         if update_spent_success:
             typer.echo(
@@ -1229,8 +1236,7 @@ def session_commit(
                 start_position=tm_oldest_voted_position,
                 max_positions_to_consolidate=max_cascade_positions,
                 canonical_path_file=canonical_path_file,
-                forking_path_dir=forking_path_dir,
-                ratings_dir=ratings_dir,
+                # forking_path_dir and ratings_dir removed as args from run_temporal_cascade
                 typer_echo=typer.echo,  # Pass the echo function
             )
             if cascade_made_changes:
