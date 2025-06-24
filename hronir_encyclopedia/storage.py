@@ -2,7 +2,8 @@ import shutil
 import uuid
 from pathlib import Path
 
-from .models import Path as PathModel, Transaction, Vote
+from .models import Path as PathModel
+from .models import Transaction, Vote
 from .pandas_data_manager import PandasDataManager
 
 UUID_NAMESPACE = uuid.NAMESPACE_URL
@@ -31,7 +32,7 @@ class DataManager:
         self.pandas_manager = PandasDataManager(
             path_csv_dir=path_csv_dir,
             ratings_csv_dir=ratings_csv_dir,
-            transactions_json_dir=transactions_json_dir
+            transactions_json_dir=transactions_json_dir,
         )
         self._initialized = False
 
@@ -69,10 +70,26 @@ class DataManager:
         self.pandas_manager.initialize_if_needed()
         self.pandas_manager.add_path(path)
 
-    def update_path_status(self, path_uuid: str, status: str):
-        """Update path status."""
+    def update_path_status(
+        self,
+        path_uuid: str,
+        status: str,
+        mandate_id: str | None = None,
+        set_mandate_explicitly: bool = False,
+    ):
+        """Update path status and optionally mandate_id.
+
+        Args:
+            path_uuid: The UUID of the path to update.
+            status: The new status for the path.
+            mandate_id: The new mandate_id for the path. Only updated if `set_mandate_explicitly` is True.
+            set_mandate_explicitly: If True, the mandate_id field will be updated to the value of `mandate_id`
+                                   (which can be None to clear it). If False, `mandate_id` field is not changed.
+        """
         self.pandas_manager.initialize_if_needed()
-        self.pandas_manager.update_path_status(path_uuid, status)
+        self.pandas_manager.update_path_status(
+            path_uuid, status, mandate_id=mandate_id, set_mandate_explicitly=set_mandate_explicitly
+        )
 
     def get_path_by_uuid(self, path_uuid: str) -> PathModel | None:
         """Get a specific path by UUID."""
@@ -197,7 +214,8 @@ def store_chapter(chapter_file: Path, base: Path | str = "the_library") -> str:
 def store_chapter_text(text: str, base: Path | str = "the_library") -> str:
     """Store chapter text - compatibility wrapper."""
     import tempfile
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
         f.write(text)
         temp_path = Path(f.name)
 
@@ -206,3 +224,21 @@ def store_chapter_text(text: str, base: Path | str = "the_library") -> str:
         return data_manager.store_hrönir(temp_path)
     finally:
         temp_path.unlink()  # Clean up temp file
+
+
+def compute_narrative_path_uuid(
+    position: int, prev_hronir_uuid: str, current_hronir_uuid: str
+) -> uuid.UUID:
+    """
+    Computes a deterministic UUID for a narrative path (edge).
+    Path UUIDs are UUIDv5 based on the concatenated string of:
+    position, predecessor hrönir UUID, and current hrönir UUID.
+    """
+    # Ensure consistent string representation for None or empty prev_uuid, especially for position 0
+    # The CLI 'path' command uses "" for source at position 0.
+    # The PathModel uses None for prev_uuid at position 0.
+    # Let's standardize on using an empty string for hashing if prev_hronir_uuid is None or empty.
+    prev_uuid_str = prev_hronir_uuid if prev_hronir_uuid else ""
+
+    path_key = f"{position}:{prev_uuid_str}:{current_hronir_uuid}"
+    return uuid.uuid5(UUID_NAMESPACE, path_key)
