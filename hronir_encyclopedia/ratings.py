@@ -35,13 +35,7 @@ def record_vote(
     data_manager.initialize_and_load()
 
     vote_uuid = str(uuid.uuid4())
-    vote = Vote(
-        uuid=vote_uuid,
-        position=position,
-        voter=voter,
-        winner=winner,
-        loser=loser
-    )
+    vote = Vote(uuid=vote_uuid, position=position, voter=voter, winner=winner, loser=loser)
 
     data_manager.add_vote(vote)
     data_manager.save_all_data_to_csvs()
@@ -67,7 +61,9 @@ def get_ranking(
     if predecessor_hronir_uuid is None:
         if position == 0:
             # For position 0, include paths with no predecessor or empty predecessor
-            eligible_paths = [p for p in eligible_paths if p.prev_uuid is None or str(p.prev_uuid) == ""]
+            eligible_paths = [
+                p for p in eligible_paths if p.prev_uuid is None or str(p.prev_uuid) == ""
+            ]
         else:
             return empty_df
     else:
@@ -84,14 +80,16 @@ def get_ranking(
     ELO_BASE = 1500.0
     ranking_data = []
     for path in eligible_paths:
-        ranking_data.append({
-            "path_uuid": str(path.path_uuid),
-            "hrönir_uuid": str(path.uuid),
-            "elo_rating": ELO_BASE,
-            "games_played": 0,
-            "wins": 0,
-            "losses": 0,
-        })
+        ranking_data.append(
+            {
+                "path_uuid": str(path.path_uuid),
+                "hrönir_uuid": str(path.uuid),
+                "elo_rating": ELO_BASE,
+                "games_played": 0,
+                "wins": 0,
+                "losses": 0,
+            }
+        )
 
     current_ranking_df = pd.DataFrame(ranking_data).set_index("path_uuid")
 
@@ -117,7 +115,9 @@ def get_ranking(
 
             # Keep only valid votes (both winner and loser are eligible)
             valid_votes = df_votes.dropna(subset=["winner_path_uuid", "loser_path_uuid"])
-            valid_votes = valid_votes[valid_votes["winner_path_uuid"] != valid_votes["loser_path_uuid"]]
+            valid_votes = valid_votes[
+                valid_votes["winner_path_uuid"] != valid_votes["loser_path_uuid"]
+            ]
 
             if not valid_votes.empty:
                 K_FACTOR = 32
@@ -125,7 +125,10 @@ def get_ranking(
                     winner_path = vote_row["winner_path_uuid"]
                     loser_path = vote_row["loser_path_uuid"]
 
-                    if winner_path not in current_ranking_df.index or loser_path not in current_ranking_df.index:
+                    if (
+                        winner_path not in current_ranking_df.index
+                        or loser_path not in current_ranking_df.index
+                    ):
                         continue
 
                     # Update stats
@@ -146,21 +149,19 @@ def get_ranking(
                     current_ranking_df.loc[loser_path, "elo_rating"] = new_r_loser
 
                 # Round ratings to integers
-                current_ranking_df["elo_rating"] = current_ranking_df["elo_rating"].round().astype(int)
+                current_ranking_df["elo_rating"] = (
+                    current_ranking_df["elo_rating"].round().astype(int)
+                )
 
     # Return sorted results
     final_df = current_ranking_df.reset_index()
     final_df = final_df.sort_values(
-        by=["elo_rating", "wins", "games_played"],
-        ascending=[False, False, True]
+        by=["elo_rating", "wins", "games_played"], ascending=[False, False, True]
     )
     return final_df[output_columns]
 
 
-def determine_next_duel_entropy(
-    position: int,
-    predecessor_hronir_uuid: str | None
-) -> dict | None:
+def determine_next_duel_entropy(position: int, predecessor_hronir_uuid: str | None) -> dict | None:
     """
     Choose the pair of paths with MAX Shannon entropy of predicted outcome.
     """
@@ -180,10 +181,7 @@ def determine_next_duel_entropy(
     for path_A_uuid, path_B_uuid in itertools.combinations(path_keys, 2):
         possible_duels_count += 1
 
-        current_entropy = _calculate_duel_entropy(
-            path_elos[path_A_uuid],
-            path_elos[path_B_uuid]
-        )
+        current_entropy = _calculate_duel_entropy(path_elos[path_A_uuid], path_elos[path_B_uuid])
 
         if current_entropy < ENTROPY_SATURATION_THRESHOLD:
             low_entropy_duels_count += 1
