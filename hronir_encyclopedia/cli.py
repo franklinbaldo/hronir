@@ -1,7 +1,10 @@
+import datetime  # Required for SessionModel if used directly, or for its string representations
 import json
+
+# Define module-level logger
+import logging
 import subprocess
 import uuid
-import datetime # Required for SessionModel if used directly, or for its string representations
 from pathlib import Path
 from typing import (
     Annotated,
@@ -19,7 +22,9 @@ from . import (
     storage,
     transaction_manager,
 )
-from .models import SessionModel # Import SessionModel for type hinting if needed
+from .models import SessionModel  # Import SessionModel for type hinting if needed
+
+logger = logging.getLogger(__name__)
 
 app = typer.Typer(
     help="Hrönir Encyclopedia CLI: A tool for managing and generating content for the encyclopedia.",
@@ -57,9 +62,9 @@ def recover_canon(
 
 @app.command("init-test", help="Generate a minimal sample narrative for quick testing.")
 def init_test(
-    library_dir: Annotated[
-        Path, typer.Option(help="Directory to store sample hrönirs.")
-    ] = Path("the_library"),
+    library_dir: Annotated[Path, typer.Option(help="Directory to store sample hrönirs.")] = Path(
+        "the_library"
+    ),
     narrative_paths_dir: Annotated[Path, typer.Option(help="Directory for path CSV files.")] = Path(
         "narrative_paths"
     ),
@@ -100,37 +105,36 @@ def init_test(
         canonical_file_path.unlink()
 
     # Clear consumed paths file as well
-    consumed_paths_file = sessions_dir / "consumed_path_uuids.json" # Using new name
+    consumed_paths_file = sessions_dir / "consumed_path_uuids.json"  # Using new name
     if consumed_paths_file.exists():
         consumed_paths_file.unlink()
 
     h0_uuid_str = storage.store_chapter_text("Example Hrönir 0", base=library_dir)
     h1_uuid_str = storage.store_chapter_text("Example Hrönir 1", base=library_dir)
 
-    h0_uuid = uuid.UUID(h0_uuid_str) # Convert to UUID objects
+    h0_uuid = uuid.UUID(h0_uuid_str)  # Convert to UUID objects
     h1_uuid = uuid.UUID(h1_uuid_str)
 
+    from .models import Path as PathModel  # Correct import
 
-    from .models import Path as PathModel # Correct import
-
-    data_manager = storage.DataManager() # Already initialized by callback
+    data_manager = storage.DataManager()  # Already initialized by callback
 
     p0_path_uuid_val = storage.compute_narrative_path_uuid(0, "", h0_uuid_str)
     path0 = PathModel(
-        path_uuid=p0_path_uuid_val, # type: ignore
+        path_uuid=p0_path_uuid_val,  # type: ignore
         position=0,
         prev_uuid=None,
-        uuid=h0_uuid, # type: ignore
+        uuid=h0_uuid,  # type: ignore
         status="PENDING",
     )
     data_manager.add_path(path0)
 
     p1_path_uuid_val = storage.compute_narrative_path_uuid(1, h0_uuid_str, h1_uuid_str)
     path1 = PathModel(
-        path_uuid=p1_path_uuid_val, # type: ignore
+        path_uuid=p1_path_uuid_val,  # type: ignore
         position=1,
-        prev_uuid=h0_uuid, # type: ignore
-        uuid=h1_uuid, # type: ignore
+        prev_uuid=h0_uuid,  # type: ignore
+        uuid=h1_uuid,  # type: ignore
         status="PENDING",
     )
     data_manager.add_path(path1)
@@ -185,6 +189,50 @@ def store(
     typer.echo(uuid_str)
 
 
+def _validate_and_normalize_path_inputs(
+    position: int, source: str, target: str, secho: callable, echo: callable
+) -> str:
+    """Validates inputs for the path command and normalizes source."""
+    from pathlib import Path  # Local import
+
+    if position < 0:
+        secho(f"Error: Position must be non-negative, got {position}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    if position > 0 and not source:
+        secho("Error: source (predecessor UUID) is required for position > 0.", fg=typer.colors.RED)
+        echo("  Paths at positions greater than 0 represent a continuation from a previous hrönir.")
+        echo(
+            "  Please specify the UUID of the hrönir this new path follows using the --source option."
+        )
+        raise typer.Exit(1)
+    if position == 0 and source:
+        echo("Warning: source UUID ignored for position 0, as it's a root position.")
+        source = ""  # Normalize source for position 0
+
+    library_dir = Path("the_library")
+    # Validate target hrönir
+    if not target:  # Target UUID must be provided
+        secho("Error: Target hrönir UUID must be provided.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    if not (library_dir / f"{target}.md").exists():  # Check for .md file
+        secho(
+            f"Error: Target hrönir '{target}' not found in the library ('{library_dir}/{target}.md').",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    # Validate source hrönir if provided (it will be "" for position 0 at this point if it was originally given)
+    if source and not (library_dir / f"{source}.md").exists():  # Check for .md file
+        secho(
+            f"Error: Source (predecessor) hrönir '{source}' not found in the library ('{library_dir}/{source}.md').",
+            fg=typer.colors.RED,
+        )
+        echo("  A path cannot be created from a non-existent source hrönir.")
+        echo(f"  Please ensure the hrönir file '{source}.md' exists or verify the UUID.")
+        raise typer.Exit(1)
+    return source
+
+
 @app.command(help="Create a narrative connection (path) between hrönirs.")
 def path(
     position: Annotated[int, typer.Option(help="Position in the narrative sequence")],
@@ -193,32 +241,17 @@ def path(
         str, typer.Option(help="Source hrönir UUID (empty string for position 0)")
     ] = "",
 ):
-    from pathlib import Path # Local import fine here
+    from pathlib import Path  # Local import fine here
 
-    if position < 0:
-        typer.secho(f"Error: Position must be non-negative, got {position}", fg=typer.colors.RED)
-        raise typer.Exit(1)
-    if position > 0 and not source:
-        typer.secho("Error: source (predecessor UUID) is required for position > 0", fg=typer.colors.RED)
-        raise typer.Exit(1)
-    if position == 0 and source:
-        typer.echo("Warning: source UUID ignored for position 0, as it's a root position.")
-        source = ""
-
-    library_dir = Path("the_library")
-    if not (library_dir / target).exists():
-        typer.secho(f"Error: Target hrönir '{target}' not found in the library ('{library_dir}/').", fg=typer.colors.RED)
-        raise typer.Exit(1)
-    if source and not (library_dir / source).exists():
-        typer.secho(f"Error: Source (predecessor) hrönir '{source}' not found in the library ('{library_dir}/').", fg=typer.colors.RED)
-        typer.echo("  A path cannot be created from a non-existent source hrönir.")
-        typer.echo(f"  Please ensure the hrönir file '{source}.md' exists or verify the UUID.")
-        raise typer.Exit(1)
+    # Note: The _validate_and_normalize_path_inputs function now includes the .md check
+    source = _validate_and_normalize_path_inputs(position, source, target, typer.secho, typer.echo)
 
     path_uuid = storage.compute_narrative_path_uuid(position, source, target)
     narrative_paths_dir = Path("narrative_paths")
     narrative_paths_dir.mkdir(exist_ok=True)
-    csv_file = narrative_paths_dir / f"narrative_paths_position_{position:03d}.csv" # Ensure consistent naming with PandasDataManager
+    csv_file = (
+        narrative_paths_dir / f"narrative_paths_position_{position:03d}.csv"
+    )  # Ensure consistent naming with PandasDataManager
 
     if not csv_file.exists():
         # Ensure consistent headers with PandasDataManager expectations
@@ -226,6 +259,7 @@ def path(
         csv_file.write_text("path_uuid,position,prev_uuid,uuid,status,mandate_id\n")
 
     import pandas as pd
+
     try:
         df = pd.read_csv(csv_file)
         # Ensure path_uuid is compared as string if it's read as object
@@ -236,7 +270,7 @@ def path(
         csv_file.write_text("path_uuid,position,prev_uuid,uuid,status,mandate_id\n")
 
     # Match CSV column order: path_uuid,position,prev_uuid,uuid,status,mandate_id
-    path_entry = f"{path_uuid},{position},{source},{target},PENDING,\n" # mandate_id is empty
+    path_entry = f"{path_uuid},{position},{source},{target},PENDING,\n"  # mandate_id is empty
     with csv_file.open("a") as f:
         f.write(path_entry)
 
@@ -251,7 +285,7 @@ def path(
 def list_paths(
     position: Annotated[int, typer.Option(help="Position to list paths for")] = None,
 ):
-    data_manager = storage.DataManager() # Access through DataManager
+    data_manager = storage.DataManager()  # Access through DataManager
     if position is not None:
         paths_list = data_manager.get_paths_by_position(position)
         if not paths_list:
@@ -274,14 +308,15 @@ def list_paths(
                 "prev_uuid": p.prev_uuid,
                 "uuid": p.uuid,
                 "status": p.status,
-                "mandate_id": p.mandate_id
-            } for p in paths_list
+                "mandate_id": p.mandate_id,
+            }
+            for p in paths_list
         ]
         df = pd.DataFrame(paths_data)
         display_cols = ["path_uuid", "position", "prev_uuid", "uuid", "status", "mandate_id"]
         # Ensure prev_uuid and mandate_id are displayed as strings, handling None
-        df['prev_uuid'] = df['prev_uuid'].astype(str).replace('None', '')
-        df['mandate_id'] = df['mandate_id'].astype(str).replace('None', '')
+        df["prev_uuid"] = df["prev_uuid"].astype(str).replace("None", "")
+        df["mandate_id"] = df["mandate_id"].astype(str).replace("None", "")
         typer.echo(df[display_cols].to_string(index=False))
 
 
@@ -289,7 +324,10 @@ def list_paths(
 def path_status(path_uuid: str) -> None:
     path_data = storage.DataManager().get_path_by_uuid(path_uuid)
     if not path_data:
-        typer.secho(f"Error: Path with UUID '{path_uuid}' not found in the narrative path data.", fg=typer.colors.RED)
+        typer.secho(
+            f"Error: Path with UUID '{path_uuid}' not found in the narrative path data.",
+            fg=typer.colors.RED,
+        )
         typer.echo("  Please ensure the path UUID is correct and the path exists.")
         raise typer.Exit(code=1)
 
@@ -322,9 +360,9 @@ def _calculate_status_counts(narrative_paths_dir: Path) -> dict[str, int]:
     for path_obj in all_paths:
         status_val = path_obj.status.upper() if path_obj.status else "UNKNOWN"
         if status_val in status_counts:
-            status_counts[status_val] +=1
+            status_counts[status_val] += 1
         else:
-            status_counts["UNKNOWN"] +=1
+            status_counts["UNKNOWN"] += 1
     return status_counts
 
 
@@ -337,10 +375,10 @@ def status(
         bool,
         typer.Option(
             "--counts",
-            help="Also show number of paths by status.", # Uses DataManager now
+            help="Also show number of paths by status.",  # Uses DataManager now
         ),
     ] = False,
-    narrative_paths_dir: Annotated[ # No longer directly used by _calculate_status_counts
+    narrative_paths_dir: Annotated[  # No longer directly used by _calculate_status_counts
         Path,
         typer.Option(help="Directory containing narrative path CSV files (for --counts, legacy)."),
     ] = Path("narrative_paths"),
@@ -349,7 +387,9 @@ def status(
         with open(canonical_path_file) as f:
             canonical_data = json.load(f)
     except (OSError, json.JSONDecodeError):
-        typer.secho(f"Error reading canonical path file: {canonical_path_file}", fg=typer.colors.RED)
+        typer.secho(
+            f"Error reading canonical path file: {canonical_path_file}", fg=typer.colors.RED
+        )
         raise typer.Exit(code=1)
 
     path_entries = canonical_data.get("path", {})
@@ -380,8 +420,9 @@ def audit():
     # storage.DataManager().validate_data_integrity() covers some aspects.
 
     typer.echo("Auditing narrative path consistency (cycle check)...")
-    from . import graph_logic # graph_logic now uses DataManager
-    if graph_logic.is_narrative_consistent(): # Removed path_dir argument
+    from . import graph_logic  # graph_logic now uses DataManager
+
+    if graph_logic.is_narrative_consistent():  # Removed path_dir argument
         typer.echo("Narrative graph is consistent (no cycles detected).")
     else:
         typer.secho("WARNING: Narrative graph contains cycles!", fg=typer.colors.RED)
@@ -395,7 +436,10 @@ def validate_paths_command():
     issues = data_manager.validate_data_integrity()
 
     if not issues:
-        typer.secho("All narrative paths validated successfully. No integrity issues found.", fg=typer.colors.GREEN)
+        typer.secho(
+            "All narrative paths validated successfully. No integrity issues found.",
+            fg=typer.colors.GREEN,
+        )
     else:
         typer.secho(f"Found {len(issues)} integrity issue(s):", fg=typer.colors.YELLOW)
         for i, issue_message in enumerate(issues, 1):
@@ -425,7 +469,7 @@ def ranking(
 ):
     predecessor_hronir_uuid = None
     if position > 0:
-        canonical_path_file = Path("data/canonical_path.json") # Default path
+        canonical_path_file = Path("data/canonical_path.json")  # Default path
         if canonical_path_file.exists():
             with open(canonical_path_file) as f:
                 canonical_data = json.load(f)
@@ -436,21 +480,29 @@ def ranking(
     # ratings.get_ranking now uses DataManager, so session is handled internally or not needed for read-only
     ranking_data = ratings.get_ranking(position, predecessor_hronir_uuid)
     if ranking_data.empty:
-        typer.echo(f"No ranking data found for position {position} (predecessor: {predecessor_hronir_uuid or 'None'}).")
+        typer.echo(
+            f"No ranking data found for position {position} (predecessor: {predecessor_hronir_uuid or 'None'})."
+        )
     else:
-        typer.echo(f"Ranking for Position {position} (predecessor: {predecessor_hronir_uuid or 'None'}):")
+        typer.echo(
+            f"Ranking for Position {position} (predecessor: {predecessor_hronir_uuid or 'None'}):"
+        )
         typer.echo(ranking_data.to_string(index=False))
 
 
-@app.command(help="Obtém o duelo de máxima entropia entre paths para uma posição.")
+@app.command(
+    help="Get the maximum entropy duel between paths for a position."
+)  # Changed help to English
 def get_duel(
     position: Annotated[
         int,
-        typer.Option(help="A posição do capítulo para a qual obter o duelo de paths."),
+        typer.Option(
+            help="The chapter position for which to get the path duel."
+        ),  # Changed help to English
     ],
     # ratings_dir and narrative_paths_dir no longer needed by determine_next_duel_entropy
     canonical_path_file: Annotated[
-        Path, typer.Option(help="Caminho para o arquivo JSON do caminho canônico.")
+        Path, typer.Option(help="Path to the canonical path JSON file.")  # Changed help to English
     ] = Path("data/canonical_path.json"),
 ):
     predecessor_hronir_uuid: str | None = None
@@ -459,33 +511,68 @@ def get_duel(
             position - 1, canonical_path_file
         )
         if not canonical_path_info_prev_pos or "hrönir_uuid" not in canonical_path_info_prev_pos:
-            typer.secho(f"Error: Cannot determine canonical predecessor hrönir for position {position - 1}.", fg=typer.colors.RED)
+            typer.secho(
+                f"Error: Cannot determine canonical predecessor hrönir for position {position - 1} from '{canonical_path_file}'.",
+                fg=typer.colors.RED,
+            )
+            typer.echo("  This could be because:")
+            typer.echo(
+                f"    1. The canonical path does not have an entry for position {position - 1}."
+            )
+            typer.echo(
+                f"    2. The canonical path file ('{canonical_path_file}') is missing, empty, or corrupted."
+            )
+            typer.echo(
+                f"    3. Position {position} is too far ahead of the current canonical path."
+            )
+            typer.echo(
+                "  Ensure 'data/canonical_path.json' is up-to-date. You may need to run 'session commit' or 'recover-canon'."
+            )
             raise typer.Exit(code=1)
         predecessor_hronir_uuid = canonical_path_info_prev_pos["hrönir_uuid"]
     elif position < 0:
-        typer.secho("Error: Position inválida. Deve ser >= 0.", fg=typer.colors.RED)
+        typer.secho(
+            "Error: Invalid position. Must be >= 0.", fg=typer.colors.RED
+        )  # Corrected Portuguese "inválida" to English
         raise typer.Exit(code=1)
 
-    db_session = storage.get_db_session() # ratings.determine_next_duel_entropy expects a SQLAlchemy session
+    db_session = (
+        storage.get_db_session()
+    )  # ratings.determine_next_duel_entropy expects a SQLAlchemy session
     try:
         duel_info = ratings.determine_next_duel_entropy(
             position=position,
             predecessor_hronir_uuid=predecessor_hronir_uuid,
-            session=db_session, # Pass the active session
+            session=db_session,  # Pass the active session
         )
     finally:
-        db_session.close() # Ensure session is closed
+        db_session.close()  # Ensure session is closed
 
     if duel_info:
         typer.echo(json.dumps(duel_info, indent=2))
     else:
-        typer.echo(json.dumps({"error": "Não foi possível determinar um duelo de paths.","position": position,"predecessor_hrönir_uuid_used": predecessor_hronir_uuid,},indent=2,))
+        typer.echo(
+            json.dumps(
+                {
+                    "error": "Não foi possível determinar um duelo de paths.",
+                    "position": position,
+                    "predecessor_hrönir_uuid_used": predecessor_hronir_uuid,
+                },
+                indent=2,
+            )
+        )
 
 
 def _git_remove_deleted_files():
     try:
-        subprocess.check_call(["git", "rev-parse", "--is-inside-work-tree"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        output = subprocess.check_output(["git", "ls-files", "--deleted"], text=True, stderr=subprocess.PIPE)
+        subprocess.check_call(
+            ["git", "rev-parse", "--is-inside-work-tree"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        output = subprocess.check_output(
+            ["git", "ls-files", "--deleted"], text=True, stderr=subprocess.PIPE
+        )
         if not output.strip():
             typer.echo("No deleted files to stage in Git.")
             return
@@ -517,7 +604,9 @@ def clean(
     storage.purge_fake_hronirs()
     # storage.purge_fake_narrative_csvs() # Example if this function is updated for DataManager
     # storage.purge_fake_votes_csvs()   # Example
-    typer.echo("Cleanup may require updates to align with DataManager. For now, primarily relies on older direct file access methods in storage.")
+    typer.echo(
+        "Cleanup may require updates to align with DataManager. For now, primarily relies on older direct file access methods in storage."
+    )
 
     if git_stage_deleted:
         typer.echo("Attempting to stage deleted files in Git...")
@@ -542,7 +631,7 @@ def dev_qualify_path_uuid(path_uuid_str: str, typer_echo: callable):
         mandate_id=mandate_id,
         set_mandate_explicitly=True,
     )
-    data_manager.save_all_data_to_csvs() # Persist change
+    data_manager.save_all_data_to_csvs()  # Persist change
     typer_echo(f"  Path {path_uuid_str} status set to QUALIFIED with mandate_id {mandate_id}.")
 
 
@@ -550,7 +639,7 @@ def dev_qualify_path_uuid(path_uuid_str: str, typer_echo: callable):
 def tutorial_command(
     auto_qualify_for_session: Annotated[
         bool, typer.Option(help="Automatically qualify a path to demonstrate session workflow.")
-    ] = True
+    ] = True,
 ):
     typer.secho("Welcome to the Hrönir Encyclopedia Tutorial!", fg=typer.colors.CYAN, bold=True)
     typer.echo("This will demonstrate a common workflow.\n")
@@ -558,7 +647,7 @@ def tutorial_command(
 
     typer.secho("Step 1: Initializing a clean test environment...", fg=typer.colors.BLUE)
     # Call init_test directly, which now uses DataManager correctly
-    init_test() # Uses default paths
+    init_test()  # Uses default paths
     typer.echo("  Test environment initialized.\n")
 
     # Get H0, H1, P0, P1 UUIDs from init_test's known output for tutorial steps
@@ -566,24 +655,52 @@ def tutorial_command(
     h0_content_uuid = uuid.uuid5(storage.UUID_NAMESPACE, "Example Hrönir 0")
     h1_content_uuid = uuid.uuid5(storage.UUID_NAMESPACE, "Example Hrönir 1")
     p0_path_uuid = storage.compute_narrative_path_uuid(0, "", str(h0_content_uuid))
-    p1a_path_uuid = storage.compute_narrative_path_uuid(1, str(h0_content_uuid), str(h1_content_uuid))
+    p1a_path_uuid = storage.compute_narrative_path_uuid(
+        1, str(h0_content_uuid), str(h1_content_uuid)
+    )
 
     # Store additional hrönirs for more complex scenario
-    h1b_content_uuid_str = storage.store_chapter_text("Tutorial: The Second Age - Divergent Paths B.")
+    h1b_content_uuid_str = storage.store_chapter_text(
+        "Tutorial: The Second Age - Divergent Paths B."
+    )
     h2a_content_uuid_str = storage.store_chapter_text("Tutorial: The Third Age - Aftermath of A.")
     h1b_content_uuid = uuid.UUID(h1b_content_uuid_str)
     h2a_content_uuid = uuid.UUID(h2a_content_uuid_str)
 
     # Create paths for them using DataManager
     from .models import Path as PathModel
-    p1b_path_uuid = storage.compute_narrative_path_uuid(1, str(h0_content_uuid), str(h1b_content_uuid))
-    data_manager.add_path(PathModel(path_uuid=p1b_path_uuid,position=1,prev_uuid=h0_content_uuid,uuid=h1b_content_uuid,status="PENDING")) # type: ignore
 
-    p2a_path_uuid = storage.compute_narrative_path_uuid(2, str(h1_content_uuid), str(h2a_content_uuid))
-    data_manager.add_path(PathModel(path_uuid=p2a_path_uuid,position=2,prev_uuid=h1_content_uuid,uuid=h2a_content_uuid,status="PENDING")) # type: ignore
+    p1b_path_uuid = storage.compute_narrative_path_uuid(
+        1, str(h0_content_uuid), str(h1b_content_uuid)
+    )
+    data_manager.add_path(
+        PathModel(
+            path_uuid=p1b_path_uuid,
+            position=1,
+            prev_uuid=h0_content_uuid,
+            uuid=h1b_content_uuid,
+            status="PENDING",
+        )
+    )  # type: ignore
+
+    p2a_path_uuid = storage.compute_narrative_path_uuid(
+        2, str(h1_content_uuid), str(h2a_content_uuid)
+    )
+    data_manager.add_path(
+        PathModel(
+            path_uuid=p2a_path_uuid,
+            position=2,
+            prev_uuid=h1_content_uuid,
+            uuid=h2a_content_uuid,
+            status="PENDING",
+        )
+    )  # type: ignore
     data_manager.save_all_data_to_csvs()
 
-    typer.secho("Step 2 & 3: Sample hrönirs and paths created via init-test and additions.", fg=typer.colors.BLUE)
+    typer.secho(
+        "Step 2 & 3: Sample hrönirs and paths created via init-test and additions.",
+        fg=typer.colors.BLUE,
+    )
     typer.echo(f"  H0: {h0_content_uuid}, P0: {p0_path_uuid}")
     typer.echo(f"  H1A: {h1_content_uuid}, P1A: {p1a_path_uuid}")
     typer.echo(f"  H1B: {h1b_content_uuid}, P1B: {p1b_path_uuid}")
@@ -598,43 +715,66 @@ def tutorial_command(
             qualified_path_for_session_uuid_str = path_to_qualify_uuid_str
             typer.echo(f"  Path {path_to_qualify_uuid_str} (P2A) is now QUALIFIED.\n")
         except Exception as e:
-            typer.secho(f"  Error auto-qualifying path: {e}. Session demo might fail.", fg=typer.colors.RED)
+            typer.secho(
+                f"  Error auto-qualifying path: {e}. Session demo might fail.", fg=typer.colors.RED
+            )
 
     if not qualified_path_for_session_uuid_str:
-        typer.secho("  Skipping session demonstration as no path was qualified.", fg=typer.colors.YELLOW)
+        typer.secho(
+            "  Skipping session demonstration as no path was qualified.", fg=typer.colors.YELLOW
+        )
     else:
-        typer.secho(f"Step 5: Starting judgment session with qualified path {qualified_path_for_session_uuid_str}...", fg=typer.colors.BLUE)
+        typer.secho(
+            f"Step 5: Starting judgment session with qualified path {qualified_path_for_session_uuid_str}...",
+            fg=typer.colors.BLUE,
+        )
         session_model_instance: SessionModel | None = None
         try:
             path_data_obj = data_manager.get_path_by_uuid(qualified_path_for_session_uuid_str)
-            if not path_data_obj or path_data_obj.status != "QUALIFIED" or not path_data_obj.mandate_id:
-                 raise ValueError(f"Path {qualified_path_for_session_uuid_str} not properly qualified.")
+            if (
+                not path_data_obj
+                or path_data_obj.status != "QUALIFIED"
+                or not path_data_obj.mandate_id
+            ):
+                raise ValueError(
+                    f"Path {qualified_path_for_session_uuid_str} not properly qualified."
+                )
 
             session_model_instance = session_manager.create_session(
                 path_n_uuid_str=qualified_path_for_session_uuid_str,
                 position_n=path_data_obj.position,
                 mandate_id_str=str(path_data_obj.mandate_id),
-                canonical_path_file=Path("data/canonical_path.json") # Default path
+                canonical_path_file=Path("data/canonical_path.json"),  # Default path
             )
             typer.echo(f"  Session {session_model_instance.session_id} started.")
             typer.echo("  Dossier created with duels:")
             if session_model_instance.dossier.duels:
                 for pos_str_key, duel_details_model in session_model_instance.dossier.duels.items():
-                    typer.echo(f"    Pos {pos_str_key}: {duel_details_model.path_A_uuid} vs {duel_details_model.path_B_uuid}")
+                    typer.echo(
+                        f"    Pos {pos_str_key}: {duel_details_model.path_A_uuid} vs {duel_details_model.path_B_uuid}"
+                    )
             else:
-                typer.echo("    (No duels in dossier - expected if qualified path is at low position or no prior contention)")
+                typer.echo(
+                    "    (No duels in dossier - expected if qualified path is at low position or no prior contention)"
+                )
             typer.echo("")
         except Exception as e:
             typer.secho(f"  Error starting session: {e}", fg=typer.colors.RED)
-            session_model_instance = None # Ensure it's None on failure
+            session_model_instance = None  # Ensure it's None on failure
 
         if session_model_instance and session_model_instance.dossier.duels:
-            typer.secho(f"Step 6: Committing example verdicts for session {session_model_instance.session_id}...", fg=typer.colors.BLUE)
+            typer.secho(
+                f"Step 6: Committing example verdicts for session {session_model_instance.session_id}...",
+                fg=typer.colors.BLUE,
+            )
             example_verdicts_for_cli: dict[str, str] = {}
 
             # Example: Choose P1A (p1a_path_uuid) over P1B (p1b_path_uuid) for position 1 duel
             duel_at_pos_1 = session_model_instance.dossier.duels.get("1")
-            if duel_at_pos_1 and (p1a_path_uuid == duel_at_pos_1.path_A_uuid or p1a_path_uuid == duel_at_pos_1.path_B_uuid):
+            if duel_at_pos_1 and (
+                p1a_path_uuid == duel_at_pos_1.path_A_uuid
+                or p1a_path_uuid == duel_at_pos_1.path_B_uuid
+            ):
                 example_verdicts_for_cli["1"] = str(p1a_path_uuid)
                 typer.echo(f"  Verdict for Pos 1: Choose Path {p1a_path_uuid} (P1A)")
 
@@ -644,7 +784,7 @@ def tutorial_command(
                     session_commit(
                         session_id=str(session_model_instance.session_id),
                         verdicts_input=json.dumps(example_verdicts_for_cli),
-                        canonical_path_file=Path("data/canonical_path.json"), # Pass necessary args
+                        canonical_path_file=Path("data/canonical_path.json"),  # Pass necessary args
                         # ratings_dir and narrative_paths_dir are not used by commit directly
                     )
                     typer.echo("  Session commit finished.\n")
@@ -652,32 +792,44 @@ def tutorial_command(
                     typer.secho(f"  Error committing session: {e}", fg=typer.colors.RED)
             else:
                 typer.echo("  No example verdicts to commit for this dossier's duels.\n")
-        elif session_model_instance: # Session started but no duels in dossier
-             typer.echo(f"  Session {session_model_instance.session_id} started, but no duels in dossier. Committing vacuous session.")
-             try:
+        elif session_model_instance:  # Session started but no duels in dossier
+            typer.echo(
+                f"  Session {session_model_instance.session_id} started, but no duels in dossier. Committing vacuous session."
+            )
+            try:
                 session_commit(
                     session_id=str(session_model_instance.session_id),
-                    verdicts_input="{}", # Empty verdicts
+                    verdicts_input="{}",  # Empty verdicts
                     canonical_path_file=Path("data/canonical_path.json"),
                 )
                 typer.echo("  Empty session committed.\n")
-             except Exception as e:
-                 typer.secho(f"  Error committing empty session: {e}", fg=typer.colors.RED)
-
+            except Exception as e:
+                typer.secho(f"  Error committing empty session: {e}", fg=typer.colors.RED)
 
     typer.secho("Step 7: Showing resulting rankings and canonical status...", fg=typer.colors.BLUE)
     try:
-        ranking(position=1) # Call ranking command directly
-        status(canonical_path_file=Path("data/canonical_path.json"), counts=True) # Call status command
+        ranking(position=1)  # Call ranking command directly
+        status(
+            canonical_path_file=Path("data/canonical_path.json"), counts=True
+        )  # Call status command
         typer.echo("\n  Tutorial finished.")
     except Exception as e:
         typer.secho(f"  Error showing status: {e}", fg=typer.colors.RED)
 
 
-@app.command("dev-qualify", help="FOR DEVELOPMENT: Manually qualify a path and assign a mandate ID.")
+@app.command(
+    "dev-qualify", help="FOR DEVELOPMENT: Manually qualify a path and assign a mandate ID."
+)
 def dev_qualify_command(
-    path_uuid_to_qualify: Annotated[str, typer.Argument(help="The path_uuid to mark as QUALIFIED.")],
-    mandate_id_override: Annotated[str, typer.Option(help="Optional specific mandate_id to assign. If not provided, a new UUID is generated.")] = None,
+    path_uuid_to_qualify: Annotated[
+        str, typer.Argument(help="The path_uuid to mark as QUALIFIED.")
+    ],
+    mandate_id_override: Annotated[
+        str,
+        typer.Option(
+            help="Optional specific mandate_id to assign. If not provided, a new UUID is generated."
+        ),
+    ] = None,
 ):
     typer.secho(f"Attempting to dev-qualify path: {path_uuid_to_qualify}", fg=typer.colors.YELLOW)
     data_manager = storage.DataManager()
@@ -687,9 +839,15 @@ def dev_qualify_command(
         typer.secho(f"Error: Path {path_uuid_to_qualify} not found.", fg=typer.colors.RED)
         raise typer.Exit(code=1)
     if path_obj.status == "QUALIFIED":
-        typer.secho(f"Path {path_uuid_to_qualify} is already QUALIFIED. Mandate ID: {path_obj.mandate_id}", fg=typer.colors.YELLOW)
+        typer.secho(
+            f"Path {path_uuid_to_qualify} is already QUALIFIED. Mandate ID: {path_obj.mandate_id}",
+            fg=typer.colors.YELLOW,
+        )
         if mandate_id_override and str(path_obj.mandate_id) != mandate_id_override:
-             typer.secho(f"  Note: Provided mandate_id_override ({mandate_id_override}) differs from existing. Not changed.", fg=typer.colors.YELLOW)
+            typer.secho(
+                f"  Note: Provided mandate_id_override ({mandate_id_override}) differs from existing. Not changed.",
+                fg=typer.colors.YELLOW,
+            )
         return
 
     actual_mandate_id_obj: uuid.UUID
@@ -697,7 +855,10 @@ def dev_qualify_command(
         try:
             actual_mandate_id_obj = uuid.UUID(mandate_id_override)
         except ValueError:
-            typer.secho(f"Error: Provided mandate_id_override '{mandate_id_override}' is not a valid UUID.", fg=typer.colors.RED)
+            typer.secho(
+                f"Error: Provided mandate_id_override '{mandate_id_override}' is not a valid UUID.",
+                fg=typer.colors.RED,
+            )
             raise typer.Exit(code=1)
     else:
         actual_mandate_id_obj = uuid.uuid4()
@@ -706,11 +867,13 @@ def dev_qualify_command(
         data_manager.update_path_status(
             path_uuid=path_uuid_to_qualify,
             status="QUALIFIED",
-            mandate_id=str(actual_mandate_id_obj), # Pass as string
-            set_mandate_explicitly=True
+            mandate_id=str(actual_mandate_id_obj),  # Pass as string
+            set_mandate_explicitly=True,
         )
-        data_manager.save_all_data_to_csvs() # Persist
-        typer.secho(f"Path {path_uuid_to_qualify} successfully set to QUALIFIED.", fg=typer.colors.GREEN)
+        data_manager.save_all_data_to_csvs()  # Persist
+        typer.secho(
+            f"Path {path_uuid_to_qualify} successfully set to QUALIFIED.", fg=typer.colors.GREEN
+        )
         typer.echo(f"  Assigned Mandate ID: {actual_mandate_id_obj}")
     except Exception as e:
         typer.secho(f"Error during dev-qualify operation: {e}", fg=typer.colors.RED)
@@ -719,13 +882,59 @@ def dev_qualify_command(
 
 @app.callback()
 def main_callback(ctx: typer.Context):
+    # Basic logging configuration
+    # TODO: Make log level configurable via CLI option or env var
+    logging.basicConfig(  # Use logging module directly for basicConfig
+        level=logging.INFO,  # Default level
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    logger.debug("CLI application main_callback started. Initializing DataManager...")
+
     try:
         data_manager = storage.DataManager()
-        if not hasattr(data_manager, '_initialized') or not data_manager._initialized:
+        if not hasattr(data_manager, "_initialized") or not data_manager._initialized:
+            logger.info("DataManager not initialized in callback. Calling initialize_and_load().")
             data_manager.initialize_and_load()
+            logger.info("DataManager initialized and loaded via callback.")
+        else:
+            logger.debug("DataManager already initialized when callback ran.")
     except Exception as e:
-        typer.secho(f"Fatal: DataManager initialization failed: {e}",fg=typer.colors.RED,err=True,)
+        logger.exception("Fatal: DataManager initialization failed in callback.")
+        typer.secho(
+            f"Fatal: DataManager initialization failed: {e}",
+            fg=typer.colors.RED,
+            err=True,
+        )
         raise typer.Exit(code=1)
+    logger.debug("Main callback finished successfully.")
+
+
+# TODO: Implement the actual temporal cascade logic. This is a critical missing piece.
+def run_temporal_cascade(
+    start_position: int,
+    max_positions_to_consolidate: int,
+    canonical_path_file: Path,
+    typer_echo: callable,
+):
+    """
+    Placeholder for the temporal cascade logic.
+    This function is responsible for recalculating the canonical path.
+    """
+    logger.critical("CRITICAL: `run_temporal_cascade` is not implemented!")
+    typer_echo(
+        typer.style(
+            "CRITICAL WARNING: Temporal Cascade logic is NOT IMPLEMENTED. Canonical path will not be updated.",
+            fg=typer.colors.RED,
+            bold=True,
+        )
+    )
+    # Example of what it might do:
+    # 1. Load all relevant transactions and votes.
+    # 2. Starting from start_position, determine the winning path at each position based on Elo or other metrics.
+    # 3. Update the canonical_path_file.
+    # For now, it does nothing.
+    pass
 
 
 def main(argv: list[str] | None = None):
@@ -753,23 +962,35 @@ def session_start(
     path_data_obj = storage.DataManager().get_path_by_uuid(path_uuid_str)
 
     if not path_data_obj:
-        typer.secho(f"Error: Path UUID '{path_uuid_str}' not found. Cannot start session.", fg=typer.colors.RED)
+        typer.secho(
+            f"Error: Path UUID '{path_uuid_str}' not found. Cannot start session.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(code=1)
 
     position_n = path_data_obj.position
     mandate_id_obj = path_data_obj.mandate_id
 
     if path_data_obj.status != "QUALIFIED":
-        typer.secho(f"Error: Path UUID '{path_uuid_str}' is not QUALIFIED (status: '{path_data_obj.status}'). Cannot start session.", fg=typer.colors.RED)
+        typer.secho(
+            f"Error: Path UUID '{path_uuid_str}' is not QUALIFIED (status: '{path_data_obj.status}'). Cannot start session.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(code=1)
 
     if not mandate_id_obj:
-        typer.secho(f"Error: Path UUID '{path_uuid_str}' is QUALIFIED but has no mandate_id. This indicates an inconsistency.", fg=typer.colors.RED)
+        typer.secho(
+            f"Error: Path UUID '{path_uuid_str}' is QUALIFIED but has no mandate_id. This indicates an inconsistency.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(code=1)
 
     consumed_by_session_id = session_manager.is_path_consumed(path_uuid_str)
     if consumed_by_session_id:
-        typer.secho(f"Error: Path UUID '{path_uuid_str}' has already been used for session '{consumed_by_session_id}'.", fg=typer.colors.RED)
+        typer.secho(
+            f"Error: Path UUID '{path_uuid_str}' has already been used for session '{consumed_by_session_id}'.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(code=1)
 
     try:
@@ -799,7 +1020,7 @@ def session_start(
             "position_n": session_model.position_n,
             "status": session_model.status,
             "created_at": session_model.created_at.isoformat(),
-            "dossier": {"duels": cli_dossier_output}
+            "dossier": {"duels": cli_dossier_output},
         }
         typer.echo(json.dumps(output_data, indent=2))
 
@@ -807,7 +1028,10 @@ def session_start(
         typer.secho(f"Error creating session: {str(ve)}", fg=typer.colors.RED)
         raise typer.Exit(code=1)
     except Exception as e:
-        typer.secho(f"An unexpected error occurred while creating the session: {str(e)}", fg=typer.colors.RED)
+        typer.secho(
+            f"An unexpected error occurred while creating the session: {str(e)}",
+            fg=typer.colors.RED,
+        )
         # import traceback; traceback.print_exc();
         raise typer.Exit(code=1)
 
@@ -843,11 +1067,16 @@ def session_commit(
 ):
     session_model = session_manager.get_session(session_id)
     if not session_model:
-        typer.secho(f"Error: Session ID '{session_id}' not found or failed to load.", fg=typer.colors.RED)
+        typer.secho(
+            f"Error: Session ID '{session_id}' not found or failed to load.", fg=typer.colors.RED
+        )
         raise typer.Exit(code=1)
 
     if session_model.status != "active":
-        typer.secho(f"Error: Session '{session_id}' is not active. Current status: '{session_model.status}'", fg=typer.colors.RED)
+        typer.secho(
+            f"Error: Session '{session_id}' is not active. Current status: '{session_model.status}'",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(code=1)
 
     verdicts: dict[str, str] = {}
@@ -856,7 +1085,10 @@ def session_commit(
         try:
             verdicts = json.loads(verdicts_path.read_text())
         except Exception as e:
-            typer.secho(f"Error: Failed to parse verdicts JSON file {verdicts_input}: {e}", fg=typer.colors.RED)
+            typer.secho(
+                f"Error: Failed to parse verdicts JSON file {verdicts_input}: {e}",
+                fg=typer.colors.RED,
+            )
             raise typer.Exit(code=1)
     else:
         try:
@@ -882,14 +1114,17 @@ def session_commit(
             continue
         try:
             position_idx = int(pos_str)
-            if position_idx < 0: raise ValueError("Position must be non-negative")
+            if position_idx < 0:
+                raise ValueError("Position must be non-negative")
         except ValueError:
             typer.echo(f"Warning: Invalid position key '{pos_str}' in verdicts. Skipping.")
             continue
 
         duel_model_for_pos = dossier_duels_models.get(pos_str)
         if not duel_model_for_pos:
-            typer.echo(f"Warning: No duel found in dossier for position {pos_str}. Skipping verdict.")
+            typer.echo(
+                f"Warning: No duel found in dossier for position {pos_str}. Skipping verdict."
+            )
             continue
 
         path_a_uuid_obj = duel_model_for_pos.path_A_uuid
@@ -898,40 +1133,62 @@ def session_commit(
         try:
             winning_path_uuid_verdict_obj = uuid.UUID(winning_path_uuid_verdict_str)
         except ValueError:
-            typer.echo(f"Warning: Verdict for position {pos_str}: winning path UUID '{winning_path_uuid_verdict_str}' is not a valid UUID. Skipping.")
+            typer.echo(
+                f"Warning: Verdict for position {pos_str}: winning path UUID '{winning_path_uuid_verdict_str}' is not a valid UUID. Skipping."
+            )
             continue
 
         if winning_path_uuid_verdict_obj not in [path_a_uuid_obj, path_b_uuid_obj]:
-            typer.echo(f"Warning: Verdict for position {pos_str}: winning path {winning_path_uuid_verdict_str[:8]} is not part of the original duel ({str(path_a_uuid_obj)[:8]} vs {str(path_b_uuid_obj)[:8]}). Skipping.")
+            typer.echo(
+                f"Warning: Verdict for position {pos_str}: winning path {winning_path_uuid_verdict_str[:8]} is not part of the original duel ({str(path_a_uuid_obj)[:8]} vs {str(path_b_uuid_obj)[:8]}). Skipping."
+            )
             continue
 
-        loser_path_uuid_obj = path_a_uuid_obj if winning_path_uuid_verdict_obj == path_b_uuid_obj else path_b_uuid_obj
+        loser_path_uuid_obj = (
+            path_a_uuid_obj if winning_path_uuid_verdict_obj == path_b_uuid_obj else path_b_uuid_obj
+        )
         winner_hronir_uuid_str = _get_successor_hronir_for_path(str(winning_path_uuid_verdict_obj))
         loser_hronir_uuid_str = _get_successor_hronir_for_path(str(loser_path_uuid_obj))
 
         if not winner_hronir_uuid_str or not loser_hronir_uuid_str:
-            typer.secho(f"Error: Could not map duel paths for pos {pos_str} to hrönir UUIDs. Aborting.", fg=typer.colors.RED)
+            typer.secho(
+                f"Error: Could not map duel paths for pos {pos_str} to hrönir UUIDs. Aborting.",
+                fg=typer.colors.RED,
+            )
             raise typer.Exit(code=1)
 
-        path_data_for_winner = storage.DataManager().get_path_by_uuid(str(winning_path_uuid_verdict_obj))
+        path_data_for_winner = storage.DataManager().get_path_by_uuid(
+            str(winning_path_uuid_verdict_obj)
+        )
         if not path_data_for_winner:
-            typer.secho(f"Error: Path data for winning_path_uuid {winning_path_uuid_verdict_str} not found. Aborting.", fg=typer.colors.RED)
+            typer.secho(
+                f"Error: Path data for winning_path_uuid {winning_path_uuid_verdict_str} not found. Aborting.",
+                fg=typer.colors.RED,
+            )
             raise typer.Exit(1)
 
-        predecessor_hrönir_uuid_str = str(path_data_for_winner.prev_uuid) if path_data_for_winner.prev_uuid else None
-        if position_idx == 0: predecessor_hrönir_uuid_str = None
+        predecessor_hrönir_uuid_str = (
+            str(path_data_for_winner.prev_uuid) if path_data_for_winner.prev_uuid else None
+        )
+        if position_idx == 0:
+            predecessor_hrönir_uuid_str = None
 
-        valid_votes_for_tm.append({
-            "position": position_idx,
-            "winner_hrönir_uuid": winner_hronir_uuid_str,
-            "loser_hrönir_uuid": loser_hronir_uuid_str,
-            "predecessor_hrönir_uuid": predecessor_hrönir_uuid_str,
-        })
+        valid_votes_for_tm.append(
+            {
+                "position": position_idx,
+                "winner_hrönir_uuid": winner_hronir_uuid_str,
+                "loser_hrönir_uuid": loser_hronir_uuid_str,
+                "predecessor_hrönir_uuid": predecessor_hrönir_uuid_str,
+            }
+        )
         processed_verdicts_for_session_model[pos_str] = winning_path_uuid_verdict_obj
-        if position_idx < oldest_voted_position: oldest_voted_position = position_idx
+        if position_idx < oldest_voted_position:
+            oldest_voted_position = position_idx
 
     if not valid_votes_for_tm:
-        typer.echo("No valid verdicts provided or matched dossier. No votes recorded. Session remains active.")
+        typer.echo(
+            "No valid verdicts provided or matched dossier. No votes recorded. Session remains active."
+        )
         raise typer.Exit(code=0)
 
     typer.echo(f"{len(valid_votes_for_tm)} valid verdicts prepared for transaction processing.")
@@ -942,10 +1199,23 @@ def session_commit(
             initiating_path_uuid=initiating_path_uuid_str,
             session_verdicts=valid_votes_for_tm,
         )
-        typer.echo(json.dumps({"message": "Transaction processing complete.","transaction_uuid": transaction_result["transaction_uuid"],"promotions_granted": transaction_result.get("promotions_granted", [])}, indent=2))
+        typer.echo(
+            json.dumps(
+                {
+                    "message": "Transaction processing complete.",
+                    "transaction_uuid": transaction_result["transaction_uuid"],
+                    "promotions_granted": transaction_result.get("promotions_granted", []),
+                },
+                indent=2,
+            )
+        )
     except Exception as e:
-        typer.secho(f"Error: Failed to process transaction: {e}. Aborting commit.", fg=typer.colors.RED)
-        session_manager.update_session_status(str(session_model.session_id), "commit_failed_tx_processing")
+        typer.secho(
+            f"Error: Failed to process transaction: {e}. Aborting commit.", fg=typer.colors.RED
+        )
+        session_manager.update_session_status(
+            str(session_model.session_id), "commit_failed_tx_processing"
+        )
         raise typer.Exit(code=1)
 
     try:
@@ -954,18 +1224,22 @@ def session_commit(
             path_uuid_to_update=initiating_path_uuid_str,
             new_status="SPENT",
             mandate_id=mandate_id_for_update,
-            set_mandate_explicitly=True
+            set_mandate_explicitly=True,
         )
         storage.DataManager().save_all_data_to_csvs()
         typer.echo(f"Path {initiating_path_uuid_str} status updated to SPENT.")
     except Exception as e:
-        typer.echo(f"Warning: Error updating status for path {initiating_path_uuid_str} to SPENT: {e}.")
+        typer.echo(
+            f"Warning: Error updating status for path {initiating_path_uuid_str} to SPENT: {e}."
+        )
 
     session_model.committed_verdicts = processed_verdicts_for_session_model
 
     tm_oldest_voted_position = transaction_result.get("oldest_voted_position", float("inf"))
     if tm_oldest_voted_position != float("inf") and tm_oldest_voted_position >= 0:
-        typer.echo(f"Oldest voted position: {tm_oldest_voted_position}. Triggering Temporal Cascade.")
+        typer.echo(
+            f"Oldest voted position: {tm_oldest_voted_position}. Triggering Temporal Cascade."
+        )
         try:
             run_temporal_cascade(
                 start_position=tm_oldest_voted_position,
@@ -976,13 +1250,19 @@ def session_commit(
             typer.echo("Temporal Cascade completed.")
         except Exception as e:
             typer.secho(f"Error: Temporal Cascade failed: {e}.", fg=typer.colors.RED)
-            session_manager.update_session_status(str(session_model.session_id), "commit_failed_cascade")
-            session_model.status = "commit_failed_cascade" # also update local model before saving
+            session_manager.update_session_status(
+                str(session_model.session_id), "commit_failed_cascade"
+            )
+            session_model.status = "commit_failed_cascade"  # also update local model before saving
             session_model_file = session_manager.SESSIONS_DIR / f"{session_model.session_id}.json"
-            session_model_file.write_text(session_model.model_dump_json(indent=2)) # Save with committed verdicts
+            session_model_file.write_text(
+                session_model.model_dump_json(indent=2)
+            )  # Save with committed verdicts
             raise typer.Exit(code=1)
     else:
-        typer.echo("No valid votes cast, or oldest position not determined; Temporal Cascade not triggered.")
+        typer.echo(
+            "No valid votes cast, or oldest position not determined; Temporal Cascade not triggered."
+        )
 
     if session_manager.update_session_status(str(session_model.session_id), "committed"):
         session_model.status = "committed"
@@ -991,16 +1271,21 @@ def session_commit(
         session_model_file.write_text(session_model.model_dump_json(indent=2))
         typer.echo(f"Session {session_id} committed successfully. Committed verdicts saved.")
     else:
-        typer.secho(f"Error: Failed to update session {session_id} status to committed.", fg=typer.colors.RED)
+        typer.secho(
+            f"Error: Failed to update session {session_id} status to committed.",
+            fg=typer.colors.RED,
+        )
 
 
 @app.command("metrics", help="Expose path status metrics in Prometheus format (TDD 2.6).")
 def metrics_command(
-    narrative_paths_dir: Annotated[ # This parameter is kept for now but _calculate_status_counts uses DataManager
+    narrative_paths_dir: Annotated[  # This parameter is kept for now but _calculate_status_counts uses DataManager
         Path, typer.Option(help="Directory containing narrative path CSV files (legacy).")
     ] = Path("narrative_paths"),
 ):
-    status_counts = _calculate_status_counts(narrative_paths_dir) # narrative_paths_dir is not strictly needed by new version
+    status_counts = _calculate_status_counts(
+        narrative_paths_dir
+    )  # narrative_paths_dir is not strictly needed by new version
 
     typer.echo("# HELP hronir_path_status_total Total number of paths by status.")
     typer.echo("# TYPE hronir_path_status_total gauge")
@@ -1010,4 +1295,3 @@ def metrics_command(
 
 if __name__ == "__main__":
     main()
-```

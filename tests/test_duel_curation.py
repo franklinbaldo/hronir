@@ -293,14 +293,14 @@ class TestDetermineNextDuelPurelyEntropic:
         malformed_df_for_test = pd.DataFrame(
             [
                 {
-                    "path_uuid": h1_uuid, # Changed from fork_uuid
+                    "path_uuid": h1_uuid,  # Changed from fork_uuid
                     "hrönir_uuid": h1_uuid,
                     "elo_rating": 1600.0,
                     "wins": 10,
                     "losses": 2,
                 },
                 {
-                    "path_uuid": h2_uuid, # Changed from fork_uuid
+                    "path_uuid": h2_uuid,  # Changed from fork_uuid
                     "hrönir_uuid": h2_uuid,
                     "elo_rating": 1550.0,
                     "wins": 8,

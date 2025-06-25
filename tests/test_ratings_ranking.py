@@ -60,9 +60,7 @@ def test_get_ranking(tmp_path: Path):
         {"uuid": "vote2", "voter": "v2", "winner": UUID_A, "loser": UUID_C},
         {"uuid": "vote3", "voter": "v3", "winner": UUID_B, "loser": UUID_A},
     ]
-    pd.DataFrame(votes_for_pos1).to_csv(
-        ratings_dir_test_var / "position_001.csv", index=False
-    )
+    pd.DataFrame(votes_for_pos1).to_csv(ratings_dir_test_var / "position_001.csv", index=False)
 
     df = _call_get_ranking_with_setup(
         position=1,

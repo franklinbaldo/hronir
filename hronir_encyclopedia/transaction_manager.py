@@ -1,10 +1,9 @@
 import datetime
-import json
 import uuid
 from pathlib import Path
 from typing import Any
 
-from .models import TransactionContent, Transaction # Import TransactionContent
+from .models import Transaction, TransactionContent  # Import TransactionContent
 
 TRANSACTIONS_DIR = Path("data/transactions")
 HEAD_FILE = TRANSACTIONS_DIR / "HEAD"
@@ -17,10 +16,10 @@ def _ensure_transactions_dir():
 
 def record_transaction(
     session_id: str,
-    initiating_fork_uuid: str, # This is a path_uuid
+    initiating_fork_uuid: str,  # This is a path_uuid
     session_verdicts: list[dict[str, Any]],
-    forking_path_dir: Path | None = None, # These are not used by this TM
-    ratings_dir: Path | None = None,     # These are not used by this TM
+    forking_path_dir: Path | None = None,  # These are not used by this TM
+    ratings_dir: Path | None = None,  # These are not used by this TM
 ) -> dict[str, Any]:
     """
     Records a transaction, processes its verdicts to update ratings and path statuses,
@@ -30,7 +29,7 @@ def record_transaction(
 
     timestamp_dt = datetime.datetime.now(datetime.timezone.utc)
     # prev_tx_uuid = HEAD_FILE.read_text().strip() if HEAD_FILE.exists() else None # Not used by current model
-    prev_tx_uuid = None # Simplified: prev_uuid is optional in Transaction model
+    prev_tx_uuid = None  # Simplified: prev_uuid is optional in Transaction model
 
     # Process verdicts to update ratings and check for qualifications
     # This part needs to align with how ratings and qualifications are actually handled.
@@ -40,13 +39,14 @@ def record_transaction(
 
     # --- Logic for processing votes and qualifications (adapted from existing code) ---
     import pandas as pd
-    from . import ratings, storage # Local import for clarity
 
-    dm = storage.DataManager() # This will use paths set by fixture or defaults relative to CWD
-    if not dm._initialized: # Ensure DataManager is loaded if not already by the test fixture
+    from . import ratings, storage  # Local import for clarity
+
+    dm = storage.DataManager()  # This will use paths set by fixture or defaults relative to CWD
+    if not dm._initialized:  # Ensure DataManager is loaded if not already by the test fixture
         dm.initialize_and_load()
 
-    promotions_granted_uuids = [] # Store path_uuids of promoted paths
+    promotions_granted_uuids = []  # Store path_uuids of promoted paths
     oldest_voted_position = float("inf")
     affected_contexts = set()
 
@@ -57,7 +57,6 @@ def record_transaction(
         winner_hrönir_uuid = verdict["winner_hrönir_uuid"]
         loser_hrönir_uuid = verdict["loser_hrönir_uuid"]
         predecessor_hrönir_uuid = verdict.get("predecessor_hrönir_uuid")
-
 
         ratings.record_vote(
             position=pos,
@@ -71,26 +70,29 @@ def record_transaction(
         affected_contexts.add((pos, predecessor_hrönir_uuid))
 
         # For TransactionContent.verdicts_processed
-        processed_verdicts_for_tx_content.append({
-            "position": pos,
-            "winner_hrönir_uuid": winner_hrönir_uuid,
-            "loser_hrönir_uuid": loser_hrönir_uuid,
-            "predecessor_hrönir_uuid": predecessor_hrönir_uuid
-        })
-
+        processed_verdicts_for_tx_content.append(
+            {
+                "position": pos,
+                "winner_hrönir_uuid": winner_hrönir_uuid,
+                "loser_hrönir_uuid": loser_hrönir_uuid,
+                "predecessor_hrönir_uuid": predecessor_hrönir_uuid,
+            }
+        )
 
     for pos, pred_uuid_str in affected_contexts:
         current_rankings_df = ratings.get_ranking(pos, pred_uuid_str)
 
         all_paths_in_context_models = []
-        for p_model in dm.get_all_paths(): # Use get_all_paths then filter
+        for p_model in dm.get_all_paths():  # Use get_all_paths then filter
             if p_model.position == pos:
                 p_model_prev_uuid_str = str(p_model.prev_uuid) if p_model.prev_uuid else None
                 # Handle case where pred_uuid_str is None for position 0
-                if pred_uuid_str is None and (p_model_prev_uuid_str is None or p_model_prev_uuid_str == ""):
+                if pred_uuid_str is None and (
+                    p_model_prev_uuid_str is None or p_model_prev_uuid_str == ""
+                ):
                     all_paths_in_context_models.append(p_model)
                 elif p_model_prev_uuid_str == pred_uuid_str:
-                     all_paths_in_context_models.append(p_model)
+                    all_paths_in_context_models.append(p_model)
 
         if not all_paths_in_context_models:
             continue
@@ -107,21 +109,23 @@ def record_transaction(
                     all_paths_in_position_df=all_paths_in_context_df,
                 )
                 if is_qualified:
-                    new_mandate_id = uuid.uuid4() # mandate_id is UUID
+                    new_mandate_id = uuid.uuid4()  # mandate_id is UUID
                     dm.update_path_status(
                         path_uuid=str(path_model_to_check.path_uuid),
                         status="QUALIFIED",
-                        mandate_id=str(new_mandate_id), # Pass as string if model expects string
+                        mandate_id=str(new_mandate_id),  # Pass as string if model expects string
                         set_mandate_explicitly=True,
                     )
-                    promotions_granted_uuids.append(path_model_to_check.path_uuid) # Store UUID object
+                    promotions_granted_uuids.append(
+                        path_model_to_check.path_uuid
+                    )  # Store UUID object
 
     # Create transaction content for the model
     transaction_content_data = TransactionContent(
-        session_id=uuid.UUID(session_id), # Ensure session_id is UUID object
-        initiating_path_uuid=uuid.UUID(initiating_fork_uuid), # Ensure this is UUIDv5
+        session_id=uuid.UUID(session_id),  # Ensure session_id is UUID object
+        initiating_path_uuid=uuid.UUID(initiating_fork_uuid),  # Ensure this is UUIDv5
         verdicts_processed=processed_verdicts_for_tx_content,
-        promotions_granted=promotions_granted_uuids
+        promotions_granted=promotions_granted_uuids,
     )
 
     # Generate transaction UUID based on content to ensure determinism if needed, or just random for now
@@ -132,7 +136,7 @@ def record_transaction(
         uuid=transaction_uuid_obj,
         timestamp=timestamp_dt,
         prev_uuid=uuid.UUID(prev_tx_uuid) if prev_tx_uuid else None,
-        content=transaction_content_data
+        content=transaction_content_data,
     )
 
     # Save transaction to file (using model_dump_json for Pydantic model)
@@ -151,8 +155,10 @@ def record_transaction(
 
     return {
         "transaction_uuid": str(transaction_uuid_obj),
-        "promotions_granted": [str(p_uuid) for p_uuid in promotions_granted_uuids], # Return strings
-        "new_qualified_forks": [str(p_uuid) for p_uuid in promotions_granted_uuids], # Consistency
-        "status": "completed", # This status is for the return dict, not part of Transaction model
+        "promotions_granted": [
+            str(p_uuid) for p_uuid in promotions_granted_uuids
+        ],  # Return strings
+        "new_qualified_forks": [str(p_uuid) for p_uuid in promotions_granted_uuids],  # Consistency
+        "status": "completed",  # This status is for the return dict, not part of Transaction model
         "oldest_voted_position": final_oldest_voted_position,
     }
