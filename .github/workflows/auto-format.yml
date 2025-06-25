@@ -7,6 +7,8 @@ jobs:
   format:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    permissions: # Add permissions for GITHUB_TOKEN
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
