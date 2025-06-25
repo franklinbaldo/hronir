@@ -50,7 +50,7 @@ class DataManager:
 
     @ratings_csv_dir.setter
     def ratings_csv_dir(self, value):
-        self.pandas_manager.ratings_csv_dir = Path(value) # Ensure it's a Path object
+        self.pandas_manager.ratings_csv_dir = Path(value)  # Ensure it's a Path object
 
     @property
     def transactions_json_dir(self):
@@ -184,7 +184,7 @@ class DataManager:
         """Check if a hrönir exists."""
         # Ensure content_uuid is a string and not None or empty before creating Path object
         if not content_uuid or not isinstance(content_uuid, str):
-            return False # Or raise an error, depending on desired strictness
+            return False  # Or raise an error, depending on desired strictness
         return self.get_hrönir_path(content_uuid).exists()
 
     def get_hrönir_content(self, content_uuid: str) -> str | None:
@@ -199,13 +199,13 @@ class DataManager:
     def validate_data_integrity(self) -> list[str]:
         """Validate data integrity and return list of issues."""
         issues = []
-        self.pandas_manager.initialize_if_needed() # Ensure data is loaded via pandas_manager
+        self.pandas_manager.initialize_if_needed()  # Ensure data is loaded via pandas_manager
 
         # Check that all referenced hrönirs exist
-        paths = self.get_all_paths() # This uses self.pandas_manager to get PathModels
+        paths = self.get_all_paths()  # This uses self.pandas_manager to get PathModels
         for path in paths:
             # Check existence of the current hrönir (uuid)
-            if not self.hrönir_exists(str(path.uuid)): # self.hrönir_exists uses file system
+            if not self.hrönir_exists(str(path.uuid)):  # self.hrönir_exists uses file system
                 issues.append(
                     f"Path {path.path_uuid} (Pos: {path.position}, Prev: {path.prev_uuid}, Curr: {path.uuid}) "
                     f"references non-existent current hrönir {path.uuid}."

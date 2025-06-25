@@ -1,12 +1,13 @@
 import datetime
-import uuid # Ensure this import is present
-import pathlib # Changed from "from pathlib import Path"
-from typing import Any # For Hronir.metadata and ValidationIssue.details
+import pathlib  # Changed from "from pathlib import Path"
+import uuid  # Ensure this import is present
+from typing import Any  # For Hronir.metadata and ValidationIssue.details
 
 from pydantic import UUID5, BaseModel, Field, field_validator
 
 # --- Type Aliases ---
-MandateID = uuid.UUID # Represents the ID associated with a QUALIFIED path's mandate to judge.
+MandateID = uuid.UUID  # Represents the ID associated with a QUALIFIED path's mandate to judge.
+
 
 # --- Pydantic Models for Data Validation and Business Logic ---
 class Vote(BaseModel):
@@ -33,11 +34,13 @@ class SessionVerdictRecord(BaseModel):
     loser_hrönir_uuid: UUID5
     predecessor_hrönir_uuid: UUID5 | None
 
+
 class TransactionContent(BaseModel):
     session_id: uuid.UUID
     initiating_path_uuid: UUID5
     verdicts_processed: list[SessionVerdictRecord] = Field(default_factory=list)
     promotions_granted: list[UUID5] = Field(default_factory=list)
+
 
 class Transaction(BaseModel):
     uuid: UUID5
@@ -60,6 +63,7 @@ class SuperBlock(BaseModel):
             raise ValueError("A merge block must have two parents (parent_b is missing)")
         return v
 
+
 # --- Session Models ---
 class SessionDuel(BaseModel):
     """
@@ -67,12 +71,14 @@ class SessionDuel(BaseModel):
     A duel consists of two competing paths at a specific position.
     path_A_uuid and path_B_uuid store the UUIDs of the paths in the duel.
     """
+
     path_A_uuid: UUID5
     path_B_uuid: UUID5
     entropy: float = Field(default=0.0, description="Entropy of the duel, if calculated.")
 
     class Config:
-        extra = 'forbid'
+        extra = "forbid"
+
 
 class SessionDossier(BaseModel):
     """
@@ -80,31 +86,44 @@ class SessionDossier(BaseModel):
     It contains all the duels that need to be judged for prior positions.
     Duels are keyed by position string (e.g., "0", "1", "2").
     """
+
     duels: dict[str, SessionDuel] = Field(default_factory=dict)
 
     class Config:
-        extra = 'forbid'
+        extra = "forbid"
 
-class SessionModel(BaseModel): # Renamed from Session to SessionModel
+
+class SessionModel(BaseModel):  # Renamed from Session to SessionModel
     """
     Represents a judgment session in the Hrönir Encyclopedia.
     """
+
     session_id: uuid.UUID = Field(default_factory=uuid.uuid4)
-    initiating_path_uuid: UUID5 # The QUALIFIED path_uuid that granted the mandate for this session
-    mandate_id: MandateID # The mandate_id from the initiating_path_uuid that was used.
-    position_n: int # The position of the initiating_path_uuid
+    initiating_path_uuid: UUID5  # The QUALIFIED path_uuid that granted the mandate for this session
+    mandate_id: MandateID  # The mandate_id from the initiating_path_uuid that was used.
+    position_n: int  # The position of the initiating_path_uuid
 
     dossier: SessionDossier = Field(default_factory=SessionDossier)
-    status: str = Field(default="active", description="Current status of the session (e.g., active, committed, aborted).")
+    status: str = Field(
+        default="active",
+        description="Current status of the session (e.g., active, committed, aborted).",
+    )
 
     # Store verdicts as position string to winning path UUID
-    committed_verdicts: dict[str, UUID5] | None = Field(default=None, description="Verdicts committed for this session, mapping position string to winning path UUID.")
+    committed_verdicts: dict[str, UUID5] | None = Field(
+        default=None,
+        description="Verdicts committed for this session, mapping position string to winning path UUID.",
+    )
 
-    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
-    updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
+    created_at: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
+    updated_at: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
 
     class Config:
-        extra = 'forbid'
+        extra = "forbid"
         # Pydantic v2 handles datetime and UUID serialization well by default.
         # If specific string formats are needed, json_encoders can be used.
         # Example:
@@ -112,7 +131,9 @@ class SessionModel(BaseModel): # Renamed from Session to SessionModel
         #     datetime.datetime: lambda dt: dt.isoformat(),
         #     uuid.UUID: lambda u: str(u),
         # }
-        validate_assignment = True # Allows updated_at to be auto-updated on field change via validators if needed
+        validate_assignment = (
+            True  # Allows updated_at to be auto-updated on field change via validators if needed
+        )
 
     # Automatically update `updated_at` when relevant fields change.
     # This is a common pattern, but for simple "touch on save" it's often handled in the manager.
@@ -123,8 +144,10 @@ class SessionModel(BaseModel): # Renamed from Session to SessionModel
         # Ensure updated_at is also set to created_at initially if factories behave unexpectedly or for older Pydantic versions
         # For Pydantic v2, default_factory should ensure they are set.
         # This is more of a safeguard or for specific initialization logic.
-        if self.created_at and self.updated_at and self.updated_at < self.created_at: # Should not happen with factories
-             self.updated_at = self.created_at
+        if (
+            self.created_at and self.updated_at and self.updated_at < self.created_at
+        ):  # Should not happen with factories
+            self.updated_at = self.created_at
         # Ensure UTC for datetime fields if not already handled by factory
         if self.created_at.tzinfo is None:
             self.created_at = self.created_at.replace(tzinfo=datetime.timezone.utc)
@@ -146,12 +169,13 @@ class CanonicalEntry(BaseModel):
     path_uuid: UUID5
     hrönir_uuid: UUID5
 
+
 class CanonicalPath(BaseModel):
     title: str = "The Hrönir Encyclopedia - Canonical Path"
     path: dict[int, CanonicalEntry] = Field(default_factory=dict)
     last_updated: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
 
-    @field_validator('path', mode='before')
+    @field_validator("path", mode="before")
     def coerce_str_keys_to_int(cls, value):
         if isinstance(value, dict):
             new_dict = {}
@@ -163,6 +187,7 @@ class CanonicalPath(BaseModel):
             return new_dict
         return value
 
+
 # --- Duel/Ranking Models ---
 class RankingEntry(BaseModel):
     path_uuid: UUID5
@@ -172,9 +197,11 @@ class RankingEntry(BaseModel):
     wins: int
     losses: int
 
+
 class ProposedDuelPair(BaseModel):
     path_A_uuid: UUID5
     path_B_uuid: UUID5
+
 
 class ProposedDuel(BaseModel):
     position: int
@@ -182,9 +209,13 @@ class ProposedDuel(BaseModel):
     entropy: float
     duel_pair: ProposedDuelPair
 
+
 # --- Mandate/Qualification Models ---
 class QualificationRules(BaseModel):
-    elo_threshold: int = Field(default=1550, description="ELO rating at or above which a path qualifies.")
+    elo_threshold: int = Field(
+        default=1550, description="ELO rating at or above which a path qualifies."
+    )
+
 
 # --- Configuration Models ---
 class StoragePaths(BaseModel):
@@ -205,12 +236,18 @@ class StoragePaths(BaseModel):
     def canonical_path_file(self) -> pathlib.Path:
         return self.data_dir / "canonical_path.json"
 
+
 class SystemConfig(BaseModel):
     storage_paths: StoragePaths = Field(default_factory=StoragePaths)
     qualification_rules: QualificationRules = Field(default_factory=QualificationRules)
     elo_k_factor: int = Field(default=32, description="K-factor for ELO calculations.")
-    entropy_saturation_threshold: float = Field(default=0.2, description="Entropy below which a league is considered saturated.")
-    max_cascade_positions: int = Field(default=100, description="Default max positions for temporal cascade.")
+    entropy_saturation_threshold: float = Field(
+        default=0.2, description="Entropy below which a league is considered saturated."
+    )
+    max_cascade_positions: int = Field(
+        default=100, description="Default max positions for temporal cascade."
+    )
+
 
 # --- Validation Models ---
 class ValidationIssue(BaseModel):
@@ -219,6 +256,7 @@ class ValidationIssue(BaseModel):
     source_entity_type: str | None = None
     source_entity_id: str | None = None
     details: dict[str, Any] | None = None
+
 
 class DataIntegrityReport(BaseModel):
     report_generated_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)

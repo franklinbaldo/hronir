@@ -6,7 +6,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from hronir_encyclopedia import cli, models, session_manager, storage, transaction_manager
+from hronir_encyclopedia import cli, session_manager, storage, transaction_manager
 from hronir_encyclopedia.models import Path as PathModel
 
 
@@ -29,9 +29,7 @@ class TestProtocolV2(unittest.TestCase):
         cls.library_path = cls.base_dir / "the_library"
         cls.forking_path_dir = cls.base_dir / "forking_path"
         cls.ratings_dir = cls.base_dir / "ratings"
-        cls.transactions_dir = (
-            cls.base_dir / "data" / "transactions"
-        )
+        cls.transactions_dir = cls.base_dir / "data" / "transactions"
         cls.sessions_dir = cls.base_dir / "data" / "sessions"
         cls.canonical_path_file = cls.base_dir / "data" / "canonical_path.json"
 
@@ -64,7 +62,7 @@ class TestProtocolV2(unittest.TestCase):
         self.original_tm_transactions_dir = transaction_manager.TRANSACTIONS_DIR
         self.original_tm_head_file = transaction_manager.HEAD_FILE
         self.original_sm_sessions_dir = session_manager.SESSIONS_DIR
-        self.original_sm_consumed_file = session_manager.CONSUMED_FORKS_FILE
+        self.original_sm_consumed_file = session_manager.CONSUMED_PATHS_FILE # Changed FORKS to PATHS
         self.original_storage_uuid_namespace = storage.UUID_NAMESPACE
 
         self.original_dm_fork_csv_dir = storage.data_manager.fork_csv_dir
@@ -91,7 +89,7 @@ class TestProtocolV2(unittest.TestCase):
         transaction_manager.TRANSACTIONS_DIR = self.original_tm_transactions_dir
         transaction_manager.HEAD_FILE = self.original_tm_head_file
         session_manager.SESSIONS_DIR = self.original_sm_sessions_dir
-        session_manager.CONSUMED_FORKS_FILE = self.original_sm_consumed_file
+        session_manager.CONSUMED_PATHS_FILE = self.original_sm_consumed_file # Changed FORKS to PATHS
         storage.UUID_NAMESPACE = self.original_storage_uuid_namespace
 
         storage.data_manager.fork_csv_dir = self.original_dm_fork_csv_dir
@@ -103,19 +101,19 @@ class TestProtocolV2(unittest.TestCase):
     ) -> str:
         """Helper to create a fork entry and return the path_uuid."""
         path_uuid_obj = storage.compute_narrative_path_uuid(
-            position,
-            prev_uuid_str if prev_uuid_str else "",
-            current_hrönir_uuid
+            position, prev_uuid_str if prev_uuid_str else "", current_hrönir_uuid
         )
 
-        model_prev_uuid = uuid.UUID(prev_uuid_str) if prev_uuid_str and prev_uuid_str != "" else None
+        model_prev_uuid = (
+            uuid.UUID(prev_uuid_str) if prev_uuid_str and prev_uuid_str != "" else None
+        )
 
         path_model = PathModel(
             path_uuid=path_uuid_obj,
             position=position,
             prev_uuid=model_prev_uuid,
             uuid=uuid.UUID(current_hrönir_uuid),
-            status="PENDING"
+            status="PENDING",
         )
         storage.data_manager.add_path(path_model)
         return str(path_uuid_obj)
@@ -137,7 +135,7 @@ class TestProtocolV2(unittest.TestCase):
             )
             sybil_path_uuids.append(path_uuid)
 
-        storage.data_manager.save_all_data_to_csvs() # Ensure data is on disk for CLI
+        storage.data_manager.save_all_data_to_csvs()  # Ensure data is on disk for CLI
 
         for path_uuid in sybil_path_uuids:
             # Re-fetch after potential save/load cycle or ensure test uses consistent DataManager state
@@ -152,12 +150,10 @@ class TestProtocolV2(unittest.TestCase):
                 [
                     "session",
                     "start",
-                    "--fork-uuid",
+                    "--path-uuid", # Changed --fork-uuid to --path-uuid
                     path_uuid,
-                    "--forking-path-dir",
-                    str(self.forking_path_dir),
-                    "--ratings-dir",
-                    str(self.ratings_dir),
+                    # "--forking-path-dir", str(self.forking_path_dir), # Removed
+                    # "--ratings-dir", str(self.ratings_dir), # Removed
                     "--canonical-path-file",
                     str(self.canonical_path_file),
                 ],
@@ -168,22 +164,28 @@ class TestProtocolV2(unittest.TestCase):
             # CLI commands now print errors to stderr by default with Typer/Rich.
             # The output JSON is only for success cases.
             if result.stderr:
-                self.assertTrue("does not have 'QUALIFIED' status" in result.stderr or "already been used" in result.stderr)
-            elif result.stdout and result.stdout.strip(): # Check if stdout has non-whitespace content
+                self.assertTrue(
+                    "does not have 'QUALIFIED' status" in result.stderr
+                    or "already been used" in result.stderr
+                )
+            elif (
+                result.stdout and result.stdout.strip()
+            ):  # Check if stdout has non-whitespace content
                 try:
                     output_json = json.loads(result.stdout)
                     self.assertIn("error", output_json, "Error key missing in JSON output")
                     self.assertIn("does not have 'QUALIFIED' status", output_json["error"])
                 except json.JSONDecodeError:
-                     self.fail(f"Session start for PENDING path {path_uuid} produced non-JSON output: {result.stdout}")
+                    self.fail(
+                        f"Session start for PENDING path {path_uuid} produced non-JSON output: {result.stdout}"
+                    )
             else:
-                self.fail(f"Session start for PENDING path {path_uuid} did not produce expected error output on stderr or JSON error on stdout.")
-
+                self.fail(
+                    f"Session start for PENDING path {path_uuid} did not produce expected error output on stderr or JSON error on stdout."
+                )
 
     def test_legitimate_promotion_and_mandate_issuance(self):
-        pos0_hrönir_A = _create_dummy_chapter(
-            self.library_path, "pos0_chA_promo"
-        )
+        pos0_hrönir_A = _create_dummy_chapter(self.library_path, "pos0_chA_promo")
 
         fgood_hrönir = _create_dummy_chapter(self.library_path, "fgood_ch_pos1")
         fother_hrönir = _create_dummy_chapter(self.library_path, "fother_ch_pos1")
@@ -208,13 +210,19 @@ class TestProtocolV2(unittest.TestCase):
         dummy_session_id = str(uuid.uuid4())
         # This should be a valid path_uuid that is QUALIFIED, or a placeholder if not strictly checked by TM
         # Generate a dummy UUIDv5 for the initiating voter path
-        dummy_initiator_prev_hr_uuid = _create_dummy_chapter(self.library_path, "dummy_initiator_prev_hr")
-        dummy_initiator_curr_hr_uuid = _create_dummy_chapter(self.library_path, "dummy_initiator_curr_hr")
-        dummy_initiating_voter_path_uuid = str(storage.compute_narrative_path_uuid(
-            position=0, # Or any appropriate position for the initiator
-            prev_hronir_uuid=dummy_initiator_prev_hr_uuid,
-            current_hronir_uuid=dummy_initiator_curr_hr_uuid
-        ))
+        dummy_initiator_prev_hr_uuid = _create_dummy_chapter(
+            self.library_path, "dummy_initiator_prev_hr"
+        )
+        dummy_initiator_curr_hr_uuid = _create_dummy_chapter(
+            self.library_path, "dummy_initiator_curr_hr"
+        )
+        dummy_initiating_voter_path_uuid = str(
+            storage.compute_narrative_path_uuid(
+                position=0,  # Or any appropriate position for the initiator
+                prev_hronir_uuid=dummy_initiator_prev_hr_uuid,
+                current_hronir_uuid=dummy_initiator_curr_hr_uuid,
+            )
+        )
         # Ensure this dummy path is added to storage so it can be found if needed by TM logic (though not strictly required by all TM versions)
         # For this test, we assume the TM doesn't need to fetch the full initiator PathModel object, just its UUID.
         # If it did, we'd need to _create_fork_entry for it and potentially qualify it.
@@ -234,7 +242,7 @@ class TestProtocolV2(unittest.TestCase):
                     "position": 1,
                     "winner_hrönir_uuid": fgood_hrönir,
                     "loser_hrönir_uuid": dummy_loser_hrönir,
-                    "predecessor_hrönir_uuid": pos0_hrönir_A
+                    "predecessor_hrönir_uuid": pos0_hrönir_A,
                 }
             )
 
@@ -245,7 +253,7 @@ class TestProtocolV2(unittest.TestCase):
 
         tx_result_data = transaction_manager.record_transaction(
             session_id=dummy_session_id,
-            initiating_fork_uuid=dummy_initiating_voter_path_uuid,
+            initiating_path_uuid=dummy_initiating_voter_path_uuid, # Ensure this is path_uuid
             session_verdicts=votes_to_qualify_fgood,
         )
         self.assertIsNotNone(tx_result_data)
@@ -269,7 +277,9 @@ class TestProtocolV2(unittest.TestCase):
         ]
 
         self.assertEqual(
-            str(generated_mandate_id), expected_mandate_id, "Generated mandate_id is not as expected."
+            str(generated_mandate_id),
+            expected_mandate_id,
+            "Generated mandate_id is not as expected.",
         )
 
         promotions = tx_result_data.get("promotions_granted", [])
@@ -307,30 +317,36 @@ class TestProtocolV2(unittest.TestCase):
                     "position": 1,
                     "winner_hrönir_uuid": fork_to_spend_hrönir,
                     "loser_hrönir_uuid": dummy_loser_hrönir_ds,
-                    "predecessor_hrönir_uuid": pos0_hrönir_pred
+                    "predecessor_hrönir_uuid": pos0_hrönir_pred,
                 }
             )
 
         # Generate a dummy UUIDv5 for the initiating voter path
-        dummy_initiator_prev_hr_uuid_ds = _create_dummy_chapter(self.library_path, "dummy_initiator_prev_hr_ds")
-        dummy_initiator_curr_hr_uuid_ds = _create_dummy_chapter(self.library_path, "dummy_initiator_curr_hr_ds")
-        ds_initiating_path_uuid = str(storage.compute_narrative_path_uuid(
-            position=0,
-            prev_hronir_uuid=dummy_initiator_prev_hr_uuid_ds,
-            current_hronir_uuid=dummy_initiator_curr_hr_uuid_ds
-        ))
+        dummy_initiator_prev_hr_uuid_ds = _create_dummy_chapter(
+            self.library_path, "dummy_initiator_prev_hr_ds"
+        )
+        dummy_initiator_curr_hr_uuid_ds = _create_dummy_chapter(
+            self.library_path, "dummy_initiator_curr_hr_ds"
+        )
+        ds_initiating_path_uuid = str(
+            storage.compute_narrative_path_uuid(
+                position=0,
+                prev_hronir_uuid=dummy_initiator_prev_hr_uuid_ds,
+                current_hronir_uuid=dummy_initiator_curr_hr_uuid_ds,
+            )
+        )
 
         # Ensure all paths created by _create_fork_entry are saved before record_transaction
         storage.data_manager.save_all_data_to_csvs()
 
         qualifying_tx_data = transaction_manager.record_transaction(
             session_id=str(uuid.uuid4()),
-            initiating_fork_uuid=ds_initiating_path_uuid,
+            initiating_path_uuid=ds_initiating_path_uuid, # Ensure this is path_uuid
             session_verdicts=votes_for_qualification,
         )
         self.assertIsNotNone(qualifying_tx_data)
 
-        storage.data_manager.save_all_data_to_csvs() # Save after TX before CLI
+        storage.data_manager.save_all_data_to_csvs()  # Save after TX before CLI
 
         path_data_qualified_obj = storage.data_manager.get_path_by_uuid(path_to_spend_uuid)
         self.assertIsNotNone(
@@ -344,10 +360,12 @@ class TestProtocolV2(unittest.TestCase):
         p0_duel_chA = _create_dummy_chapter(self.library_path, "p0_duelA_ds")
         p0_duel_chB = _create_dummy_chapter(self.library_path, "p0_duelB_ds")
         # These fork entries also need to be saved if the CLI session start depends on them for duel generation
-        p0_path_A = self._create_fork_entry(position=0, prev_uuid_str=None, current_hrönir_uuid=p0_duel_chA)
+        _p0_path_A = self._create_fork_entry(
+            position=0, prev_uuid_str=None, current_hrönir_uuid=p0_duel_chA
+        )
         self._create_fork_entry(position=0, prev_uuid_str=None, current_hrönir_uuid=p0_duel_chB)
 
-        storage.data_manager.save_all_data_to_csvs() # Save after creating duel options
+        storage.data_manager.save_all_data_to_csvs()  # Save after creating duel options
 
         self.canonical_path_file.write_text(
             json.dumps({"title": "Test Canonical Path", "path": {}})
@@ -407,7 +425,6 @@ class TestProtocolV2(unittest.TestCase):
         # The test's DataManager instance needs to reload to see these changes.
         storage.data_manager.initialize_and_load(clear_existing_data=True)
 
-
         path_data_spent_obj = storage.data_manager.get_path_by_uuid(path_to_spend_uuid)
         self.assertIsNotNone(
             path_data_spent_obj, f"Path {path_to_spend_uuid} not found in DB after spending."
@@ -421,12 +438,10 @@ class TestProtocolV2(unittest.TestCase):
             [
                 "session",
                 "start",
-                "--fork-uuid",
+                    "--path-uuid", # Changed --fork-uuid to --path-uuid
                 path_to_spend_uuid,
-                "--forking-path-dir",
-                str(self.forking_path_dir),
-                "--ratings-dir",
-                str(self.ratings_dir),
+                    # "--forking-path-dir", str(self.forking_path_dir), # Removed
+                    # "--ratings-dir", str(self.ratings_dir), # Removed
                 "--canonical-path-file",
                 str(self.canonical_path_file),
             ],
@@ -443,17 +458,24 @@ class TestProtocolV2(unittest.TestCase):
     def test_temporal_cascade_trigger(self):
         p0_ch_A = _create_dummy_chapter(self.library_path, "p0_cascade_A")
         p0_ch_B = _create_dummy_chapter(self.library_path, "p0_cascade_B")
-        p0_path_A_uuid = self._create_fork_entry(position=0, prev_uuid_str=None, current_hrönir_uuid=p0_ch_A)
-        p0_path_B_uuid = self._create_fork_entry(position=0, prev_uuid_str=None, current_hrönir_uuid=p0_ch_B)
+        p0_path_A_uuid = self._create_fork_entry(
+            position=0, prev_uuid_str=None, current_hrönir_uuid=p0_ch_A
+        )
+        p0_path_B_uuid = self._create_fork_entry(
+            position=0, prev_uuid_str=None, current_hrönir_uuid=p0_ch_B
+        )
 
         p1_ch_X = _create_dummy_chapter(self.library_path, "p1_cascade_X")
         p1_ch_Y = _create_dummy_chapter(self.library_path, "p1_cascade_Y")
-        p1_path_X_uuid = self._create_fork_entry(position=1, prev_uuid_str=p0_ch_A, current_hrönir_uuid=p1_ch_X)
+        p1_path_X_uuid = self._create_fork_entry(
+            position=1, prev_uuid_str=p0_ch_A, current_hrönir_uuid=p1_ch_X
+        )
         self._create_fork_entry(position=1, prev_uuid_str=p0_ch_A, current_hrönir_uuid=p1_ch_Y)
 
         p1_ch_Z_from_B = _create_dummy_chapter(self.library_path, "p1_cascade_Z_from_B")
-        p1_path_Z_from_B_uuid = self._create_fork_entry(position=1, prev_uuid_str=p0_ch_B, current_hrönir_uuid=p1_ch_Z_from_B)
-
+        p1_path_Z_from_B_uuid = self._create_fork_entry(
+            position=1, prev_uuid_str=p0_ch_B, current_hrönir_uuid=p1_ch_Z_from_B
+        )
 
         initial_canon_data = {
             "title": "Initial Canon for Cascade Test",
@@ -487,36 +509,43 @@ class TestProtocolV2(unittest.TestCase):
                     "position": qualifying_fork_pos,
                     "winner_hrönir_uuid": qf_hrönir,
                     "loser_hrönir_uuid": dummy_loser_qf,
-                    "predecessor_hrönir_uuid": p1_ch_X
+                    "predecessor_hrönir_uuid": p1_ch_X,
                 }
             )
 
         # Generate a dummy UUIDv5 for the initiating voter path
-        dummy_initiator_prev_hr_uuid_tc = _create_dummy_chapter(self.library_path, "dummy_initiator_prev_hr_tc")
-        dummy_initiator_curr_hr_uuid_tc = _create_dummy_chapter(self.library_path, "dummy_initiator_curr_hr_tc")
-        tc_initiating_path_uuid = str(storage.compute_narrative_path_uuid(
-            # The initiating path for qualifying a fork at 'qualifying_fork_pos'
-            # would typically be at 'qualifying_fork_pos - 1' or some other existing qualified path.
-            # For simplicity, using pos 0, but in a real scenario, it should be a relevant qualified path.
-            position=0,
-            prev_hronir_uuid=dummy_initiator_prev_hr_uuid_tc,
-            current_hronir_uuid=dummy_initiator_curr_hr_uuid_tc
-        ))
+        dummy_initiator_prev_hr_uuid_tc = _create_dummy_chapter(
+            self.library_path, "dummy_initiator_prev_hr_tc"
+        )
+        dummy_initiator_curr_hr_uuid_tc = _create_dummy_chapter(
+            self.library_path, "dummy_initiator_curr_hr_tc"
+        )
+        tc_initiating_path_uuid = str(
+            storage.compute_narrative_path_uuid(
+                # The initiating path for qualifying a fork at 'qualifying_fork_pos'
+                # would typically be at 'qualifying_fork_pos - 1' or some other existing qualified path.
+                # For simplicity, using pos 0, but in a real scenario, it should be a relevant qualified path.
+                position=0,
+                prev_hronir_uuid=dummy_initiator_prev_hr_uuid_tc,
+                current_hronir_uuid=dummy_initiator_curr_hr_uuid_tc,
+            )
+        )
 
         # Ensure all paths created by _create_fork_entry are saved before record_transaction
         storage.data_manager.save_all_data_to_csvs()
 
         transaction_manager.record_transaction(
             session_id=str(uuid.uuid4()),
-            initiating_fork_uuid=tc_initiating_path_uuid,
+            initiating_path_uuid=tc_initiating_path_uuid, # Ensure this is path_uuid
             session_verdicts=votes_for_qf_qualification,
         )
 
-        storage.data_manager.save_all_data_to_csvs() # Save after TX, before CLI
+        storage.data_manager.save_all_data_to_csvs()  # Save after TX, before CLI
 
         qf_data_qualified_obj = storage.data_manager.get_path_by_uuid(qf_path_uuid)
         self.assertIsNotNone(
-            qf_data_qualified_obj, f"Judging path {qf_path_uuid} not found in DB after qualification."
+            qf_data_qualified_obj,
+            f"Judging path {qf_path_uuid} not found in DB after qualification.",
         )
         self.assertEqual(
             qf_data_qualified_obj.status, "QUALIFIED", "Judging path QF failed to qualify."
@@ -527,12 +556,11 @@ class TestProtocolV2(unittest.TestCase):
             [
                 "session",
                 "start",
-                "--fork-uuid",
+                    "--path-uuid",
                 qf_path_uuid,
-                "--forking-path-dir",
-                str(self.forking_path_dir),
-                "--ratings-dir",
-                str(self.ratings_dir),
+                    # No longer passing these as session_start uses DataManager internally
+                    # "--forking-path-dir", str(self.forking_path_dir),
+                    # "--ratings-dir", str(self.ratings_dir),
                 "--canonical-path-file",
                 str(self.canonical_path_file),
             ],
@@ -540,9 +568,7 @@ class TestProtocolV2(unittest.TestCase):
         self.assertEqual(start_res.exit_code, 0, f"Session start for QF failed: {start_res.stdout}")
         session_id_for_cascade = json.loads(start_res.stdout)["session_id"]
 
-        verdicts_to_change_canon = {
-            "0": p0_path_B_uuid
-        }
+        verdicts_to_change_canon = {"0": p0_path_B_uuid}
 
         commit_res = self.runner.invoke(
             cli.app,

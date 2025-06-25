@@ -4,14 +4,12 @@ import shutil
 import uuid
 from pathlib import Path
 
-import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
 from hronir_encyclopedia import cli as hronir_cli
-from hronir_encyclopedia import models, ratings, storage, transaction_manager
+from hronir_encyclopedia import ratings, storage, transaction_manager
 from hronir_encyclopedia.models import Path as PathModel
-
 
 runner = CliRunner()
 
@@ -35,6 +33,7 @@ CANONICAL_PATH_FILE_runtime = DATA_DIR_runtime / "canonical_path.json"
 def compute_uuid_from_content_helper(content: str) -> uuid.UUID:
     return uuid.uuid5(storage.UUID_NAMESPACE, content)
 
+
 def _run_cli_command(args: list[str]):
     result = runner.invoke(hronir_cli.app, args, catch_exceptions=False)
     output = result.stdout
@@ -44,15 +43,17 @@ def _run_cli_command(args: list[str]):
             print(f"CLI Stderr:\n{result.stderr}")
     return result, output
 
+
 def _create_hronir(hr_uuid_str: str, text_content: str) -> str:
     content_derived_uuid = str(compute_uuid_from_content_helper(text_content))
 
     try:
         uuid.UUID(hr_uuid_str)
-        assert hr_uuid_str == content_derived_uuid, \
+        assert hr_uuid_str == content_derived_uuid, (
             f"Provided hr_uuid {hr_uuid_str} does not match content-derived {content_derived_uuid}."
+        )
     except ValueError:
-         hr_uuid_str = content_derived_uuid
+        hr_uuid_str = content_derived_uuid
 
     stored_uuid = storage.store_chapter_text(text_content, base=Path("the_library"))
     assert stored_uuid == hr_uuid_str
@@ -62,18 +63,19 @@ def _create_hronir(hr_uuid_str: str, text_content: str) -> str:
 def hr_uuid_filename_safe(hr_uuid: str) -> str:
     return hr_uuid.replace("-", "")
 
+
 def _create_fork_entry(
     position: int,
     prev_hr_uuid_str: str | None,
     current_hr_uuid_str: str,
 ):
     path_uuid_obj = storage.compute_narrative_path_uuid(
-        position,
-        prev_hr_uuid_str if prev_hr_uuid_str else "",
-        current_hr_uuid_str
+        position, prev_hr_uuid_str if prev_hr_uuid_str else "", current_hr_uuid_str
     )
 
-    model_prev_uuid = uuid.UUID(prev_hr_uuid_str) if prev_hr_uuid_str and prev_hr_uuid_str != "" else None
+    model_prev_uuid = (
+        uuid.UUID(prev_hr_uuid_str) if prev_hr_uuid_str and prev_hr_uuid_str != "" else None
+    )
     model_current_uuid = uuid.UUID(current_hr_uuid_str)
 
     path_data = {
@@ -89,7 +91,11 @@ def _create_fork_entry(
 
 
 def _get_fork_uuid(position: int, prev_hr_uuid: str, current_hr_uuid: str) -> str:
-    return str(storage.compute_narrative_path_uuid(position, prev_hr_uuid if prev_hr_uuid else "", current_hr_uuid))
+    return str(
+        storage.compute_narrative_path_uuid(
+            position, prev_hr_uuid if prev_hr_uuid else "", current_hr_uuid
+        )
+    )
 
 
 def _create_vote_entry(
@@ -160,7 +166,7 @@ def _qualify_fork(
                 "position": position,
                 "winner_hrönir_uuid": hr_to_qualify_uuid_str,
                 "loser_hrönir_uuid": dummy_opponent_hr_uuid_str,
-                "predecessor_hrönir_uuid": predecessor_hr_uuid_str
+                "predecessor_hrönir_uuid": predecessor_hr_uuid_str,
             }
         ]
         # Use a valid UUIDv5 for initiating_fork_uuid
@@ -168,21 +174,21 @@ def _qualify_fork(
         # For testing, we can generate a deterministic one or a random v4 if the model allows.
         # The TransactionContent model expects initiating_path_uuid to be UUIDv5.
         # Let's create a dummy path_uuid for the initiator.
-        dummy_initiator_content_1 = f"initiator_content_1_{i}_{path_to_qualify_uuid_str}"
-        dummy_initiator_content_2 = f"initiator_content_2_{i}_{path_to_qualify_uuid_str}"
+        _dummy_initiator_content_1 = f"initiator_content_1_{i}_{path_to_qualify_uuid_str}"
+        _dummy_initiator_content_2 = f"initiator_content_2_{i}_{path_to_qualify_uuid_str}"
 
         # Create a hrönir UUID (can be v4 or v5, PathModel's uuid is UUID5 but accepts v4 if it's a valid UUID string)
         # For simplicity, let's use v4 for these dummy hrönirs
         dummy_initiator_hr_prev_uuid = str(uuid.uuid4())
         dummy_initiator_hr_curr_uuid = str(uuid.uuid4())
 
-
-        initiating_path_uuid = str(storage.compute_narrative_path_uuid(
-            position -1 if position > 0 else 0, # A path at pos N judges pos N-1 and N-2
-            dummy_initiator_hr_prev_uuid,
-            dummy_initiator_hr_curr_uuid
-        ))
-
+        initiating_path_uuid = str(
+            storage.compute_narrative_path_uuid(
+                position - 1 if position > 0 else 0,  # A path at pos N judges pos N-1 and N-2
+                dummy_initiator_hr_prev_uuid,
+                dummy_initiator_hr_curr_uuid,
+            )
+        )
 
         tx_result = transaction_manager.record_transaction(
             session_id=str(uuid.uuid4()),
@@ -199,9 +205,7 @@ def _qualify_fork(
     )
 
     elo_rating_msg = "N/A"
-    ranking_for_elo_check = ratings.get_ranking(
-        position, predecessor_hr_uuid_str
-    )
+    ranking_for_elo_check = ratings.get_ranking(position, predecessor_hr_uuid_str)
     if not ranking_for_elo_check.empty:
         path_in_ranking = ranking_for_elo_check[
             ranking_for_elo_check["path_uuid"] == path_to_qualify_uuid_str
@@ -215,6 +219,7 @@ def _qualify_fork(
     assert qualified_path_data.mandate_id is not None, (
         f"Path {path_to_qualify_uuid_str} is QUALIFIED but has no mandate_id."
     )
+
 
 @pytest.fixture(autouse=True)
 def test_environment(monkeypatch):
@@ -244,9 +249,7 @@ def test_environment(monkeypatch):
     storage.data_manager.transactions_json_dir = Path("data") / "transactions"
 
     storage.data_manager._initialized = False
-    storage.data_manager.initialize_and_load(
-        clear_existing_data=True
-    )
+    storage.data_manager.initialize_and_load(clear_existing_data=True)
 
     yield
 
@@ -297,7 +300,10 @@ class TestSessionWorkflow:
         _qualify_fork(f2_judge_path_uuid, h2_judge_uuid, 2, h1a_uuid)
 
         cmd_args_start = [
-            "session", "start", "--fork-uuid", f2_judge_path_uuid,
+            "session",
+            "start",
+            "--fork-uuid",
+            f2_judge_path_uuid,
         ]
 
         result_start, output_start = _run_cli_command(cmd_args_start)
@@ -308,16 +314,18 @@ class TestSessionWorkflow:
 
         assert session_id is not None
 
-        assert SESSIONS_DIR_runtime.joinpath(
-            f"{session_id}.json"
-        ).exists()
+        assert SESSIONS_DIR_runtime.joinpath(f"{session_id}.json").exists()
         consumed_forks = _get_consumed_forks_data()
         assert consumed_forks.get(f2_judge_path_uuid) == session_id
 
         verdicts_json_str = json.dumps({"0": f0b_path_uuid})
         cmd_args_commit = [
-            "session", "commit", "--session-id", session_id,
-            "--verdicts", verdicts_json_str,
+            "session",
+            "commit",
+            "--session-id",
+            session_id,
+            "--verdicts",
+            verdicts_json_str,
         ]
         result_commit, output_commit = _run_cli_command(cmd_args_commit)
         assert result_commit.exit_code == 0, f"session commit failed: {output_commit}"

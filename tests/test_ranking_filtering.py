@@ -38,9 +38,7 @@ def _call_get_ranking_with_setup(position, predecessor_hronir_uuid, forking_dir,
         storage.data_manager.clear_in_memory_data()
         db_cleared_by_this_run = True
 
-        storage.data_manager.initialize_and_load(
-            clear_existing_data=False
-        )
+        storage.data_manager.initialize_and_load(clear_existing_data=False)
 
         df = get_ranking(
             position=position,
@@ -254,9 +252,7 @@ def test_get_ranking_empty_forking_path_dir(temp_data_dir):
 
 def test_get_ranking_empty_ratings_files(temp_data_dir):
     forking_dir, ratings_dir = temp_data_dir
-    create_csv(
-        forks_main_data, forking_dir / "forks_main.csv"
-    )
+    create_csv(forks_main_data, forking_dir / "forks_main.csv")
 
     pd.DataFrame(columns=["uuid", "voter", "winner", "loser"]).to_csv(
         ratings_dir / "position_001.csv", index=False
@@ -363,9 +359,7 @@ def test_get_ranking_ratings_path_missing_columns(temp_data_dir):
         [{"position": 1, "prev_uuid": H0_ROOT, "uuid": H1A, "fork_uuid": _uuid("f1")}],
         forking_dir / "forks.csv",
     )
-    (ratings_dir / "position_001.csv").write_text(
-        "voter_id,winning_id,losing_id\nv1,w1,l1"
-    )
+    (ratings_dir / "position_001.csv").write_text("voter_id,winning_id,losing_id\nv1,w1,l1")
 
     ranking_df = _call_get_ranking_with_setup(
         position=1,
