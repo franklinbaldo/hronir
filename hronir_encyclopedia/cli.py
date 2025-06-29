@@ -1,5 +1,6 @@
 import datetime  # Required for SessionModel if used directly, or for its string representations
 import json
+import os # Added for getenv in sync
 
 # Define module-level logger
 import logging
@@ -24,6 +25,7 @@ from . import (
     transaction_manager,
 )
 from .models import SessionModel  # Import SessionModel for type hinting if needed
+from .transaction_manager import ConflictDetection # For sync command
 
 logger = logging.getLogger(__name__)
 
@@ -1317,19 +1319,29 @@ def sync(
     # Placeholder: Assume discovery yields a manifest object or None
     # This would be where `discover_latest_remote_snapshot_robust` is called.
     # For now, we'll simulate a successful discovery of a dummy manifest.
-    class DummyManifest: # Simulate a fetched manifest
-        def __init__(self, seq, merkle):
-            self.sequence = seq
-            self.merkle_root = merkle
-            self.shards = [storage.sharding.ShardInfo(file="dummy_shard.db.zst", sha256="abc", size=100)]
-            self.network_uuid = network_uuid_env
-            self.created_at = datetime.datetime.now(datetime.timezone.utc)
-            self.pgp_signature = "dummy_sig"
+    # class DummyManifest: # Simulate a fetched manifest
+    #     def __init__(self, seq, merkle):
+    #         self.sequence = seq
+    #         self.merkle_root = merkle
+    #         self.shards = [storage.sharding.ShardInfo(file="dummy_shard.db.zst", sha256="abc", size=100)]
+    #         self.network_uuid = network_uuid_env
+    #         self.created_at = datetime.datetime.now(datetime.timezone.utc)
+    #         self.pgp_signature = "dummy_pgp_signature_placeholder_sync" # Ensure it has a signature
 
-    latest_manifest = DummyManifest(seq=42, merkle="dummymerklerootforsync") # Example
+    # latest_manifest = DummyManifest(seq=42, merkle="dummymerklerootforsync") # Example
+
+    # --- Actual call to discovery logic ---
+    # The `retry` parameter of this `sync` command is implicitly handled by `discover_latest_remote_snapshot_robust`
+    # if its implementation uses retries. The `discover_latest_remote_snapshot_robust` already has a retry loop structure.
+    conflict_detector = ConflictDetection(network_uuid=network_uuid_env) # pgp_key_id not needed for discovery
+    latest_manifest = conflict_detector.discover_latest_remote_snapshot_robust()
+    # Note: discover_latest_remote_snapshot_robust currently returns a placeholder or simulated result.
+    # The retry logic *within* it is also placeholder/simulated.
+    # The `retry` flag from the CLI can be passed down if discover_latest_remote_snapshot_robust is modified to accept it.
+    # For now, the retry structure is always active in the placeholder.
 
     if not latest_manifest:
-        typer.secho(f"Failed to discover latest snapshot for network {network_uuid_env}.", fg=typer.colors.RED)
+        typer.secho(f"Failed to discover latest snapshot for network {network_uuid_env} after retries.", fg=typer.colors.RED)
         raise typer.Exit(code=1)
 
     typer.echo(f"Discovered latest snapshot: Sequence {latest_manifest.sequence}, Merkle Root {latest_manifest.merkle_root}")
@@ -1348,14 +1360,37 @@ def sync(
     # manifest_json_path = snapshot_download_dir / "snapshot_manifest.json"
     # manifest_json_path.write_text(latest_manifest.to_json()) # If SnapshotManifest has to_json
 
-    # 3. (Placeholder) Verify PGP signature of the manifest (if present)
-    if latest_manifest.pgp_signature:
-        typer.echo(f"Verifying PGP signature of manifest (placeholder)... Signature: {latest_manifest.pgp_signature}")
-        # pgp_verify(manifest_content, latest_manifest.pgp_signature)
-        typer.echo("PGP signature verified (placeholder).")
-    else:
-        typer.echo("No PGP signature found on manifest (placeholder).")
+    # 3. Verify PGP signature of the manifest (MANDATORY)
+    if not latest_manifest.pgp_signature:
+        typer.secho("ERROR: Downloaded manifest does not have a PGP signature. Sync aborted.", fg=typer.colors.RED)
+        # Consider cleaning up snapshot_download_dir
+        raise typer.Exit(code=1)
 
+    typer.echo(f"Verifying PGP signature of manifest (Signature: {latest_manifest.pgp_signature[:20]}...)...")
+
+    # Placeholder for actual PGP verification call
+    # In a real implementation, this would involve:
+    # 1. Getting the manifest content that was signed (e.g., specific fields or full JSON representation before adding signature)
+    # 2. Fetching the public key of the signer (potentially based on network policy or key ID in manifest)
+    # 3. Calling a PGP library (e.g., GnuPG, python-gnupg)
+    # For now, simulate verification. Assume a function `verify_pgp_signature_placeholder` exists.
+
+    # manifest_content_to_verify = latest_manifest.get_signed_content_representation() # Hypothetical method
+    # pgp_key_for_network = os.getenv("HRONIR_EXPECTED_NETWORK_SIGNER_KEY_FINGERPRINT") # Example
+
+    # simulated_verification_success = verify_pgp_signature_placeholder(
+    #     data=manifest_content_to_verify,
+    #     signature=latest_manifest.pgp_signature,
+    #     # expected_signer_key_id=pgp_key_for_network
+    # )
+    simulated_verification_success = True # Placeholder: Assume success for now
+
+    if simulated_verification_success:
+        typer.echo("PGP signature verified successfully (placeholder).")
+    else:
+        typer.secho("ERROR: PGP signature verification FAILED for the downloaded manifest. Sync aborted.", fg=typer.colors.RED)
+        # Consider cleaning up snapshot_download_dir
+        raise typer.Exit(code=1)
 
     # 4. (Placeholder) Reconstruct the database from shards (if sharded)
     # This would use ShardingManager.reconstruct_from_shards

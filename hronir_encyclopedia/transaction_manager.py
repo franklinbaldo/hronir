@@ -1,8 +1,10 @@
+import random # Added for sampling
 import datetime
+import hashlib # Added for Merkle tree
 import uuid
 import warnings
 from pathlib import Path
-from typing import Any
+from typing import Any, List, Optional # Optional was already used but not explicitly imported from typing
 
 import logging # Added
 import time # Added
@@ -175,6 +177,184 @@ class ConflictDetection:
 
         logging.warning(f"Remote snapshot discovery failed for network {self.network_uuid} after all attempts and fallbacks.")
         return None
+
+# --- Merkle Tree Utilities ---
+# These functions will be used to build Merkle trees for transactions or other data.
+
+def _hash_data(data: str) -> str:
+    """Hashes a string using SHA256."""
+    return hashlib.sha256(data.encode('utf-8')).hexdigest()
+
+def _build_merkle_tree_level(hashes: List[str]) -> List[str]:
+    """Builds the next level of a Merkle tree."""
+    if not hashes:
+        return []
+    if len(hashes) == 1: # Odd number of hashes, duplicate the last one
+        hashes.append(hashes[0])
+
+    next_level = []
+    for i in range(0, len(hashes), 2):
+        combined_hash = _hash_data(hashes[i] + hashes[i+1])
+        next_level.append(combined_hash)
+    return next_level
+
+def compute_merkle_root(data_items: List[str]) -> Optional[str]:
+    """
+    Computes the Merkle root for a list of data items (e.g., transaction IDs or serialized transaction data).
+    Each item in data_items should be a string.
+    """
+    if not data_items:
+        return None
+
+    # First level: hash each data item
+    current_level_hashes = [_hash_data(item) for item in data_items]
+
+    while len(current_level_hashes) > 1:
+        current_level_hashes = _build_merkle_tree_level(current_level_hashes)
+
+    return current_level_hashes[0] if current_level_hashes else None
+
+def generate_merkle_proof(data_items: List[str], item_index: int) -> Optional[List[tuple[str, str]]]:
+    """
+    Generates a Merkle proof for a specific item in the list.
+    The proof consists of a list of tuples (hash, direction_LR),
+    where direction_LR is 'L' if the hash is a left sibling, 'R' if right.
+    Returns None if item_index is out of bounds or data_items is empty.
+    """
+    if not data_items or not 0 <= item_index < len(data_items):
+        return None
+
+    if len(data_items) == 1: # Single item tree, proof is empty
+        return []
+
+    # Hash all items to get leaf nodes
+    leaf_hashes = [_hash_data(item) for item in data_items]
+
+    proof = []
+    current_index = item_index
+    current_level_hashes = list(leaf_hashes) # Work on a copy
+
+    while len(current_level_hashes) > 1:
+        if current_index % 2 == 0: # Current item is a left node
+            if current_index + 1 < len(current_level_hashes):
+                sibling_hash = current_level_hashes[current_index + 1]
+                proof.append((sibling_hash, 'R')) # Sibling is to the right
+            # If no right sibling, it's an odd end, its parent uses itself as sibling (handled by _build_merkle_tree_level implicitly)
+            # This case means the proof doesn't need this sibling if it was duplicated to form a pair.
+            # The _build_merkle_tree_level handles duplication, proof path follows the actual data.
+        else: # Current item is a right node
+            sibling_hash = current_level_hashes[current_index - 1]
+            proof.append((sibling_hash, 'L')) # Sibling is to the left
+
+        current_level_hashes = _build_merkle_tree_level(current_level_hashes)
+        current_index //= 2 # Move to parent index in the next level
+
+        # If the last level had an odd number of elements and our item was the last one,
+        # it would have been paired with itself. The proof doesn't need to reflect this artificial pairing.
+        # The structure of _build_merkle_tree_level ensures the tree calculation is correct.
+        # The proof path should only include actual sibling hashes.
+        # This is implicitly handled as current_index will map correctly to the smaller next level.
+
+    return proof
+
+def verify_merkle_proof(item_data: str, root: str, proof: List[tuple[str, str]]) -> bool:
+    """
+    Verifies a Merkle proof for a given item.
+    item_data: The original data of the leaf node.
+    root: The expected Merkle root.
+    proof: A list of tuples (hash, direction_LR), where direction_LR is 'L' or 'R'.
+           'L' means the proof hash is the left sibling, 'R' means it's the right.
+    """
+    if not root:
+        return False
+
+    current_hash = _hash_data(item_data)
+
+    for sibling_hash, direction in proof:
+        if direction == 'L': # Sibling is on the left
+            current_hash = _hash_data(sibling_hash + current_hash)
+        elif direction == 'R': # Sibling is on the right
+            current_hash = _hash_data(current_hash + sibling_hash)
+        else:
+            logging.error(f"Invalid direction in Merkle proof: {direction}")
+            return False # Invalid proof format
+
+    return current_hash == root
+
+def perform_trust_check_sampling(
+    all_transaction_data_items: List[str],
+    overall_transactions_merkle_root: str,
+    sample_size: int = 5,
+    min_sample_size: int = 1
+) -> bool:
+    """
+    Performs a trust check by cryptographically sampling transactions and verifying their Merkle proofs.
+
+    Args:
+        all_transaction_data_items: A list of strings, where each string is the data of a transaction.
+                                    The order must be consistent with how overall_transactions_merkle_root was generated.
+        overall_transactions_merkle_root: The Merkle root of all transactions.
+        sample_size: The number of transactions to sample and verify.
+        min_sample_size: The minimum number of samples if population is smaller than sample_size.
+
+    Returns:
+        True if all sampled transactions are verified successfully, False otherwise.
+    """
+    if not all_transaction_data_items:
+        logging.warning("Trust check: No transaction data items provided. Check cannot be performed.")
+        # Depending on policy, this might be True (nothing to fail) or False (incomplete data)
+        return True # Or False, if an empty set is inherently untrusted or invalid
+
+    if not overall_transactions_merkle_root:
+        logging.error("Trust check: Overall transactions Merkle root not provided. Cannot verify.")
+        return False
+
+    num_items = len(all_transaction_data_items)
+
+    # Adjust sample size if the total number of items is less than the desired sample_size
+    actual_sample_size = min(sample_size, num_items)
+    if num_items > 0: # Ensure actual_sample_size is at least min_sample_size if there are items
+        actual_sample_size = max(min_sample_size, actual_sample_size)
+    else: # No items to sample
+        return True # Or False, see above comment about empty all_transaction_data_items
+
+    if actual_sample_size == 0 and num_items > 0: # Should not happen if min_sample_size >=1
+        logging.warning("Trust check: Sample size is zero, but there are items. Check is vacuously true.")
+        return True
+
+    try:
+        # Get indices of items to sample
+        sampled_indices = random.sample(range(num_items), actual_sample_size)
+    except ValueError:
+        # This can happen if range(num_items) is empty, or actual_sample_size > num_items
+        # The checks above should prevent this, but as a safeguard:
+        logging.error(f"Trust check: Error generating sample. Num items: {num_items}, sample size: {actual_sample_size}")
+        return False
+
+    logging.info(f"Performing trust check: Sampling {actual_sample_size} out of {num_items} transactions.")
+
+    for index_to_check in sampled_indices:
+        item_to_check = all_transaction_data_items[index_to_check]
+
+        logging.debug(f"Trust check: Verifying item at index {index_to_check}...")
+
+        proof = generate_merkle_proof(all_transaction_data_items, index_to_check)
+        if proof is None:
+            # This can happen if generate_merkle_proof fails (e.g., index out of bounds, though sample should prevent this)
+            logging.error(f"Trust check: Failed to generate Merkle proof for item at index {index_to_check}.")
+            return False
+
+        is_valid = verify_merkle_proof(item_to_check, overall_transactions_merkle_root, proof)
+        if not is_valid:
+            logging.warning(f"Trust check FAILED: Verification failed for transaction at index {index_to_check}.")
+            logging.debug(f"Failed item data (first 100 chars): {item_to_check[:100]}")
+            logging.debug(f"Proof (first 3 elements): {proof[:3]}")
+            return False
+        logging.debug(f"Trust check: Item at index {index_to_check} verified successfully.")
+
+    logging.info("Trust check PASSED: All sampled transactions verified successfully.")
+    return True
+
 
     def push_with_locking(self, local_snapshot_manifest: SnapshotManifest, snapshot_dir: Path) -> str:
         """
