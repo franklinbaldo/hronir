@@ -1,7 +1,9 @@
+import os
 import shutil
 import uuid
 from pathlib import Path
 
+from .duckdb_storage import DuckDBDataManager
 from .models import Path as PathModel
 from .models import Transaction, Vote
 from .pandas_data_manager import PandasDataManager
@@ -11,7 +13,7 @@ UUID_NAMESPACE = uuid.NAMESPACE_URL
 
 # --- Global Data Manager ---
 class DataManager:
-    """Simplified DataManager using pandas instead of SQLAlchemy."""
+    """DataManager that delegates to pandas or DuckDB backends."""
 
     _instance = None
 
@@ -25,74 +27,90 @@ class DataManager:
         path_csv_dir="narrative_paths",
         ratings_csv_dir="ratings",
         transactions_json_dir="data/transactions",
+        use_duckdb: bool | None = None,
     ):
         if hasattr(self, "_initialized") and self._initialized:
             return
 
-        self.pandas_manager = PandasDataManager(
-            path_csv_dir=path_csv_dir,
-            ratings_csv_dir=ratings_csv_dir,
-            transactions_json_dir=transactions_json_dir,
-        )
+        if use_duckdb is None:
+            env = os.getenv("HRONIR_USE_DUCKDB", "0").lower()
+            use_duckdb = env in {"1", "true", "yes"}
+
+        if use_duckdb:
+            db_path = os.getenv("HRONIR_DUCKDB_PATH", "data/encyclopedia.duckdb")
+            self.backend = DuckDBDataManager(
+                db_path=db_path,
+                path_csv_dir=path_csv_dir,
+                ratings_csv_dir=ratings_csv_dir,
+                transactions_json_dir=transactions_json_dir,
+            )
+        else:
+            self.backend = PandasDataManager(
+                path_csv_dir=path_csv_dir,
+                ratings_csv_dir=ratings_csv_dir,
+                transactions_json_dir=transactions_json_dir,
+            )
         self._initialized = False
 
     @property
     def fork_csv_dir(self):
-        return self.pandas_manager.path_csv_dir
+        return getattr(self.backend, "path_csv_dir", Path(""))
 
     @fork_csv_dir.setter
     def fork_csv_dir(self, value):
-        self.pandas_manager.path_csv_dir = value
+        if hasattr(self.backend, "path_csv_dir"):
+            self.backend.path_csv_dir = value
 
     @property
     def ratings_csv_dir(self):
-        return self.pandas_manager.ratings_csv_dir
+        return getattr(self.backend, "ratings_csv_dir", Path(""))
 
     @ratings_csv_dir.setter
     def ratings_csv_dir(self, value):
-        self.pandas_manager.ratings_csv_dir = Path(value)  # Ensure it's a Path object
+        if hasattr(self.backend, "ratings_csv_dir"):
+            self.backend.ratings_csv_dir = Path(value)
 
     @property
     def transactions_json_dir(self):
-        return self.pandas_manager.transactions_json_dir
+        return getattr(self.backend, "transactions_json_dir", Path(""))
 
     @transactions_json_dir.setter
     def transactions_json_dir(self, value):
-        self.pandas_manager.transactions_json_dir = value
+        if hasattr(self.backend, "transactions_json_dir"):
+            self.backend.transactions_json_dir = value
 
     def initialize_and_load(self, clear_existing_data=False):
         """Initialize the data manager and load data from files."""
         if clear_existing_data:
             self.clear_in_memory_data()
 
-        self.pandas_manager.load_all_data()
+        self.backend.load_all_data()
         self._initialized = True
 
     def clear_in_memory_data(self):
         """Clear all in-memory data."""
-        self.pandas_manager._paths_df = None
-        self.pandas_manager._votes_df = None
-        self.pandas_manager._transactions = {}
+        if hasattr(self.backend, "clear_in_memory_data"):
+            self.backend.clear_in_memory_data()
 
     def save_all_data_to_csvs(self):
         """Save all data back to CSV files."""
-        self.pandas_manager.save_all_data()
+        self.backend.save_all_data()
 
     # --- Path operations ---
     def get_all_paths(self) -> list[PathModel]:
         """Get all paths."""
-        self.pandas_manager.initialize_if_needed()
-        return self.pandas_manager.get_all_paths()
+        self.backend.initialize_if_needed()
+        return self.backend.get_all_paths()
 
     def get_paths_by_position(self, position: int) -> list[PathModel]:
         """Get paths at a specific position."""
-        self.pandas_manager.initialize_if_needed()
-        return self.pandas_manager.get_paths_by_position(position)
+        self.backend.initialize_if_needed()
+        return self.backend.get_paths_by_position(position)
 
     def add_path(self, path: PathModel):
         """Add a new path."""
-        self.pandas_manager.initialize_if_needed()
-        self.pandas_manager.add_path(path)
+        self.backend.initialize_if_needed()
+        self.backend.add_path(path)
 
     def update_path_status(
         self,
@@ -110,15 +128,15 @@ class DataManager:
             set_mandate_explicitly: If True, the mandate_id field will be updated to the value of `mandate_id`
                                    (which can be None to clear it). If False, `mandate_id` field is not changed.
         """
-        self.pandas_manager.initialize_if_needed()
-        self.pandas_manager.update_path_status(
+        self.backend.initialize_if_needed()
+        self.backend.update_path_status(
             path_uuid, status, mandate_id=mandate_id, set_mandate_explicitly=set_mandate_explicitly
         )
 
     def get_path_by_uuid(self, path_uuid: str) -> PathModel | None:
         """Get a specific path by UUID."""
-        self.pandas_manager.initialize_if_needed()
-        paths = self.pandas_manager.get_all_paths()
+        self.backend.initialize_if_needed()
+        paths = self.backend.get_all_paths()
         for path in paths:
             if str(path.path_uuid) == path_uuid:
                 return path
@@ -127,34 +145,34 @@ class DataManager:
     # --- Vote operations ---
     def get_all_votes(self) -> list[Vote]:
         """Get all votes."""
-        self.pandas_manager.initialize_if_needed()
-        return self.pandas_manager.get_all_votes()
+        self.backend.initialize_if_needed()
+        return self.backend.get_all_votes()
 
     def add_vote(self, vote: Vote):
         """Add a new vote."""
-        self.pandas_manager.initialize_if_needed()
-        self.pandas_manager.add_vote(vote)
+        self.backend.initialize_if_needed()
+        self.backend.add_vote(vote)
 
     def get_votes_by_position(self, position: int) -> list[Vote]:
         """Get votes for a specific position."""
-        self.pandas_manager.initialize_if_needed()
-        return self.pandas_manager.get_votes_by_position(position)
+        self.backend.initialize_if_needed()
+        return self.backend.get_votes_by_position(position)
 
     # --- Transaction operations ---
     def get_all_transactions(self) -> list[Transaction]:
         """Get all transactions."""
-        self.pandas_manager.initialize_if_needed()
-        return self.pandas_manager.get_all_transactions()
+        self.backend.initialize_if_needed()
+        return self.backend.get_all_transactions()
 
     def add_transaction(self, transaction: Transaction):
         """Add a new transaction."""
-        self.pandas_manager.initialize_if_needed()
-        self.pandas_manager.add_transaction(transaction)
+        self.backend.initialize_if_needed()
+        self.backend.add_transaction(transaction)
 
     def get_transaction(self, tx_uuid: str) -> Transaction | None:
         """Get a specific transaction."""
-        self.pandas_manager.initialize_if_needed()
-        return self.pandas_manager.get_transaction(tx_uuid)
+        self.backend.initialize_if_needed()
+        return self.backend.get_transaction(tx_uuid)
 
     # --- File operations ---
     def store_hrönir(self, file_path: Path) -> str:
@@ -199,10 +217,10 @@ class DataManager:
     def validate_data_integrity(self) -> list[str]:
         """Validate data integrity and return list of issues."""
         issues = []
-        self.pandas_manager.initialize_if_needed()  # Ensure data is loaded via pandas_manager
+        self.backend.initialize_if_needed()  # Ensure data is loaded via backend
 
         # Check that all referenced hrönirs exist
-        paths = self.get_all_paths()  # This uses self.pandas_manager to get PathModels
+        paths = self.get_all_paths()
         for path in paths:
             # Check existence of the current hrönir (uuid)
             if not self.hrönir_exists(str(path.uuid)):  # self.hrönir_exists uses file system
