@@ -269,6 +269,18 @@ uv run hronir metrics
 uv run hronir recover-canon
 ```
 
+### Snapshot Management
+```bash
+# Download latest snapshot and load it into DuckDB
+uv run hronir sync
+
+# Export current state to snapshot.zip
+uv run hronir export
+
+# Upload snapshot and metadata to the Internet Archive
+uv run hronir push
+```
+
 ## 🔏 Proof-of-Work (Mandate for Judgment)
 
 Under Protocol v2, Proof-of-Work has been elevated. Creating a new path is just the beginning. True influence—the **mandate for judgment**—is earned through **Proof of Relevance**. Only when your path proves its value in duels and becomes `QUALIFIED` do you gain the right to initiate a `session` and reshape the narrative's history.
