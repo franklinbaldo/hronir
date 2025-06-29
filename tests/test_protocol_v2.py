@@ -18,6 +18,15 @@ def _create_dummy_chapter(library_path: Path, content_prefix: str) -> str:
     return chapter_uuid
 
 
+def _get_head_transaction_uuid(tx_dir: Path | None = None) -> str | None:
+    if tx_dir is None:
+        tx_dir = transaction_manager.TRANSACTIONS_DIR
+    head_file = tx_dir / "HEAD"
+    if not head_file.exists():
+        return None
+    return head_file.read_text().strip()
+
+
 class TestProtocolV2(unittest.TestCase):
     runner = CliRunner()
     base_dir = Path("temp_test_hronir_data")
@@ -27,14 +36,14 @@ class TestProtocolV2(unittest.TestCase):
         cls.base_dir.mkdir(parents=True, exist_ok=True)
         # Define specific paths for test data
         cls.library_path = cls.base_dir / "the_library"
-        cls.narrative_paths_dir = cls.base_dir / "narrative_paths"
+        cls.forking_path_dir = cls.base_dir / "narrative_paths"
         cls.ratings_dir = cls.base_dir / "ratings"
         cls.transactions_dir = cls.base_dir / "data" / "transactions"
         cls.sessions_dir = cls.base_dir / "data" / "sessions"
         cls.canonical_path_file = cls.base_dir / "data" / "canonical_path.json"
 
         cls.library_path.mkdir(parents=True, exist_ok=True)
-        cls.narrative_paths_dir.mkdir(parents=True, exist_ok=True)
+        cls.forking_path_dir.mkdir(parents=True, exist_ok=True)
         cls.ratings_dir.mkdir(parents=True, exist_ok=True)
         cls.transactions_dir.parent.mkdir(parents=True, exist_ok=True)
         cls.transactions_dir.mkdir(parents=True, exist_ok=True)
@@ -46,14 +55,14 @@ class TestProtocolV2(unittest.TestCase):
         shutil.rmtree(cls.base_dir, ignore_errors=True)
 
     def setUp(self):
-        shutil.rmtree(self.narrative_paths_dir, ignore_errors=True)
+        shutil.rmtree(self.forking_path_dir, ignore_errors=True)
         shutil.rmtree(self.ratings_dir, ignore_errors=True)
         shutil.rmtree(self.transactions_dir, ignore_errors=True)
         shutil.rmtree(self.sessions_dir, ignore_errors=True)
         if self.canonical_path_file.exists():
             self.canonical_path_file.unlink()
 
-        self.narrative_paths_dir.mkdir(parents=True, exist_ok=True)
+        self.forking_path_dir.mkdir(parents=True, exist_ok=True)
         self.ratings_dir.mkdir(parents=True, exist_ok=True)
         self.transactions_dir.mkdir(parents=True, exist_ok=True)
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
@@ -71,14 +80,14 @@ class TestProtocolV2(unittest.TestCase):
         self.original_dm_ratings_csv_dir = storage.data_manager.ratings_csv_dir
         self.original_dm_transactions_json_dir = storage.data_manager.transactions_json_dir
 
-        storage.data_manager.fork_csv_dir = self.narrative_paths_dir
+        storage.data_manager.fork_csv_dir = self.forking_path_dir
         storage.data_manager.ratings_csv_dir = self.ratings_dir
         storage.data_manager.transactions_json_dir = self.transactions_dir
 
         transaction_manager.TRANSACTIONS_DIR = self.transactions_dir
         transaction_manager.HEAD_FILE = self.transactions_dir / "HEAD"
         session_manager.SESSIONS_DIR = self.sessions_dir
-        session_manager.CONSUMED_FORKS_FILE = self.sessions_dir / "consumed_fork_uuids.json"
+        session_manager.CONSUMED_PATHS_FILE = self.sessions_dir / "consumed_fork_uuids.json"
 
         storage.data_manager._initialized = False
         storage.data_manager.initialize_and_load(clear_existing_data=True)
@@ -156,7 +165,7 @@ class TestProtocolV2(unittest.TestCase):
                     "start",
                     "--path-uuid",  # Changed --fork-uuid to --path-uuid
                     path_uuid,
-                    # "--forking-path-dir", str(self.narrative_paths_dir), # Removed
+                    # "--forking-path-dir", str(self.forking_path_dir), # Removed
                     # "--ratings-dir", str(self.ratings_dir), # Removed
                     "--canonical-path-file",
                     str(self.canonical_path_file),
@@ -262,6 +271,10 @@ class TestProtocolV2(unittest.TestCase):
         )
         self.assertIsNotNone(tx_result_data)
         self.assertIn("transaction_uuid", tx_result_data)
+        self.assertEqual(
+            _get_head_transaction_uuid(self.transactions_dir),
+            tx_result_data["transaction_uuid"],
+        )
 
         fgood_final_obj = storage.data_manager.get_path_by_uuid(fgood_path_uuid)
         self.assertIsNotNone(
@@ -349,6 +362,10 @@ class TestProtocolV2(unittest.TestCase):
             session_verdicts=votes_for_qualification,
         )
         self.assertIsNotNone(qualifying_tx_data)
+        self.assertEqual(
+            _get_head_transaction_uuid(self.transactions_dir),
+            qualifying_tx_data["transaction_uuid"],
+        )
 
         storage.data_manager.save_all_data_to_csvs()  # Save after TX before CLI
 
@@ -380,12 +397,10 @@ class TestProtocolV2(unittest.TestCase):
             [
                 "session",
                 "start",
-                "--fork-uuid",
+                "--path-uuid",
                 path_to_spend_uuid,
-                "--forking-path-dir",
-                str(self.narrative_paths_dir),
-                "--ratings-dir",
-                str(self.ratings_dir),
+                # "--forking-path-dir", str(self.forking_path_dir),  # Removed
+                # "--ratings-dir", str(self.ratings_dir),  # Removed
                 "--canonical-path-file",
                 str(self.canonical_path_file),
             ],
@@ -414,7 +429,7 @@ class TestProtocolV2(unittest.TestCase):
                 "--verdicts",
                 json.dumps(verdicts_for_commit),
                 "--forking-path-dir",
-                str(self.narrative_paths_dir),
+                str(self.forking_path_dir),
                 "--ratings-dir",
                 str(self.ratings_dir),
                 "--canonical-path-file",
@@ -444,7 +459,7 @@ class TestProtocolV2(unittest.TestCase):
                 "start",
                 "--path-uuid",  # Changed --fork-uuid to --path-uuid
                 path_to_spend_uuid,
-                # "--forking-path-dir", str(self.narrative_paths_dir), # Removed
+                # "--forking-path-dir", str(self.forking_path_dir), # Removed
                 # "--ratings-dir", str(self.ratings_dir), # Removed
                 "--canonical-path-file",
                 str(self.canonical_path_file),
@@ -563,7 +578,7 @@ class TestProtocolV2(unittest.TestCase):
                 "--path-uuid",
                 qf_path_uuid,
                 # No longer passing these as session_start uses DataManager internally
-                # "--forking-path-dir", str(self.narrative_paths_dir),
+                # "--forking-path-dir", str(self.forking_path_dir),
                 # "--ratings-dir", str(self.ratings_dir),
                 "--canonical-path-file",
                 str(self.canonical_path_file),
@@ -584,7 +599,7 @@ class TestProtocolV2(unittest.TestCase):
                 "--verdicts",
                 json.dumps(verdicts_to_change_canon),
                 "--forking-path-dir",
-                str(self.narrative_paths_dir),
+                str(self.forking_path_dir),
                 "--ratings-dir",
                 str(self.ratings_dir),
                 "--canonical-path-file",
