@@ -45,7 +45,7 @@ def setup_test_environment(tmp_path: Path) -> dict[str, Path]:
     data_dir.mkdir(parents=True, exist_ok=True)
     library_dir = tmp_path / "the_library"
     library_dir.mkdir(parents=True, exist_ok=True)
-    fork_dir = tmp_path / "forking_path"
+    fork_dir = tmp_path / "narrative_paths"
     fork_dir.mkdir(parents=True, exist_ok=True)
     ratings_dir = tmp_path / "ratings"
     ratings_dir.mkdir(parents=True, exist_ok=True)
@@ -110,7 +110,7 @@ def setup_test_environment(tmp_path: Path) -> dict[str, Path]:
         position=1, prev_uuid=hronir_B_suc, cur_uuid=hronir_F_suc
     )
 
-    # Create forking_path CSV
+    # Create narrative_paths CSV
     forks_data = [
         {"position": 0, "prev_uuid": "", "uuid": hronir_A_suc, "fork_uuid": fork_A_uuid},
         {"position": 0, "prev_uuid": "", "uuid": hronir_B_suc, "fork_uuid": fork_B_uuid},
@@ -151,7 +151,7 @@ def setup_test_environment(tmp_path: Path) -> dict[str, Path]:
     voter_for_initial_ratings_fork_uuid = storage.compute_forking_uuid(
         position=99, prev_uuid="", cur_uuid=dummy_voter_hronir_uuid
     )
-    # Add this dummy fork to a separate CSV to ensure it's found by storage.forking_path_exists
+    # Add this dummy fork to a separate CSV to ensure it's found by storage.narrative_paths_exists
     create_fork_csv(
         fork_dir,
         "dummy_forks.csv",

@@ -15,14 +15,14 @@ runner = CliRunner()
 
 TEST_ROOT = Path("temp_test_data")
 LIBRARY_DIR_abs = (Path.cwd() / TEST_ROOT / "the_library").resolve()
-FORKING_PATH_DIR_abs = (Path.cwd() / TEST_ROOT / "forking_path").resolve()
+FORKING_PATH_DIR_abs = (Path.cwd() / TEST_ROOT / "narrative_paths").resolve()
 RATINGS_DIR_abs = (Path.cwd() / TEST_ROOT / "ratings").resolve()
 DATA_DIR_abs = (Path.cwd() / TEST_ROOT / "data").resolve()
 SESSIONS_DIR_fixture_abs = (DATA_DIR_abs / "sessions").resolve()
 TRANSACTIONS_DIR_fixture_abs = (DATA_DIR_abs / "transactions").resolve()
 CANONICAL_PATH_FILE_fixture_abs = (DATA_DIR_abs / "canonical_path.json").resolve()
 
-FORKING_PATH_DIR_runtime = Path("forking_path")
+FORKING_PATH_DIR_runtime = Path("narrative_paths")
 RATINGS_DIR_runtime = Path("ratings")
 DATA_DIR_runtime = Path("data")
 SESSIONS_DIR_runtime = DATA_DIR_runtime / "sessions"
@@ -230,7 +230,7 @@ def test_environment(monkeypatch):
 
     resolved_test_root.mkdir(parents=True)
     (resolved_test_root / "the_library").mkdir(parents=True, exist_ok=True)
-    (resolved_test_root / "forking_path").mkdir(parents=True, exist_ok=True)
+    (resolved_test_root / "narrative_paths").mkdir(parents=True, exist_ok=True)
     (resolved_test_root / "ratings").mkdir(parents=True, exist_ok=True)
     (resolved_test_root / "data").mkdir(parents=True, exist_ok=True)
     (resolved_test_root / "data" / "sessions").mkdir(parents=True, exist_ok=True)
@@ -244,7 +244,7 @@ def test_environment(monkeypatch):
     original_tx_dir = storage.data_manager.transactions_json_dir
     original_initialized = storage.data_manager._initialized
 
-    storage.data_manager.fork_csv_dir = Path("forking_path")
+    storage.data_manager.fork_csv_dir = Path("narrative_paths")
     storage.data_manager.ratings_csv_dir = Path("ratings")
     storage.data_manager.transactions_json_dir = Path("data") / "transactions"
 

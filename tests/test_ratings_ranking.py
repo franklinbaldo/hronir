@@ -45,15 +45,15 @@ PREDECESSOR_POS1 = "pred-pos1"
 def test_get_ranking(tmp_path: Path):
     ratings_dir_test_var = tmp_path / "ratings"
     ratings_dir_test_var.mkdir()
-    forking_path_dir = tmp_path / "forking_path"
-    forking_path_dir.mkdir()
+    narrative_paths_dir = tmp_path / "narrative_paths"
+    narrative_paths_dir.mkdir()
 
     fork_data = [
         {"position": 1, "prev_uuid": PREDECESSOR_POS1, "uuid": UUID_A, "fork_uuid": "fork-a"},
         {"position": 1, "prev_uuid": PREDECESSOR_POS1, "uuid": UUID_B, "fork_uuid": "fork-b"},
         {"position": 1, "prev_uuid": PREDECESSOR_POS1, "uuid": UUID_C, "fork_uuid": "fork-c"},
     ]
-    pd.DataFrame(fork_data).to_csv(forking_path_dir / "test_forks.csv", index=False)
+    pd.DataFrame(fork_data).to_csv(narrative_paths_dir / "test_forks.csv", index=False)
 
     votes_for_pos1 = [
         {"uuid": "vote1", "voter": "v1", "winner": UUID_A, "loser": UUID_B},
@@ -65,7 +65,7 @@ def test_get_ranking(tmp_path: Path):
     df = _call_get_ranking_with_setup(
         position=1,
         predecessor_hronir_uuid=PREDECESSOR_POS1,
-        forking_dir=forking_path_dir,
+        forking_dir=narrative_paths_dir,
         ratings_dir=ratings_dir_test_var,
     )
 

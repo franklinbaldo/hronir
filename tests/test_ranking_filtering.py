@@ -15,7 +15,7 @@ def _uuid(name: str) -> str:
 
 @pytest.fixture
 def temp_data_dir(tmp_path: Path) -> tuple[Path, Path]:
-    forking_dir = tmp_path / "forking_path"
+    forking_dir = tmp_path / "narrative_paths"
     ratings_dir = tmp_path / "ratings"
     forking_dir.mkdir(exist_ok=True)
     ratings_dir.mkdir(exist_ok=True)
@@ -235,7 +235,7 @@ def test_get_ranking_for_position_0_no_predecessor(temp_data_dir):
     assert h0_alt_data["losses"] == 2
 
 
-def test_get_ranking_empty_forking_path_dir(temp_data_dir):
+def test_get_ranking_empty_narrative_paths_dir(temp_data_dir):
     _, ratings_dir = temp_data_dir
     forking_dir_empty = temp_data_dir[0]
 
@@ -339,7 +339,7 @@ def test_get_ranking_canonical_predecessor_none_not_pos_0(temp_data_dir):
     assert ranking_df.empty
 
 
-def test_get_ranking_forking_path_missing_columns(temp_data_dir):
+def test_get_ranking_narrative_paths_missing_columns(temp_data_dir):
     forking_dir, ratings_dir = temp_data_dir
     (forking_dir / "missing_cols.csv").write_text("uuid,fork_uuid\nval1,val2")
     create_csv(ratings_pos1_data, ratings_dir / "position_001.csv")
