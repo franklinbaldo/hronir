@@ -1,5 +1,6 @@
 import datetime
 import uuid
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -16,15 +17,34 @@ def _ensure_transactions_dir():
 
 def record_transaction(
     session_id: str,
-    initiating_fork_uuid: str,  # This is a path_uuid
-    session_verdicts: list[dict[str, Any]],
+    initiating_path_uuid: str | None = None,
+    session_verdicts: list[dict[str, Any]] | None = None,
     forking_path_dir: Path | None = None,  # These are not used by this TM
     ratings_dir: Path | None = None,  # These are not used by this TM
+    **kwargs,
 ) -> dict[str, Any]:
     """
     Records a transaction, processes its verdicts to update ratings and path statuses,
     and saves the transaction data.
     """
+    if initiating_path_uuid is None and "initiating_fork_uuid" in kwargs:
+        warnings.warn(
+            "'initiating_fork_uuid' is deprecated; use 'initiating_path_uuid'",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        initiating_path_uuid = kwargs.pop("initiating_fork_uuid")
+
+    if initiating_path_uuid is None:
+        raise TypeError("record_transaction() missing required argument 'initiating_path_uuid'")
+
+    if kwargs:
+        unexpected = ", ".join(kwargs.keys())
+        raise TypeError(f"record_transaction() got unexpected keyword argument(s): {unexpected}")
+
+    if session_verdicts is None:
+        raise TypeError("record_transaction() missing required argument 'session_verdicts'")
+
     _ensure_transactions_dir()
 
     timestamp_dt = datetime.datetime.now(datetime.timezone.utc)
@@ -60,7 +80,7 @@ def record_transaction(
 
         ratings.record_vote(
             position=pos,
-            voter=initiating_fork_uuid,
+            voter=initiating_path_uuid,
             winner=winner_hrönir_uuid,
             loser=loser_hrönir_uuid,
         )
@@ -123,7 +143,7 @@ def record_transaction(
     # Create transaction content for the model
     transaction_content_data = TransactionContent(
         session_id=uuid.UUID(session_id),  # Ensure session_id is UUID object
-        initiating_path_uuid=uuid.UUID(initiating_fork_uuid),  # Ensure this is UUIDv5
+        initiating_path_uuid=uuid.UUID(initiating_path_uuid),  # Ensure this is UUIDv5
         verdicts_processed=processed_verdicts_for_tx_content,
         promotions_granted=promotions_granted_uuids,
     )
