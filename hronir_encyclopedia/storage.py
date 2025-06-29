@@ -7,6 +7,8 @@ from .duckdb_storage import DuckDBDataManager
 from .models import Path as PathModel
 from .models import Transaction, Vote
 from .pandas_data_manager import PandasDataManager
+from .sharding import SnapshotManifest # Added
+from typing import Optional # Added
 
 UUID_NAMESPACE = uuid.NAMESPACE_URL
 
@@ -173,6 +175,27 @@ class DataManager:
         """Get a specific transaction."""
         self.backend.initialize_if_needed()
         return self.backend.get_transaction(tx_uuid)
+
+    # --- Snapshot operations ---
+    def create_snapshot(
+        self, output_dir: Path, network_uuid: str, git_commit: Optional[str] = None
+    ) -> SnapshotManifest | None:
+        """
+        Creates a snapshot of the current database, potentially sharded.
+        Delegates to the backend if the method exists.
+        Returns SnapshotManifest if successful, None otherwise.
+        """
+        if hasattr(self.backend, "create_snapshot"):
+            self.backend.initialize_if_needed() # Ensure backend is ready
+            return self.backend.create_snapshot(
+                output_dir=output_dir, network_uuid=network_uuid, git_commit=git_commit
+            )
+        else:
+            # Fallback or error for backends that don't support snapshotting (e.g., PandasDataManager)
+            print(
+                f"Warning: Backend {type(self.backend).__name__} does not support create_snapshot method."
+            )
+            return None
 
     # --- File operations ---
     def store_hrönir(self, file_path: Path) -> str:

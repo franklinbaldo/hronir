@@ -335,11 +335,34 @@ chmod +x scripts/fix_hooks.sh
 - [x] **Daily Automation**: GitHub Actions for continuous generation
 
 ### 🎯 Next Phase
+- [ ] **P0 - Pivot Plan v2.0 Implementation**: Execution of the distributed architecture migration, now estimated at 12 weeks (original 9 weeks + 3 weeks approved extension). Details in `docs/pivot_plan_v2.md` and `TODO.md`.
 - [ ] **Web Interface**: Real-time protocol visualization and interaction
 - [ ] **Interactive Reading**: Navigate canonical and alternative narrative paths
 - [ ] **Advanced Analytics**: Path performance and canonical evolution metrics
 - [ ] **EPUB/HTML Export**: Interactive books with user-selected paths
 - [ ] **Multi-Agent Systems**: Coordinated AI agent interactions
+
+---
+
+## 🏆 Pivot Plan v2.0 Success Criteria
+
+The successful implementation of the Pivot Plan v2.0 (distributed architecture) will be evaluated based on the following key metrics:
+
+- **Data Integrity**:
+    - Zero data loss during conflict resolution scenarios.
+- **Security & Robustness**:
+    - Sybil resistance demonstrated to be >95% in adversarial testing.
+    - External security audit of core new algorithms (Merkle proofs, PGP usage, conflict resolution) passed.
+- **Performance & Scalability**:
+    - Auto-sharding mechanism is transparent to the end-user.
+    - Core data queries (e.g., path lookups, rankings) maintain performance, averaging <5 seconds.
+- **Distribution & P2P Functionality**:
+    - P2P data synchronization via BitTorrent (or equivalent) is fully functional.
+    - Data snapshots are successfully published to and retrievable from the Internet Archive.
+- **Automation & CI/CD**:
+    - CI/CD pipeline for snapshot generation, testing, and publication maintains a >95% success rate.
+
+These criteria ensure that the new architecture not only meets its technical goals but also provides a reliable and performant platform for the Hrönir Encyclopedia.
 
 ---
 

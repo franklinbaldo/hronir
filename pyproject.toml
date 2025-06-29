@@ -11,6 +11,8 @@ dependencies = [
     "pydantic", # Validação de dados # Operações de grafo
     "networkx",
     "duckdb",
+    "internetarchive",
+    "python-zstandard",
     "pandas>=2.3.0",
     "typer>=0.16.0",
 ]

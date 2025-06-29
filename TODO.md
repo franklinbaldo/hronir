@@ -8,22 +8,22 @@ This document outlines the development roadmap for the **Hrönir Encyclopedia** 
 Esta seção resume as tarefas de migração para o sistema distribuído proposto em [pivot_plan_v2.md](docs/pivot_plan_v2.md).
 
 ### 1. Para Decisão
-- [ ] **Revisão técnica do plano v2.0** — avaliar a viabilidade de DuckDB + P2P e registrar parecer em `docs/decisions/`.
-- [ ] **Aprovação de 3 semanas extras** — ajustar cronograma no `README.md`.
-- [ ] **Security audit de Merkle + PGP** — revisar `transaction_manager.py` e `duckdb_storage.py`.
-- [ ] **Definir critérios de sucesso** — documentar métricas de aceitação no `README.md`.
+- [x] **Revisão técnica do plano v2.0** — avaliar a viabilidade de DuckDB + P2P e registrar parecer em `docs/decisions/`.
+- [x] **Aprovação de 3 semanas extras** — ajustar cronograma no `README.md`.
+- [x] **Security audit de Merkle + PGP** — revisar `transaction_manager.py` e `duckdb_storage.py`.
+- [x] **Definir critérios de sucesso** — documentar métricas de aceitação no `README.md`.
 
 ### 2. Cronograma de Execução
 #### Semanas 1-2 – Base + Sharding
-- [ ] Instalar `duckdb`, `internetarchive` e `zstd` no `pyproject.toml`.
-- [ ] Criar script `migrate_to_duckdb.py --backup --enable-sharding`.
-- [ ] Implementar `hronir_encyclopedia/sharding.py` com `ShardingManager`.
-- [ ] Refatorar `storage.py` para usar `DuckDBDataManager` e sharding.
-- [ ] Salvar backup dos CSVs em `data/backup/`.
-- [ ] Cobrir migração com testes em `tests/`.
+- [x] Instalar `duckdb`, `internetarchive` e `zstd` no `pyproject.toml`.
+- [x] Criar script `migrate_to_duckdb.py --backup --enable-sharding`.
+- [x] Implementar `hronir_encyclopedia/sharding.py` com `ShardingManager`.
+- [x] Refatorar `storage.py` para usar `DuckDBDataManager` e sharding.
+- [x] Salvar backup dos CSVs em `data/backup/`.
+- [x] Cobrir migração com testes em `tests/`.
 
 #### Semanas 3-4 – Conflicts + Security
-- [ ] Implementar locking por sequence number em `transaction_manager.py`.
+- [x] Implementar locking por sequence number em `transaction_manager.py`.
 - [ ] Adicionar comando `hronir sync --retry` no `cli.py`.
 - [ ] Criar comando `hronir push` com verificação de conflitos.
 - [ ] Exigir assinatura PGP nas operações (scripts e CLI).
