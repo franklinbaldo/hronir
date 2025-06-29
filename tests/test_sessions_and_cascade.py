@@ -302,7 +302,7 @@ class TestSessionWorkflow:
         cmd_args_start = [
             "session",
             "start",
-            "--fork-uuid",
+            "--path-uuid",
             f2_judge_path_uuid,
         ]
 
