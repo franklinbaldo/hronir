@@ -10,6 +10,7 @@ dependencies = [
     "blake3", # Adicionado para hashing rápido
     "pydantic", # Validação de dados # Operações de grafo
     "networkx",
+    "duckdb",
     "pandas>=2.3.0",
     "typer>=0.16.0",
 ]
