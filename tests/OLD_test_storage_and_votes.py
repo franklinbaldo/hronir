@@ -88,7 +88,7 @@ def test_clean_functions(tmp_path):
     assert len(df) == 1
 
     fork_uuid_valid = "fork1"
-    fork_dir = tmp_path / "forking_path"
+    fork_dir = tmp_path / "narrative_paths"
     fork_dir.mkdir()
     fork_csv2 = fork_dir / "paths.csv"
     pd.DataFrame(
@@ -132,8 +132,8 @@ def test_clean_functions(tmp_path):
     db_cleared_by_this_run = False
 
     try:
-        storage.data_manager.fork_csv_dir = fork_dir  # Point to tmp_path / "forking_path"
-        # Set ratings_dir to a dummy path as it's not directly used by forking_path_exists
+        storage.data_manager.fork_csv_dir = fork_dir  # Point to tmp_path / "narrative_paths"
+        # Set ratings_dir to a dummy path as it's not directly used by narrative_paths_exists
         # but DataManager initialization might expect it.
         dummy_ratings_dir_for_purge_test = tmp_path / "dummy_ratings_for_purge"
         dummy_ratings_dir_for_purge_test.mkdir(exist_ok=True)

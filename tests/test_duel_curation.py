@@ -171,7 +171,7 @@ class TestDetermineNextDuelPurelyEntropic:
             ]
         )
 
-        forking_dir = tmp_path / "forking_path"
+        forking_dir = tmp_path / "narrative_paths"
         forking_dir.mkdir()
         ratings_dir = tmp_path / "ratings"  # Adicionado para consistência
         ratings_dir.mkdir()
@@ -213,7 +213,7 @@ class TestDetermineNextDuelPurelyEntropic:
             ]
         )
 
-        forking_dir = tmp_path / "forking_path"
+        forking_dir = tmp_path / "narrative_paths"
         forking_dir.mkdir()
         ratings_dir = tmp_path / "ratings"
         ratings_dir.mkdir()
@@ -232,7 +232,7 @@ class TestDetermineNextDuelPurelyEntropic:
     def test_edge_case_no_hronirs(self, tmp_path, mock_ratings_get_ranking):
         set_df_data = mock_ratings_get_ranking
         set_df_data([])
-        forking_dir = tmp_path / "forking_path"
+        forking_dir = tmp_path / "narrative_paths"
         forking_dir.mkdir()
         ratings_dir = tmp_path / "ratings"
         ratings_dir.mkdir()
@@ -247,7 +247,7 @@ class TestDetermineNextDuelPurelyEntropic:
     def test_edge_case_one_hronir(self, tmp_path, mock_ratings_get_ranking):
         set_df_data = mock_ratings_get_ranking
         set_df_data([{"uuid": str(uuid.uuid4()), "elo": 1500, "total_duels": 0}])
-        forking_dir = tmp_path / "forking_path"
+        forking_dir = tmp_path / "narrative_paths"
         forking_dir.mkdir()
         ratings_dir = tmp_path / "ratings"
         ratings_dir.mkdir()
@@ -270,7 +270,7 @@ class TestDetermineNextDuelPurelyEntropic:
                 {"uuid": h2_new, "elo": 1500, "total_duels": 0},
             ]
         )
-        forking_dir = tmp_path / "forking_path"
+        forking_dir = tmp_path / "narrative_paths"
         forking_dir.mkdir()
         ratings_dir = tmp_path / "ratings"
         ratings_dir.mkdir()
@@ -310,7 +310,7 @@ class TestDetermineNextDuelPurelyEntropic:
         )
         set_df_data(malformed_df_for_test.copy())
 
-        forking_dir = tmp_path / "forking_path"
+        forking_dir = tmp_path / "narrative_paths"
         forking_dir.mkdir()
         ratings_dir = tmp_path / "ratings"
         ratings_dir.mkdir()
@@ -340,7 +340,7 @@ class TestDetermineNextDuelPurelyEntropic:
             ]
         )
 
-        forking_dir = tmp_path / "forking_path"
+        forking_dir = tmp_path / "narrative_paths"
         forking_dir.mkdir()
         ratings_dir = tmp_path / "ratings"
         ratings_dir.mkdir()
@@ -365,7 +365,7 @@ class TestDetermineNextDuelPurelyEntropic:
             ]
         )
 
-        forking_dir = tmp_path / "forking_path"
+        forking_dir = tmp_path / "narrative_paths"
         forking_dir.mkdir()
         ratings_dir = tmp_path / "ratings"
         ratings_dir.mkdir()

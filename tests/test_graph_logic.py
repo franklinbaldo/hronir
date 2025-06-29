@@ -37,7 +37,7 @@ def _setup_data_manager_and_check_consistency(fork_dir_path: Path):
 
 
 def test_is_narrative_consistent(tmp_path: Path):
-    fork_dir = tmp_path / "forking_path"
+    fork_dir = tmp_path / "narrative_paths"
     fork_dir.mkdir()
 
     # Generate UUIDs for testing using storage.compute_narrative_path_uuid
