@@ -5,6 +5,7 @@ import json
 import logging
 import subprocess
 import uuid
+import zipfile
 from pathlib import Path
 from typing import (
     Annotated,
@@ -1275,6 +1276,45 @@ def session_commit(
             f"Error: Failed to update session {session_id} status to committed.",
             fg=typer.colors.RED,
         )
+
+
+@app.command(help="Download latest snapshot from Internet Archive to local DuckDB.")
+def sync(
+    archive_id: Annotated[
+        str, typer.Option(help="Internet Archive identifier.")
+    ] = "hronir-snapshots",
+    db_file: Annotated[Path, typer.Option(help="Local DuckDB file.")] = Path(
+        "data/snapshot.duckdb"
+    ),
+) -> None:
+    db_file.parent.mkdir(parents=True, exist_ok=True)
+    typer.echo("Fetching snapshot from Internet Archive (placeholder)...")
+    db_file.touch()
+    typer.echo(f"Snapshot downloaded to {db_file} (placeholder)")
+
+
+@app.command(help="Create local snapshot archive (snapshot.zip).")
+def export(
+    output: Annotated[Path, typer.Option(help="Output archive path.")] = Path("snapshot.zip"),
+) -> None:
+    typer.echo("Creating snapshot archive (placeholder)...")
+    with zipfile.ZipFile(output, "w") as zf:
+        zf.writestr("placeholder.txt", "snapshot contents would go here")
+    typer.echo(f"Snapshot archive created at {output}")
+
+
+@app.command(help="Upload snapshot and metadata to Internet Archive.")
+def push(
+    archive_id: Annotated[
+        str, typer.Option(help="Internet Archive identifier.")
+    ] = "hronir-snapshots",
+    snapshot: Annotated[Path, typer.Option(help="Snapshot archive path.")] = Path("snapshot.zip"),
+) -> None:
+    if not snapshot.exists():
+        typer.secho("Snapshot file not found. Run 'export' first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    typer.echo(f"Uploading {snapshot} to Internet Archive ({archive_id}) (placeholder)...")
+    typer.echo("Upload complete (placeholder)")
 
 
 @app.command("metrics", help="Expose path status metrics in Prometheus format (TDD 2.6).")
