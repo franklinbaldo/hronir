@@ -1,0 +1,38 @@
+name: Publish Snapshot
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v1
+        with:
+          uv-version: "latest"
+
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+
+      - name: Install dependencies
+        run: uv sync --frozen --all-extras
+
+      - name: Run tests
+        run: uv run pytest
+
+      - name: Build snapshot
+        run: uv run hronir export
+
+      - name: Upload snapshot to Internet Archive
+        env:
+          IA_ACCESS_KEY: ${{ secrets.IA_ACCESS_KEY }}
+          NETWORK_UUID: ${{ secrets.NETWORK_UUID }}
+        run: |
+          pip install internetarchive
+          ia upload "$NETWORK_UUID" dist/snapshot.zip --retries 2
