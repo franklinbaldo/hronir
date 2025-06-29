@@ -165,7 +165,7 @@ def record_transaction(
         f.write(transaction_model_data.model_dump_json(indent=2))
 
     # Update HEAD to point to this new transaction
-    # HEAD_FILE.write_text(str(transaction_uuid_obj)) # This was missing
+    HEAD_FILE.write_text(str(transaction_uuid_obj))
 
     dm.save_all_data_to_csvs()
 
