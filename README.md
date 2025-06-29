@@ -63,15 +63,15 @@ graph TD
    cp .env.example .env  # and add your GEMINI_API_KEY to .env
    ```
 
-Dependencies are managed with `uv` using `pyproject.toml` and `uv.lock`. Core libraries include [**typer**](https://typer.tiangolo.com/) for the CLI and [**pandas**](https://pandas.pydata.org/) for data manipulation. New packages such as [**Pydantic**](https://docs.pydantic.dev/), [**SQLAlchemy**](https://www.sqlalchemy.org/) and [**NetworkX**](https://networkx.org/) are installed automatically when you run `uv sync`.
+Dependencies are managed with `uv` using `pyproject.toml` and `uv.lock`. Core libraries include [**typer**](https://typer.tiangolo.com/) for the CLI and [**pandas**](https://pandas.pydata.org/) for data manipulation. New packages such as [**Pydantic**](https://docs.pydantic.dev/), [**duckdb**](https://duckdb.org/) and [**NetworkX**](https://networkx.org/) are installed automatically when you run `uv sync`.
 
-The CLI loads rating and narrative path CSVs into a lightweight SQLite database via SQLAlchemy. This temporary database provides transactional updates and easier queries while the canonical CSV files remain on disk.
+The CLI loads rating and narrative path CSVs into a temporary DuckDB database using pandas. This ephemeral database provides transactional updates and easier queries while the canonical CSV files remain on disk.
 
 For an overview of how these libraries work together see [docs/new_libs_plan.md](docs/new_libs_plan.md).
 
 ### Key Libraries
 - **Pydantic** – validates and serializes the protocol's data models.
-- **SQLAlchemy** – powers the SQLite database used for transactional updates.
+- **DuckDB** – lightweight database used for transactional updates.
 - **NetworkX** – enables graph-based analysis of path relationships.
 
 ---
@@ -184,6 +184,24 @@ narrative_paths/
 ratings/
 └── position_*.csv               # Recorded votes for path duels at each position
 ```
+
+---
+
+## 🛡️ Resiliência da Arquitetura Distribuída
+
+Os arquivos CSV versionados em Git continuam sendo a fonte de verdade do protocolo.
+Durante a execução, o CLI carrega esses dados para um banco DuckDB temporário,
+permitindo transações rápidas sem depender de serviços externos. Qualquer clone
+do repositório pode reconstruir o estado completo apenas com esses CSVs.
+
+Para migrar dados antigos para o formato DuckDB, utilize o script:
+
+```bash
+uv run python scripts/migrate_csv_to_duckdb.py --db-path hronir.duckdb
+```
+
+O arquivo `hronir.duckdb` é opcional e pode ser regenerado a qualquer momento a
+partir dos CSVs.
 
 ---
 
