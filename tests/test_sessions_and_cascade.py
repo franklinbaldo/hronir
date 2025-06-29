@@ -169,7 +169,7 @@ def _qualify_fork(
                 "predecessor_hrönir_uuid": predecessor_hr_uuid_str,
             }
         ]
-        # Use a valid UUIDv5 for initiating_fork_uuid
+        # Use a valid UUIDv5 for initiating_path_uuid
         # This should be a path_uuid of a QUALIFIED path that is "spending" its mandate
         # For testing, we can generate a deterministic one or a random v4 if the model allows.
         # The TransactionContent model expects initiating_path_uuid to be UUIDv5.
@@ -192,7 +192,7 @@ def _qualify_fork(
 
         tx_result = transaction_manager.record_transaction(
             session_id=str(uuid.uuid4()),
-            initiating_fork_uuid=initiating_path_uuid,
+            initiating_path_uuid=initiating_path_uuid,
             session_verdicts=single_vote_verdict,
         )
         assert tx_result is not None, (
@@ -334,8 +334,8 @@ class TestSessionWorkflow:
         assert tx_head_uuid is not None
         tx_data = _get_transaction_data(tx_head_uuid)
         assert tx_data is not None
-        assert tx_data["session_id"] == session_id
-        assert tx_data["initiating_fork_uuid"] == f2_judge_path_uuid
+        assert tx_data["content"]["session_id"] == session_id
+        assert tx_data["content"]["initiating_path_uuid"] == f2_judge_path_uuid
 
         session_file_data = _get_session_file_data(session_id)
         assert session_file_data["status"] == "committed"
