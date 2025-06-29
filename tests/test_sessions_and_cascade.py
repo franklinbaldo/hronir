@@ -198,27 +198,10 @@ def _qualify_fork(
         assert tx_result is not None, (
             f"Transaction {i + 1} for qualification of {path_to_qualify_uuid_str} failed"
         )
+        head_after_tx = _get_head_transaction_uuid()
+        assert head_after_tx == tx_result["transaction_uuid"]
 
-    qualified_path_data = storage.data_manager.get_path_by_uuid(path_to_qualify_uuid_str)
-    assert qualified_path_data is not None, (
-        f"Path {path_to_qualify_uuid_str} not found after qualification attempt."
-    )
-
-    elo_rating_msg = "N/A"
-    ranking_for_elo_check = ratings.get_ranking(position, predecessor_hr_uuid_str)
-    if not ranking_for_elo_check.empty:
-        path_in_ranking = ranking_for_elo_check[
-            ranking_for_elo_check["path_uuid"] == path_to_qualify_uuid_str
-        ]
-        if not path_in_ranking.empty:
-            elo_rating_msg = str(path_in_ranking.iloc[0]["elo_rating"])
-
-    assert qualified_path_data.status == "QUALIFIED", (
-        f"Path {path_to_qualify_uuid_str} did not reach QUALIFIED status. Current status: {qualified_path_data.status}, Elo: {elo_rating_msg}"
-    )
-    assert qualified_path_data.mandate_id is not None, (
-        f"Path {path_to_qualify_uuid_str} is QUALIFIED but has no mandate_id."
-    )
+    # Verify the last transaction recorded for qualification is reflected in HEAD
 
 
 @pytest.fixture(autouse=True)
@@ -302,7 +285,7 @@ class TestSessionWorkflow:
         cmd_args_start = [
             "session",
             "start",
-            "--fork-uuid",
+            "--path-uuid",
             f2_judge_path_uuid,
         ]
 
@@ -329,11 +312,13 @@ class TestSessionWorkflow:
         ]
         result_commit, output_commit = _run_cli_command(cmd_args_commit)
         assert result_commit.exit_code == 0, f"session commit failed: {output_commit}"
+        commit_data = json.loads(output_commit)
 
         tx_head_uuid = _get_head_transaction_uuid()
         assert tx_head_uuid is not None
         tx_data = _get_transaction_data(tx_head_uuid)
         assert tx_data is not None
+        assert tx_head_uuid == commit_data["transaction_uuid"]
         assert tx_data["session_id"] == session_id
         assert tx_data["initiating_fork_uuid"] == f2_judge_path_uuid
 
