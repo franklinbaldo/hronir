@@ -62,6 +62,9 @@ graph TD
    ```bash
    cp .env.example .env  # and add your GEMINI_API_KEY to .env
    ```
+   The same file can store keys used by the snapshot release workflow:
+   - `IA_ACCESS_KEY` – token for uploading snapshots to the Internet Archive.
+   - `NETWORK_UUID` – identifier for the network item on the Archive.
 
 Dependencies are managed with `uv` using `pyproject.toml` and `uv.lock`. Core libraries include [**typer**](https://typer.tiangolo.com/) for the CLI and [**pandas**](https://pandas.pydata.org/) for data manipulation. New packages such as [**Pydantic**](https://docs.pydantic.dev/), [**SQLAlchemy**](https://www.sqlalchemy.org/) and [**NetworkX**](https://networkx.org/) are installed automatically when you run `uv sync`.
 
