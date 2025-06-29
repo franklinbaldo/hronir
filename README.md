@@ -68,6 +68,7 @@ Dependencies are managed with `uv` using `pyproject.toml` and `uv.lock`. Core li
 The CLI loads rating and narrative path CSVs into a lightweight SQLite database via SQLAlchemy. This temporary database provides transactional updates and easier queries while the canonical CSV files remain on disk.
 
 For an overview of how these libraries work together see [docs/new_libs_plan.md](docs/new_libs_plan.md).
+For detalhes sobre o pivot para uma arquitetura distribuída, consulte [docs/distributed_architecture_plan.md](docs/distributed_architecture_plan.md).
 
 ### Key Libraries
 - **Pydantic** – validates and serializes the protocol's data models.
