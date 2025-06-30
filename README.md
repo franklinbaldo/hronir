@@ -414,6 +414,20 @@ Human interfaces and traditional collaboration tools are considered *downstream*
 
 ---
 
+## 🛡️ Resiliência da Arquitetura Distribuída
+
+- `hronir export` cria **snapshots locais** para restauração offline
+- Cada arquivo carrega **checksums SHA256** para detectar corrupção antes de mesclar
+- Sincronização **P2P via Internet Archive** mantém múltiplos espelhos
+- Menor dependência do **GitHub centralizado**; o repositório armazena apenas o código
+
+**Benefícios principais**
+- Recuperação rápida mesmo sem acesso à rede
+- Corrupções evitadas por verificação de integridade
+- Continuidade do sistema se um mirror falhar
+
+---
+
 ## 📜 License and Acknowledgements
 
 Source code under MIT License.
