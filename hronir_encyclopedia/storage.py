@@ -7,8 +7,7 @@ from .duckdb_storage import DuckDBDataManager
 from .models import Path as PathModel
 from .models import Transaction, Vote
 from .pandas_data_manager import PandasDataManager
-from .sharding import SnapshotManifest # Added
-from typing import Optional # Added
+from .sharding import SnapshotManifest  # Added
 
 UUID_NAMESPACE = uuid.NAMESPACE_URL
 
@@ -178,7 +177,7 @@ class DataManager:
 
     # --- Snapshot operations ---
     def create_snapshot(
-        self, output_dir: Path, network_uuid: str, git_commit: Optional[str] = None
+        self, output_dir: Path, network_uuid: str, git_commit: str | None = None
     ) -> SnapshotManifest | None:
         """
         Creates a snapshot of the current database, potentially sharded.
@@ -186,7 +185,7 @@ class DataManager:
         Returns SnapshotManifest if successful, None otherwise.
         """
         if hasattr(self.backend, "create_snapshot"):
-            self.backend.initialize_if_needed() # Ensure backend is ready
+            self.backend.initialize_if_needed()  # Ensure backend is ready
             return self.backend.create_snapshot(
                 output_dir=output_dir, network_uuid=network_uuid, git_commit=git_commit
             )
@@ -309,6 +308,32 @@ def store_chapter(chapter_file: Path, base: Path | str = "the_library") -> str:
     data_manager = DataManager()
     return data_manager.store_hrönir(chapter_file)
 
+
+def get_canonical_path_info(position: int, canonical_path_file: Path) -> dict[str, str] | None:
+    """
+    Retrieves path_uuid and hrönir_uuid for a given position from the canonical_path.json file.
+    """
+    import json # Moved import here to be self-contained
+    # import logging # Not using logging in this simple utility for now
+
+    if not canonical_path_file.exists():
+        # logging.warning(f"Canonical path file not found: {canonical_path_file}")
+        return None
+    try:
+        with open(canonical_path_file) as f:
+            data = json.load(f)
+
+        path_entry = data.get("path", {}).get(str(position))
+        if path_entry and "path_uuid" in path_entry and "hrönir_uuid" in path_entry:
+            return {
+                "path_uuid": path_entry["path_uuid"],
+                "hrönir_uuid": path_entry["hrönir_uuid"],
+            }
+        # logging.debug(f"No canonical entry found for position {position} in {canonical_path_file}")
+        return None
+    except (OSError, json.JSONDecodeError): #  Removed "as e" as e is not used
+        # logging.error(f"Error reading or parsing canonical path file {canonical_path_file}: {e}")
+        return None
 
 def store_chapter_text(text: str, base: Path | str = "the_library") -> str:
     """Store chapter text - compatibility wrapper."""

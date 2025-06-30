@@ -1,6 +1,5 @@
 import datetime
 import json
-import os
 import shutil
 import subprocess
 import sys
@@ -23,6 +22,7 @@ else:
 
 # --- Fixtures ---
 
+
 @pytest.fixture(scope="function")
 def temp_data_dirs(tmp_path: Path) -> dict[str, Path]:
     """Create temporary data directories for a test run."""
@@ -40,31 +40,49 @@ def temp_data_dirs(tmp_path: Path) -> dict[str, Path]:
     backup_dir = base_dir / "data" / "backup"
     # backup_dir.mkdir(parents=True) # Script will create this
     db_dir = base_dir / "data"
-    db_dir.mkdir(parents=True)
+    db_dir.mkdir(parents=True, exist_ok=True) # Corrected indentation
 
     # Create dummy files
     # Paths
-    pd.DataFrame({
-        "path_uuid": ["path1", "path2"], "position": [0, 0],
-        "prev_uuid": [None, None], "uuid": ["hronirA", "hronirB"],
-        "status": ["QUALIFIED", "PENDING"], "mandate_id": [None, None],
-        "created_at": [datetime.datetime.now(datetime.timezone.utc).isoformat()] * 2
-    }).to_csv(paths_dir / "narrative_paths_position_0.csv", index=False)
+    pd.DataFrame(
+        {
+            "path_uuid": ["path1", "path2"],
+            "position": [0, 0],
+            "prev_uuid": [None, None],
+            "uuid": ["hronirA", "hronirB"],
+            "status": ["QUALIFIED", "PENDING"],
+            "mandate_id": [None, None],
+            "created_at": [datetime.datetime.now(datetime.timezone.utc).isoformat()] * 2,
+        }
+    ).to_csv(paths_dir / "narrative_paths_position_0.csv", index=False)
 
     # Votes
-    pd.DataFrame({
-        "uuid": ["vote1"], "position": [0], "voter": ["path1"],
-        "winner": ["hronirA"], "loser": ["hronirB"],
-        "created_at": [datetime.datetime.now(datetime.timezone.utc).isoformat()]
-    }).to_csv(ratings_dir / "votes.csv", index=False)
+    pd.DataFrame(
+        {
+            "uuid": ["vote1"],
+            "position": [0],
+            "voter": ["path1"],
+            "winner": ["hronirA"],
+            "loser": ["hronirB"],
+            "created_at": [datetime.datetime.now(datetime.timezone.utc).isoformat()],
+        }
+    ).to_csv(ratings_dir / "votes.csv", index=False)
 
     # Transactions
     tx_content1 = {
-        "session_id": "session1", "initiating_path_uuid": "path1",
-        "verdicts_processed": [{"position": 0, "winner_hrönir_uuid": "hronirA", "loser_hrönir_uuid": "hronirB"}],
-        "promotions_granted": []
+        "session_id": "session1",
+        "initiating_path_uuid": "path1",
+        "verdicts_processed": [
+            {"position": 0, "winner_hrönir_uuid": "hronirA", "loser_hrönir_uuid": "hronirB"}
+        ],
+        "promotions_granted": [],
     }
-    tx1 = {"uuid": "tx1", "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(), "prev_uuid": None, "content": tx_content1}
+    tx1 = {
+        "uuid": "tx1",
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "prev_uuid": None,
+        "content": tx_content1,
+    }
     with open(transactions_dir / "tx1.json", "w") as f:
         json.dump(tx1, f)
 
@@ -83,9 +101,10 @@ def temp_data_dirs(tmp_path: Path) -> dict[str, Path]:
         "ratings": ratings_dir,
         "transactions": transactions_dir,
         "library": library_dir,
-        "backup_root": backup_dir.parent, # data/
-        "db_path": db_dir / "test_encyclopedia.duckdb"
+        "backup_root": backup_dir.parent,  # data/
+        "db_path": db_dir / "test_encyclopedia.duckdb",
     }
+
 
 # --- Helper Functions ---
 def run_migration_script(cwd: Path, *args) -> subprocess.CompletedProcess:
@@ -100,6 +119,7 @@ def run_migration_script(cwd: Path, *args) -> subprocess.CompletedProcess:
 
 # --- Test Cases ---
 
+
 @pytest.mark.skipif(migrate_to_duckdb is None, reason="migrate_to_duckdb.py not found")
 def test_migration_script_arg_parsing_defaults(temp_data_dirs):
     """Test basic argument parsing and default values (indirectly)."""
@@ -107,17 +127,26 @@ def test_migration_script_arg_parsing_defaults(temp_data_dirs):
     # More specific arg parsing tests would mock argparse.
     res = run_migration_script(
         temp_data_dirs["base"],
-        "--db-path", str(temp_data_dirs["db_path"]),
-        "--csv-paths-dir", str(temp_data_dirs["paths"]),
-        "--csv-ratings-dir", str(temp_data_dirs["ratings"]),
-        "--transactions-json-dir", str(temp_data_dirs["transactions"]),
-        "--hronirs-library-dir", str(temp_data_dirs["library"]),
-        "--backup-dir", str(temp_data_dirs["backup_root"]), # data/
+        "--db-path",
+        str(temp_data_dirs["db_path"]),
+        "--csv-paths-dir",
+        str(temp_data_dirs["paths"]),
+        "--csv-ratings-dir",
+        str(temp_data_dirs["ratings"]),
+        "--transactions-json-dir",
+        str(temp_data_dirs["transactions"]),
+        "--hronirs-library-dir",
+        str(temp_data_dirs["library"]),
+        "--backup-dir",
+        str(temp_data_dirs["backup_root"]),  # data/
     )
     assert res.returncode == 0, f"Script failed: {res.stderr}"
     assert "Starting data migration to DuckDB" in res.stdout
     assert "Data migration to" in res.stdout
-    assert str(temp_data_dirs["db_path"].name) in res.stdout # Check if specified db name is mentioned
+    assert (
+        str(temp_data_dirs["db_path"].name) in res.stdout
+    )  # Check if specified db name is mentioned
+
 
 @pytest.mark.skipif(migrate_to_duckdb is None, reason="migrate_to_duckdb.py not found")
 def test_backup_functionality(temp_data_dirs: dict[str, Path]):
@@ -125,17 +154,23 @@ def test_backup_functionality(temp_data_dirs: dict[str, Path]):
     res = run_migration_script(
         temp_data_dirs["base"],
         "--backup",
-        "--db-path", str(temp_data_dirs["db_path"]),
-        "--csv-paths-dir", str(temp_data_dirs["paths"]),
-        "--csv-ratings-dir", str(temp_data_dirs["ratings"]),
-        "--transactions-json-dir", str(temp_data_dirs["transactions"]),
-        "--hronirs-library-dir", str(temp_data_dirs["library"]),
-        "--backup-dir", str(temp_data_dirs["backup_root"] / "backup") # Explicitly data/backup
+        "--db-path",
+        str(temp_data_dirs["db_path"]),
+        "--csv-paths-dir",
+        str(temp_data_dirs["paths"]),
+        "--csv-ratings-dir",
+        str(temp_data_dirs["ratings"]),
+        "--transactions-json-dir",
+        str(temp_data_dirs["transactions"]),
+        "--hronirs-library-dir",
+        str(temp_data_dirs["library"]),
+        "--backup-dir",
+        str(temp_data_dirs["backup_root"] / "backup"),  # Explicitly data/backup
     )
     assert res.returncode == 0, f"Script failed: {res.stderr}"
     assert "Backing up data to" in res.stdout
 
-    backup_base = temp_data_dirs["backup_root"] / "backup" # data/backup
+    backup_base = temp_data_dirs["backup_root"] / "backup"  # data/backup
     assert backup_base.exists()
 
     # Check for a timestamped backup directory
@@ -145,10 +180,13 @@ def test_backup_functionality(temp_data_dirs: dict[str, Path]):
     assert ts_backup_dir.is_dir()
 
     # Check for copied data
-    assert (ts_backup_dir / temp_data_dirs["paths"].name / "narrative_paths_position_0.csv").exists()
+    assert (
+        ts_backup_dir / temp_data_dirs["paths"].name / "narrative_paths_position_0.csv"
+    ).exists()
     assert (ts_backup_dir / temp_data_dirs["ratings"].name / "votes.csv").exists()
     assert (ts_backup_dir / temp_data_dirs["transactions"].name / "tx1.json").exists()
     assert (ts_backup_dir / temp_data_dirs["library"].name / "hronirA" / "index.md").exists()
+
 
 @pytest.mark.skipif(migrate_to_duckdb is None, reason="migrate_to_duckdb.py not found")
 def test_schema_creation_and_data_migration(temp_data_dirs: dict[str, Path]):
@@ -156,11 +194,16 @@ def test_schema_creation_and_data_migration(temp_data_dirs: dict[str, Path]):
     db_file = temp_data_dirs["db_path"]
     res = run_migration_script(
         temp_data_dirs["base"],
-        "--db-path", str(db_file),
-        "--csv-paths-dir", str(temp_data_dirs["paths"]),
-        "--csv-ratings-dir", str(temp_data_dirs["ratings"]),
-        "--transactions-json-dir", str(temp_data_dirs["transactions"]),
-        "--hronirs-library-dir", str(temp_data_dirs["library"]),
+        "--db-path",
+        str(db_file),
+        "--csv-paths-dir",
+        str(temp_data_dirs["paths"]),
+        "--csv-ratings-dir",
+        str(temp_data_dirs["ratings"]),
+        "--transactions-json-dir",
+        str(temp_data_dirs["transactions"]),
+        "--hronirs-library-dir",
+        str(temp_data_dirs["library"]),
     )
     assert res.returncode == 0, f"Script failed: {res.stderr}"
     assert db_file.exists(), "DuckDB file was not created"
@@ -180,7 +223,9 @@ def test_schema_creation_and_data_migration(temp_data_dirs: dict[str, Path]):
     paths_count = conn.execute("SELECT COUNT(*) FROM paths;").fetchone()[0]
     assert paths_count == 2, "Incorrect number of paths migrated"
 
-    path_data = conn.execute("SELECT path_uuid, uuid FROM paths WHERE position = 0 AND path_uuid = 'path1';").fetchone()
+    path_data = conn.execute(
+        "SELECT path_uuid, uuid FROM paths WHERE position = 0 AND path_uuid = 'path1';"
+    ).fetchone()
     assert path_data is not None
     assert path_data[0] == "path1"
     assert path_data[1] == "hronirA"
@@ -193,16 +238,21 @@ def test_schema_creation_and_data_migration(temp_data_dirs: dict[str, Path]):
 
     transactions_count = conn.execute("SELECT COUNT(*) FROM transactions;").fetchone()[0]
     assert transactions_count == 1, "Incorrect number of transactions migrated"
-    tx_data_row = conn.execute("SELECT uuid, session_id FROM transactions WHERE uuid = 'tx1';").fetchone()
+    tx_data_row = conn.execute(
+        "SELECT uuid, session_id FROM transactions WHERE uuid = 'tx1';"
+    ).fetchone()
     assert tx_data_row is not None
-    assert tx_data_row[1] == "session1" # Check session_id from content
+    assert tx_data_row[1] == "session1"  # Check session_id from content
 
     hronirs_count = conn.execute("SELECT COUNT(*) FROM hronirs;").fetchone()[0]
     assert hronirs_count == 2, "Incorrect number of hronirs migrated"
-    hronir_content = conn.execute("SELECT content FROM hronirs WHERE uuid = 'hronirA';").fetchone()[0]
+    hronir_content = conn.execute("SELECT content FROM hronirs WHERE uuid = 'hronirA';").fetchone()[
+        0
+    ]
     assert hronir_content == "Content of Hronir A"
 
     conn.close()
+
 
 @pytest.mark.skipif(migrate_to_duckdb is None, reason="migrate_to_duckdb.py not found")
 def test_enable_sharding_flag(temp_data_dirs: dict[str, Path], capsys):
@@ -212,32 +262,45 @@ def test_enable_sharding_flag(temp_data_dirs: dict[str, Path], capsys):
     res = run_migration_script(
         temp_data_dirs["base"],
         "--enable-sharding",
-        "--db-path", str(temp_data_dirs["db_path"]),
-        "--csv-paths-dir", str(temp_data_dirs["paths"]),
-        "--csv-ratings-dir", str(temp_data_dirs["ratings"]),
-        "--transactions-json-dir", str(temp_data_dirs["transactions"]),
-        "--hronirs-library-dir", str(temp_data_dirs["library"]),
+        "--db-path",
+        str(temp_data_dirs["db_path"]),
+        "--csv-paths-dir",
+        str(temp_data_dirs["paths"]),
+        "--csv-ratings-dir",
+        str(temp_data_dirs["ratings"]),
+        "--transactions-json-dir",
+        str(temp_data_dirs["transactions"]),
+        "--hronirs-library-dir",
+        str(temp_data_dirs["library"]),
     )
     assert res.returncode == 0, f"Script failed: {res.stderr}"
-    assert "--enable-sharding is specified, but sharding logic is not fully implemented" in res.stdout
+    assert (
+        "--enable-sharding is specified, but sharding logic is not fully implemented" in res.stdout
+    )
+
 
 @pytest.mark.skipif(migrate_to_duckdb is None, reason="migrate_to_duckdb.py not found")
 def test_empty_or_missing_sources(temp_data_dirs: dict[str, Path]):
     """Test migration with empty or missing source directories/files."""
     # Remove some source data
     shutil.rmtree(temp_data_dirs["paths"])
-    (temp_data_dirs["base"] / "narrative_paths").mkdir() # Recreate empty dir
+    (temp_data_dirs["base"] / "narrative_paths").mkdir()  # Recreate empty dir
 
-    (temp_data_dirs["ratings"] / "votes.csv").unlink() # Remove votes file
+    (temp_data_dirs["ratings"] / "votes.csv").unlink()  # Remove votes file
 
     db_file = temp_data_dirs["db_path"]
     res = run_migration_script(
         temp_data_dirs["base"],
-        "--db-path", str(db_file),
-        "--csv-paths-dir", str(temp_data_dirs["paths"]), # Now empty
-        "--csv-ratings-dir", str(temp_data_dirs["ratings"]), # votes.csv missing
-        "--transactions-json-dir", str(temp_data_dirs["transactions"]),
-        "--hronirs-library-dir", str(temp_data_dirs["library"]),
+        "--db-path",
+        str(db_file),
+        "--csv-paths-dir",
+        str(temp_data_dirs["paths"]),  # Now empty
+        "--csv-ratings-dir",
+        str(temp_data_dirs["ratings"]),  # votes.csv missing
+        "--transactions-json-dir",
+        str(temp_data_dirs["transactions"]),
+        "--hronirs-library-dir",
+        str(temp_data_dirs["library"]),
     )
     assert res.returncode == 0, f"Script failed: {res.stderr}"
     assert "No path CSV files found or processed" in res.stdout
@@ -249,8 +312,9 @@ def test_empty_or_missing_sources(temp_data_dirs: dict[str, Path]):
     votes_count = conn.execute("SELECT COUNT(*) FROM votes;").fetchone()[0]
     assert votes_count == 0
     transactions_count = conn.execute("SELECT COUNT(*) FROM transactions;").fetchone()[0]
-    assert transactions_count == 1 # Transactions should still load
+    assert transactions_count == 1  # Transactions should still load
     conn.close()
+
 
 # Example of how one might test the main function directly if preferred over subprocess
 # @pytest.mark.skipif(migrate_to_duckdb is None, reason="migrate_to_duckdb.py not found")
@@ -285,4 +349,4 @@ def test_empty_or_missing_sources(temp_data_dirs: dict[str, Path]):
 #     assert paths_count == 2
 #     conn.close()
 
-```
+# Removed stray ```

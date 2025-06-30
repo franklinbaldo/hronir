@@ -75,7 +75,7 @@ DUCKDB_SCHEMA = {
             pgp_signature TEXT NOT NULL,
             upload_id VARCHAR -- IA identifier
         );
-    """
+    """,
 }
 
 
@@ -110,7 +110,9 @@ def backup_existing_data(
     # Potentially backup the_library too if it's considered part of the data state
     the_library_dir = Path("the_library/")
     if the_library_dir.exists():
-        shutil.copytree(the_library_dir, backup_target_dir / the_library_dir.name, dirs_exist_ok=True)
+        shutil.copytree(
+            the_library_dir, backup_target_dir / the_library_dir.name, dirs_exist_ok=True
+        )
         logging.info(f"Backed up {the_library_dir.name}")
 
     logging.info("Backup completed.")
@@ -135,27 +137,35 @@ def migrate_paths_to_duckdb(conn: duckdb.DuckDBPyConnection, csv_paths_dir: Path
     files_processed = 0
     for csv_file in csv_paths_dir.glob("narrative_paths_position_*.csv"):
         try:
-            df = pd.read_csv(csv_file, dtype=str) # Read all as string initially
-            df["position"] = pd.to_numeric(df["position"], errors='coerce')
+            df = pd.read_csv(csv_file, dtype=str)  # Read all as string initially
+            df["position"] = pd.to_numeric(df["position"], errors="coerce")
 
             # Add created_at if missing - estimate from file mod time or use a default
             # For real migration, a better source for created_at would be ideal
-            if 'created_at' not in df.columns:
-                df['created_at'] = pd.to_datetime(os.path.getmtime(csv_file), unit='s')
+            if "created_at" not in df.columns:
+                df["created_at"] = pd.to_datetime(os.path.getmtime(csv_file), unit="s")
             else:
-                df['created_at'] = pd.to_datetime(df['created_at'], errors='coerce')
+                df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
 
-            df = df.where(pd.notnull(df), None) # Convert NaNs to None for DB
+            df = df.where(pd.notnull(df), None)  # Convert NaNs to None for DB
 
             # Ensure all necessary columns exist, fill with None if not
-            expected_cols = ["path_uuid", "position", "prev_uuid", "uuid", "status", "mandate_id", "created_at"]
+            expected_cols = [
+                "path_uuid",
+                "position",
+                "prev_uuid",
+                "uuid",
+                "status",
+                "mandate_id",
+                "created_at",
+            ]
             for col in expected_cols:
                 if col not in df.columns:
                     df[col] = None
 
-            df = df[expected_cols] # Reorder and select
+            df = df[expected_cols]  # Reorder and select
 
-            conn.register('paths_df', df)
+            conn.register("paths_df", df)
             conn.execute("""
                 INSERT INTO paths (path_uuid, position, prev_uuid, uuid, status, mandate_id, created_at)
                 SELECT path_uuid, position, prev_uuid, uuid, status, mandate_id, created_at FROM paths_df
@@ -174,17 +184,17 @@ def migrate_paths_to_duckdb(conn: duckdb.DuckDBPyConnection, csv_paths_dir: Path
 def migrate_votes_to_duckdb(conn: duckdb.DuckDBPyConnection, csv_ratings_dir: Path):
     """Migrates vote data from CSV files to DuckDB."""
     logging.info(f"Migrating votes from {csv_ratings_dir}...")
-    votes_csv = csv_ratings_dir / "votes.csv" # Assuming a single votes.csv
+    votes_csv = csv_ratings_dir / "votes.csv"  # Assuming a single votes.csv
     if votes_csv.exists():
         try:
             df = pd.read_csv(votes_csv, dtype=str)
-            df["position"] = pd.to_numeric(df["position"], errors='coerce')
+            df["position"] = pd.to_numeric(df["position"], errors="coerce")
 
-            if 'created_at' not in df.columns:
-                 # Estimate from file mod time or use a default
-                df['created_at'] = pd.to_datetime(os.path.getmtime(votes_csv), unit='s')
+            if "created_at" not in df.columns:
+                # Estimate from file mod time or use a default
+                df["created_at"] = pd.to_datetime(os.path.getmtime(votes_csv), unit="s")
             else:
-                df['created_at'] = pd.to_datetime(df['created_at'], errors='coerce')
+                df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
 
             df = df.where(pd.notnull(df), None)
 
@@ -194,7 +204,7 @@ def migrate_votes_to_duckdb(conn: duckdb.DuckDBPyConnection, csv_ratings_dir: Pa
                     df[col] = None
             df = df[expected_cols]
 
-            conn.register('votes_df', df)
+            conn.register("votes_df", df)
             conn.execute("""
                 INSERT INTO votes (uuid, position, voter, winner, loser, created_at)
                 SELECT uuid, position, voter, winner, loser, created_at FROM votes_df
@@ -208,16 +218,17 @@ def migrate_votes_to_duckdb(conn: duckdb.DuckDBPyConnection, csv_ratings_dir: Pa
     conn.commit()
     logging.info("Vote data migration complete.")
 
+
 def migrate_transactions_to_duckdb(conn: duckdb.DuckDBPyConnection, transactions_json_dir: Path):
     """Migrates transaction data from JSON files to DuckDB."""
     logging.info(f"Migrating transactions from {transactions_json_dir}...")
     files_processed = 0
     if transactions_json_dir.exists():
         for json_file in transactions_json_dir.glob("*.json"):
-            if json_file.name.lower() == "head": # Skip HEAD file
+            if json_file.name.lower() == "head":  # Skip HEAD file
                 continue
             try:
-                with open(json_file, 'r') as f:
+                with open(json_file) as f:
                     data = json.load(f)
 
                 # Extract relevant fields for the 'transactions' table
@@ -235,7 +246,7 @@ def migrate_transactions_to_duckdb(conn: duckdb.DuckDBPyConnection, transactions
                     """,
                     (
                         data.get("uuid"),
-                        pd.to_datetime(data.get("timestamp"), errors='coerce'),
+                        pd.to_datetime(data.get("timestamp"), errors="coerce"),
                         data.get("prev_uuid"),
                         content.get("session_id"),
                         content.get("initiating_path_uuid"),
@@ -244,13 +255,14 @@ def migrate_transactions_to_duckdb(conn: duckdb.DuckDBPyConnection, transactions
                     ),
                 )
                 logging.info(f"Migrated transaction {json_file.name}")
-                files_processed +=1
+                files_processed += 1
             except Exception as e:
                 logging.error(f"Error migrating transaction {json_file.name}: {e}")
     if files_processed == 0:
         logging.warning(f"No transaction JSON files found or processed in {transactions_json_dir}.")
     conn.commit()
     logging.info("Transaction data migration complete.")
+
 
 def migrate_hronirs_to_duckdb(conn: duckdb.DuckDBPyConnection, library_dir: Path):
     """Migrates hrönir content from the_library to DuckDB."""
@@ -266,8 +278,8 @@ def migrate_hronirs_to_duckdb(conn: duckdb.DuckDBPyConnection, library_dir: Path
                         hronir_uuid = hronir_uuid_dir.name
                         # created_at and metadata are not readily available from current structure
                         # For now, use file modification time for created_at
-                        created_at = pd.to_datetime(os.path.getmtime(hronir_file), unit='s')
-                        metadata_json = json.dumps({}) # Placeholder
+                        created_at = pd.to_datetime(os.path.getmtime(hronir_file), unit="s")
+                        metadata_json = json.dumps({})  # Placeholder
 
                         conn.execute(
                             """
@@ -275,7 +287,7 @@ def migrate_hronirs_to_duckdb(conn: duckdb.DuckDBPyConnection, library_dir: Path
                             VALUES (?, ?, ?, ?)
                             ON CONFLICT(uuid) DO NOTHING;
                             """,
-                            (hronir_uuid, content, created_at, metadata_json)
+                            (hronir_uuid, content, created_at, metadata_json),
                         )
                         logging.info(f"Migrated hrönir {hronir_uuid}")
                         files_processed += 1
@@ -288,7 +300,9 @@ def migrate_hronirs_to_duckdb(conn: duckdb.DuckDBPyConnection, library_dir: Path
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Migrate Hrönir Encyclopedia data from CSV/JSON to DuckDB.")
+    parser = argparse.ArgumentParser(
+        description="Migrate Hrönir Encyclopedia data from CSV/JSON to DuckDB."
+    )
     parser.add_argument(
         "--db-path",
         type=Path,
@@ -301,7 +315,7 @@ def main():
         help="Backup existing CSV/JSON data before migration.",
     )
     parser.add_argument(
-        "--enable-sharding", # Placeholder for now
+        "--enable-sharding",  # Placeholder for now
         action="store_true",
         help="Enable sharding logic during/after migration (feature not fully implemented in this script).",
     )
@@ -368,7 +382,6 @@ def main():
             # manifest = manager.create_sharded_snapshot(args.db_path)
             # logging.info(f"Sharding prepared. Manifest (details): {manifest}")
 
-
         logging.info(f"Data migration to {args.db_path} complete.")
 
         # Verification (optional)
@@ -380,8 +393,9 @@ def main():
     except Exception as e:
         logging.error(f"An error occurred during migration: {e}", exc_info=True)
     finally:
-        if 'conn' in locals() and conn:
+        if "conn" in locals() and conn:
             conn.close()
+
 
 if __name__ == "__main__":
     main()
