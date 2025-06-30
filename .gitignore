@@ -14,3 +14,13 @@ build/
 *.db
 .env
 uv.lock
+
+# Test and runtime generated data
+data/backup/
+data/sessions/
+data/transactions/HEAD
+data/canonical_path.json
+# Specific database files if not covered by *.db, e.g. data/encyclopedia.duckdb
+# However, *.db should cover it.
+# Test output files in the_library if any remain despite fixes (should be temporary now)
+# Example: the_library/test_*.md

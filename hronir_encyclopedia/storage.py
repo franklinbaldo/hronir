@@ -51,6 +51,13 @@ class DataManager:
                 ratings_csv_dir=ratings_csv_dir,
                 transactions_json_dir=transactions_json_dir,
             )
+
+        # Configurable library path
+        default_library_path = Path("the_library")
+        library_path_str = os.getenv("HRONIR_LIBRARY_DIR")
+        self.library_path = Path(library_path_str) if library_path_str else default_library_path
+        self.library_path.mkdir(parents=True, exist_ok=True) # Ensure it exists
+
         self._initialized = False
 
     @property
@@ -206,10 +213,9 @@ class DataManager:
         # Generate UUID from content
         content_uuid = str(uuid.uuid5(UUID_NAMESPACE, content))
 
-        # Create target directory and file
-        target_dir = Path("the_library")
-        target_dir.mkdir(exist_ok=True)
-        target_file = target_dir / f"{content_uuid}.md"
+        # Create target directory and file (using configurable library_path)
+        # self.library_path is initialized in __init__
+        target_file = self.library_path / f"{content_uuid}.md"
 
         # Copy the file
         shutil.copy2(file_path, target_file)
@@ -218,7 +224,7 @@ class DataManager:
 
     def get_hrönir_path(self, content_uuid: str) -> Path:
         """Get the path to a stored hrönir."""
-        return Path("the_library") / f"{content_uuid}.md"
+        return self.library_path / f"{content_uuid}.md"
 
     def hrönir_exists(self, content_uuid: str) -> bool:
         """Check if a hrönir exists."""
