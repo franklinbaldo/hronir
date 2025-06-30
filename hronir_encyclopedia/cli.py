@@ -1,9 +1,9 @@
 import datetime  # Required for SessionModel if used directly, or for its string representations
 import json
-import os # Added for getenv in sync
 
 # Define module-level logger
 import logging
+import os  # Added for getenv in sync
 import subprocess
 import uuid
 import zipfile
@@ -25,7 +25,7 @@ from . import (
     transaction_manager,
 )
 from .models import SessionModel  # Import SessionModel for type hinting if needed
-from .transaction_manager import ConflictDetection # For sync command
+from .transaction_manager import ConflictDetection  # For sync command
 
 logger = logging.getLogger(__name__)
 
@@ -1284,9 +1284,9 @@ def session_commit(
 def sync(
     archive_id: Annotated[
         str, typer.Option(help="Internet Archive identifier for discovery (placeholder).")
-    ] = "hronir-snapshots", # This might become network_uuid based
+    ] = "hronir-snapshots",  # This might become network_uuid based
     db_file: Annotated[Path, typer.Option(help="Local DuckDB file to update/replace.")] = Path(
-        "data/encyclopedia.duckdb" # Align with default DB path
+        "data/encyclopedia.duckdb"  # Align with default DB path
     ),
     retry: Annotated[
         bool, typer.Option(help="Enable retry logic for discovery and download.")
@@ -1312,7 +1312,9 @@ def sync(
     # latest_manifest = conflict_detector.discover_latest_remote_snapshot_robust()
 
     # --- More direct placeholder for sync discovery ---
-    typer.echo(f"Discovering latest snapshot for network '{network_uuid_env}' (retry enabled: {retry})...")
+    typer.echo(
+        f"Discovering latest snapshot for network '{network_uuid_env}' (retry enabled: {retry})..."
+    )
     # Simulate discovery. In reality, this would call into a module that handles IA/P2P communication.
     # For this placeholder, we'll just log what would happen.
 
@@ -1333,7 +1335,9 @@ def sync(
     # --- Actual call to discovery logic ---
     # The `retry` parameter of this `sync` command is implicitly handled by `discover_latest_remote_snapshot_robust`
     # if its implementation uses retries. The `discover_latest_remote_snapshot_robust` already has a retry loop structure.
-    conflict_detector = ConflictDetection(network_uuid=network_uuid_env) # pgp_key_id not needed for discovery
+    conflict_detector = ConflictDetection(
+        network_uuid=network_uuid_env
+    )  # pgp_key_id not needed for discovery
     latest_manifest = conflict_detector.discover_latest_remote_snapshot_robust()
     # Note: discover_latest_remote_snapshot_robust currently returns a placeholder or simulated result.
     # The retry logic *within* it is also placeholder/simulated.
@@ -1341,10 +1345,15 @@ def sync(
     # For now, the retry structure is always active in the placeholder.
 
     if not latest_manifest:
-        typer.secho(f"Failed to discover latest snapshot for network {network_uuid_env} after retries.", fg=typer.colors.RED)
+        typer.secho(
+            f"Failed to discover latest snapshot for network {network_uuid_env} after retries.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(code=1)
 
-    typer.echo(f"Discovered latest snapshot: Sequence {latest_manifest.sequence}, Merkle Root {latest_manifest.merkle_root}")
+    typer.echo(
+        f"Discovered latest snapshot: Sequence {latest_manifest.sequence}, Merkle Root {latest_manifest.merkle_root}"
+    )
 
     # 2. (Placeholder) Download the snapshot files (shards)
     # This would involve a P2P client or HTTP downloads from IA.
@@ -1362,11 +1371,16 @@ def sync(
 
     # 3. Verify PGP signature of the manifest (MANDATORY)
     if not latest_manifest.pgp_signature:
-        typer.secho("ERROR: Downloaded manifest does not have a PGP signature. Sync aborted.", fg=typer.colors.RED)
+        typer.secho(
+            "ERROR: Downloaded manifest does not have a PGP signature. Sync aborted.",
+            fg=typer.colors.RED,
+        )
         # Consider cleaning up snapshot_download_dir
         raise typer.Exit(code=1)
 
-    typer.echo(f"Verifying PGP signature of manifest (Signature: {latest_manifest.pgp_signature[:20]}...)...")
+    typer.echo(
+        f"Verifying PGP signature of manifest (Signature: {latest_manifest.pgp_signature[:20]}...)..."
+    )
 
     # Placeholder for actual PGP verification call
     # In a real implementation, this would involve:
@@ -1383,12 +1397,15 @@ def sync(
     #     signature=latest_manifest.pgp_signature,
     #     # expected_signer_key_id=pgp_key_for_network
     # )
-    simulated_verification_success = True # Placeholder: Assume success for now
+    simulated_verification_success = True  # Placeholder: Assume success for now
 
     if simulated_verification_success:
         typer.echo("PGP signature verified successfully (placeholder).")
     else:
-        typer.secho("ERROR: PGP signature verification FAILED for the downloaded manifest. Sync aborted.", fg=typer.colors.RED)
+        typer.secho(
+            "ERROR: PGP signature verification FAILED for the downloaded manifest. Sync aborted.",
+            fg=typer.colors.RED,
+        )
         # Consider cleaning up snapshot_download_dir
         raise typer.Exit(code=1)
 
@@ -1398,8 +1415,8 @@ def sync(
     # sharding_manager = ShardingManager()
     # sharding_manager.reconstruct_from_shards(latest_manifest, snapshot_download_dir, db_file)
     if len(latest_manifest.shards) > 1 and latest_manifest.merge_script:
-         typer.echo(f"Reconstructing database from shards into {db_file} (placeholder)...")
-    else: # Single shard
+        typer.echo(f"Reconstructing database from shards into {db_file} (placeholder)...")
+    else:  # Single shard
         typer.echo(f"Copying single shard snapshot to {db_file} (placeholder)...")
 
     # Simulate copying the first (or only) shard's (dummy) content to the target db_file
@@ -1408,7 +1425,6 @@ def sync(
         # Create a dummy db_file to simulate it being replaced/created
         db_file.write_bytes(b"dummy duckdb content")
 
-
     # 5. (Placeholder) Verify Merkle root of the reconstructed database
     # This needs calculate_db_merkle_root from sharding.py
     # from .sharding import calculate_db_merkle_root
@@ -1416,7 +1432,9 @@ def sync(
     # if final_merkle_root != latest_manifest.merkle_root:
     #     typer.secho("ERROR: Merkle root mismatch after sync!", fg=typer.colors.RED)
     #     raise typer.Exit(code=1)
-    typer.echo(f"Merkle root verified (placeholder). Local DB matches manifest root: {latest_manifest.merkle_root}")
+    typer.echo(
+        f"Merkle root verified (placeholder). Local DB matches manifest root: {latest_manifest.merkle_root}"
+    )
 
     # 6. (Placeholder) Update local snapshot metadata (sequence number, etc.)
     # This might involve a local version of ConflictDetection._save_local_manifest
@@ -1430,7 +1448,10 @@ def sync(
     # import shutil
     # shutil.rmtree(snapshot_download_dir)
 
-    typer.secho(f"Sync complete. Local database {db_file} updated to snapshot sequence {latest_manifest.sequence}.", fg=typer.colors.GREEN)
+    typer.secho(
+        f"Sync complete. Local database {db_file} updated to snapshot sequence {latest_manifest.sequence}.",
+        fg=typer.colors.GREEN,
+    )
 
 
 @app.command(help="Create local snapshot archive (snapshot.zip).")
@@ -1445,45 +1466,56 @@ def export(
 
 @app.command(help="Upload snapshot and metadata to Internet Archive.")
 def push(
-    archive_id: Annotated[ # This parameter might be deprecated if network_uuid is primary
-        str, typer.Option(help="Internet Archive identifier (legacy, consider using network_uuid from env).")
+    archive_id: Annotated[  # This parameter might be deprecated if network_uuid is primary
+        str,
+        typer.Option(
+            help="Internet Archive identifier (legacy, consider using network_uuid from env)."
+        ),
     ] = "hronir-snapshots",
     # snapshot_path: Annotated[Path, typer.Option(help="Path to pre-existing snapshot archive (optional).")] = None,
     force: Annotated[
-        bool, typer.Option(help="Force push, overriding remote state (DANGEROUS). Not fully implemented.")
+        bool,
+        typer.Option(
+            help="Force push, overriding remote state (DANGEROUS). Not fully implemented."
+        ),
     ] = False,
-    snapshot_output_base_dir: Annotated[Path, typer.Option(help="Base directory for creating snapshot files.")] = Path("data/snapshots_out"),
+    snapshot_output_base_dir: Annotated[
+        Path, typer.Option(help="Base directory for creating snapshot files.")
+    ] = Path("data/snapshots_out"),
 ) -> None:
     network_uuid = os.getenv("HRONIR_NETWORK_UUID")
-    pgp_key_id = os.getenv("HRONIR_PGP_KEY_ID") # For signing the manifest
+    pgp_key_id = os.getenv("HRONIR_PGP_KEY_ID")  # For signing the manifest
 
     if not network_uuid:
         typer.secho("Error: HRONIR_NETWORK_UUID environment variable not set.", fg=typer.colors.RED)
         raise typer.Exit(code=1)
 
     # We will create a temporary directory for this specific push's snapshot files
-    timestamp_str = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S%f')
+    timestamp_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%f")
     current_snapshot_dir = snapshot_output_base_dir / f"push_{network_uuid}_{timestamp_str}"
     current_snapshot_dir.mkdir(parents=True, exist_ok=True)
 
     typer.echo(f"Preparing to push snapshot for network: {network_uuid}")
     if force:
-        typer.secho("WARNING: --force flag is active. This may override remote state.", fg=typer.colors.YELLOW)
+        typer.secho(
+            "WARNING: --force flag is active. This may override remote state.",
+            fg=typer.colors.YELLOW,
+        )
 
-    data_manager = storage.DataManager() # Uses HRONIR_USE_DUCKDB env var
+    data_manager = storage.DataManager()  # Uses HRONIR_USE_DUCKDB env var
     if not isinstance(data_manager.backend, storage.DuckDBDataManager):
-        typer.secho("Error: Push command currently only supports DuckDB backend.", fg=typer.colors.RED)
+        typer.secho(
+            "Error: Push command currently only supports DuckDB backend.", fg=typer.colors.RED
+        )
         raise typer.Exit(code=1)
 
     typer.echo(f"Creating current database snapshot in {current_snapshot_dir}...")
     # TODO: Get current git commit hash
-    git_commit_hash = "dummy_git_commit_hash" # Placeholder
+    git_commit_hash = "dummy_git_commit_hash"  # Placeholder
     try:
         # create_snapshot is on DataManager, which delegates to DuckDBDataManager's implementation
         local_manifest = data_manager.create_snapshot(
-            output_dir=current_snapshot_dir,
-            network_uuid=network_uuid,
-            git_commit=git_commit_hash
+            output_dir=current_snapshot_dir, network_uuid=network_uuid, git_commit=git_commit_hash
         )
         if not local_manifest:
             typer.secho("Error: Failed to create local snapshot manifest.", fg=typer.colors.RED)
@@ -1499,7 +1531,7 @@ def push(
 
     # Now, use ConflictDetection to handle the push logic
     try:
-        from .transaction_manager import ConflictDetection, ConflictError # Import here
+        from .transaction_manager import ConflictDetection, ConflictError  # Import here
 
         conflict_detector = ConflictDetection(network_uuid=network_uuid, pgp_key_id=pgp_key_id)
 
@@ -1514,18 +1546,25 @@ def push(
         typer.echo("Attempting to push snapshot with conflict detection...")
         ia_item_id = conflict_detector.push_with_locking(
             local_snapshot_manifest=local_manifest,
-            snapshot_dir=current_snapshot_dir # Dir containing the actual shard files
+            snapshot_dir=current_snapshot_dir,  # Dir containing the actual shard files
         )
 
-        typer.secho(f"Push successful! Snapshot sequence {local_manifest.sequence} uploaded.", fg=typer.colors.GREEN)
+        typer.secho(
+            f"Push successful! Snapshot sequence {local_manifest.sequence} uploaded.",
+            fg=typer.colors.GREEN,
+        )
         typer.echo(f"  Internet Archive Item (placeholder): {ia_item_id}")
         typer.echo(f"  Manifest Merkle Root: {local_manifest.merkle_root}")
         # TODO: Provide magnet link if torrents are generated by IA upload step
 
     except ConflictError as ce:
         typer.secho(f"PUSH FAILED: {ce}", fg=typer.colors.RED)
-        typer.echo("  Recommendation: Run 'hronir sync' to get the latest changes, then attempt push again.")
-        typer.echo("  Alternatively, use 'hronir diff-remote' (not implemented) to see changes, or 'hronir push --force' (DANGEROUS).")
+        typer.echo(
+            "  Recommendation: Run 'hronir sync' to get the latest changes, then attempt push again."
+        )
+        typer.echo(
+            "  Alternatively, use 'hronir diff-remote' (not implemented) to see changes, or 'hronir push --force' (DANGEROUS)."
+        )
         # Consider cleaning up current_snapshot_dir
         # import shutil; shutil.rmtree(current_snapshot_dir)
         raise typer.Exit(code=1)

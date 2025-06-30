@@ -3,40 +3,18 @@ name = "hronir-encyclopedia"
 version = "0.1.0"
 requires-python = "==3.10.*"
 dependencies = [
-    "google-generativeai",
-    "sqlalchemy>=2.0",
-    "python-dotenv", # Adicionado para gerenciar secrets
-    "numpy", # Adicionado para um CLI moderno
-    "blake3", # Adicionado para hashing rápido
-    "pydantic", # Validação de dados # Operações de grafo
-    "networkx",
-    "duckdb",
-    "internetarchive",
-    "python-zstandard",
+    "blake3>=1.0.5",
+    "duckdb>=1.3.1",
+    "google-generativeai>=0.8.5",
+    "internetarchive>=5.4.0",
+    "networkx>=3.4.2",
+    "numpy>=2.2.6",
     "pandas>=2.3.0",
+    "pydantic>=2.11.7",
+    "python-dotenv>=1.1.1",
+    "sqlalchemy>=2.0",
     "typer>=0.16.0",
 ]
-
-[project.scripts]
-hronir = "hronir_encyclopedia.cli:main"
-
-[project.optional-dependencies]
-dev = ["pytest", "pre-commit", "ruff"]
-viz = ["matplotlib"]
-
-[tool.ruff]
-line-length = 100
-
-[tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP"] # Standard lints + isort + pyupgrade
-ignore = ["E501"] # Ignore line too long errors
-
-
-[tool.setuptools]
-packages = ["hronir_encyclopedia"]
-
-[tool.uv]
-package = true
 
 [dependency-groups]
 dev = [
@@ -45,3 +23,22 @@ dev = [
     "repomix>=0.2.9",
     "ruff>=0.12.0",
 ]
+viz = [
+    "matplotlib>=3.10.3",
+]
+
+[project.scripts]
+hronir = "hronir_encyclopedia.cli:main"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP"] # Standard lints + isort + pyupgrade
+ignore = ["E501"] # Ignore line too long errors
+
+[tool.setuptools]
+packages = ["hronir_encyclopedia"]
+
+[tool.uv]
+package = true

@@ -488,6 +488,7 @@ def test_system_dynamics_cascade(setup_test_environment):
 
 # --- Tests for Merkle Tree and Trust Check System Dynamics ---
 
+
 @pytest.fixture
 def sample_transactions_data() -> list[str]:
     """Provides a sample list of transaction data strings."""
@@ -503,6 +504,7 @@ def sample_transactions_data() -> list[str]:
         "Transaction 9: Lorem ipsum dolor sit amet",
         "Transaction 10: Consectetur adipiscing elit",
     ]
+
 
 def test_merkle_tree_and_proof_dynamics(sample_transactions_data: list[str]):
     """
@@ -524,7 +526,7 @@ def test_merkle_tree_and_proof_dynamics(sample_transactions_data: list[str]):
         proof = generate_merkle_proof(sample_transactions_data, i)
         assert proof is not None, f"Proof should be generated for transaction at index {i}."
 
-        is_valid = verify_merkle_proof(tx_data, merkle_root, proof) # type: ignore
+        is_valid = verify_merkle_proof(tx_data, merkle_root, proof)  # type: ignore
         assert is_valid, f"Merkle proof verification should pass for transaction at index {i}."
 
     # 3. Test with a modified transaction (should fail verification)
@@ -537,21 +539,30 @@ def test_merkle_tree_and_proof_dynamics(sample_transactions_data: list[str]):
         assert proof_for_original is not None
 
         # Verification should fail if data is tampered with
-        is_valid_modified = verify_merkle_proof(modified_tx_data, merkle_root, proof_for_original) # type: ignore
+        is_valid_modified = verify_merkle_proof(modified_tx_data, merkle_root, proof_for_original)  # type: ignore
         assert not is_valid_modified, "Verification should fail for tampered transaction data."
 
         # Verification should fail if root is incorrect
-        is_valid_wrong_root = verify_merkle_proof(original_tx_data, "incorrect_merkle_root_value", proof_for_original) # type: ignore
+        is_valid_wrong_root = verify_merkle_proof(
+            original_tx_data, "incorrect_merkle_root_value", proof_for_original
+        )  # type: ignore
         assert not is_valid_wrong_root, "Verification should fail for incorrect Merkle root."
 
         # Verification should fail if proof is incorrect/tampered
-        if proof_for_original: # type: ignore
-            tampered_proof = list(proof_for_original) # type: ignore
+        if proof_for_original:  # type: ignore
+            tampered_proof = list(proof_for_original)  # type: ignore
             if tampered_proof:
-                 # Modify one hash in the proof
+                # Modify one hash in the proof
                 original_hash, direction = tampered_proof[0]
-                tampered_proof[0] = (original_hash.replace(original_hash[0], 'z' if original_hash[0] != 'z' else 'a'), direction)
-                is_valid_tampered_proof = verify_merkle_proof(original_tx_data, merkle_root, tampered_proof)
+                tampered_proof[0] = (
+                    original_hash.replace(
+                        original_hash[0], "z" if original_hash[0] != "z" else "a"
+                    ),
+                    direction,
+                )
+                is_valid_tampered_proof = verify_merkle_proof(
+                    original_tx_data, merkle_root, tampered_proof
+                )
                 assert not is_valid_tampered_proof, "Verification should fail for tampered proof."
 
 
@@ -582,9 +593,10 @@ def test_trust_check_sampling_dynamics(sample_transactions_data: list[str]):
         tampered_transactions_list = list(sample_transactions_data)
         tampered_transactions_list[0] = "This transaction was tampered with, it's not the original."
 
-        is_trusted_tampered_list = perform_trust_check_sampling(
-            tampered_transactions_list, merkle_root, sample_size=3
-        )
+        # The following call's result was unused and its assertability is limited by sampling.
+        # perform_trust_check_sampling(
+        #     tampered_transactions_list, merkle_root, sample_size=3
+        # )
         # The trust check samples from tampered_transactions_list.
         # If the tampered item (index 0) is sampled, its proof (generated from tampered_transactions_list)
         # when verified against the *original* merkle_root, should fail.
@@ -598,8 +610,9 @@ def test_trust_check_sampling_dynamics(sample_transactions_data: list[str]):
         is_trusted_tampered_list_full_sample = perform_trust_check_sampling(
             tampered_transactions_list, merkle_root, sample_size=len(tampered_transactions_list)
         )
-        assert not is_trusted_tampered_list_full_sample, \
+        assert not is_trusted_tampered_list_full_sample, (
             "Trust check with full sample should fail if a transaction in the list is tampered but original root is used."
+        )
 
     # 3. Test with an incorrect Merkle root
     is_trusted_wrong_root = perform_trust_check_sampling(
@@ -608,12 +621,16 @@ def test_trust_check_sampling_dynamics(sample_transactions_data: list[str]):
     assert not is_trusted_wrong_root, "Trust check should fail if the Merkle root is incorrect."
 
     # 4. Test with empty transaction list
-    is_trusted_empty = perform_trust_check_sampling([], "some_root_for_empty_list_or_none", sample_size=1)
+    is_trusted_empty = perform_trust_check_sampling(
+        [], "some_root_for_empty_list_or_none", sample_size=1
+    )
     # The behavior for empty list (True or False) depends on policy defined in perform_trust_check_sampling
     assert is_trusted_empty, "Trust check on empty list (current policy: True)."
 
     is_trusted_empty_no_root = perform_trust_check_sampling([], "", sample_size=1)
-    assert not is_trusted_empty_no_root, "Trust check on empty list with no root should fail (current policy)."
+    assert not is_trusted_empty_no_root, (
+        "Trust check on empty list with no root should fail (current policy)."
+    )
 
 
 def test_anti_sybil_placeholder_interaction():
@@ -622,7 +639,7 @@ def test_anti_sybil_placeholder_interaction():
     This is a basic test to ensure the placeholder can be called.
     """
     from hronir_encyclopedia.session_manager import discover_trusted_entities_for_session_context
-    from hronir_encyclopedia.storage import DataManager # Assuming it needs a DataManager
+    from hronir_encyclopedia.storage import DataManager  # Assuming it needs a DataManager
 
     # This test is very basic as the function is a placeholder.
     # It mainly checks if the function can be called without errors.

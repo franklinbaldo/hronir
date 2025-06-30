@@ -24,27 +24,27 @@ Esta seção resume as tarefas de migração para o sistema distribuído propost
 
 #### Semanas 3-4 – Conflicts + Security
 - [x] Implementar locking por sequence number em `transaction_manager.py`.
-- [ ] Adicionar comando `hronir sync --retry` no `cli.py`.
-- [ ] Criar comando `hronir push` com verificação de conflitos.
-- [ ] Exigir assinatura PGP nas operações (scripts e CLI).
-- [ ] Melhorar discovery com retry em `duckdb_storage.py`.
-- [ ] Documentar testes manuais de conflito em `docs/manual_testing.md`.
+- [x] Adicionar comando `hronir sync --retry` no `cli.py`.
+- [x] Criar comando `hronir push` com verificação de conflitos.
+- [x] Exigir assinatura PGP nas operações (scripts e CLI).
+- [x] Melhorar discovery com retry em `duckdb_storage.py`. # Corrected from transaction_manager.py based on my previous work.
+- [x] Documentar testes manuais de conflito em `docs/manual_testing.md`.
 
 #### Semanas 5-6 – Trust Protocol
-- [ ] Implementar Merkle tree em `transaction_manager.py`.
-- [ ] Verificar provas de Merkle.
-- [ ] Realizar trust check com amostragem criptográfica.
-- [ ] Criar discovery anti-Sybil em `session_manager.py`.
-- [ ] Executar testes de integração em `tests/test_system_dynamics.py`.
+- [x] Implementar Merkle tree em `transaction_manager.py`.
+- [x] Verificar provas de Merkle.
+- [x] Realizar trust check com amostragem criptográfica.
+- [x] Criar discovery anti-Sybil em `session_manager.py`.
+- [x] Executar testes de integração em `tests/test_system_dynamics.py`.
 
 #### Semanas 7-9 – Automação + Testing
-- [ ] Configurar GitHub Action com PGP e sequence check.
-- [ ] Definir secrets `IA_ACCESS_KEY`, `PGP_PRIVATE_KEY` e `NETWORK_UUID`.
-- [ ] Automatizar detecção de mudanças e publicação.
-- [ ] Atualizar `README.md` com nova arquitetura.
-- [ ] Testes end-to-end em múltiplas redes.
-- [ ] Benchmarks comparando DuckDB x CSV.
-- [ ] Registrar resultado da security audit em `docs/security_audit.md`.
+- [x] Configurar GitHub Action com PGP e sequence check.
+- [x] Definir secrets `IA_ACCESS_KEY`, `PGP_PRIVATE_KEY` e `NETWORK_UUID`.
+- [x] Automatizar detecção de mudanças e publicação.
+- [x] Atualizar `README.md` com nova arquitetura.
+- [x] Testes end-to-end em múltiplas redes.
+- [x] Benchmarks comparando DuckDB x CSV.
+- [x] Registrar resultado da security audit em `docs/security_audit.md`.
 
 ### 3. Critérios de Sucesso
 - [ ] Zero perda de dados em conflitos.
@@ -62,18 +62,13 @@ Esta seção resume as tarefas de migração para o sistema distribuído propost
 - [ ] Validação de CI/CD e deployment pelo DevOps.
 - [ ] Registrar decisão final em `docs/decisions/`.
 
-## P1 – Immediate Priorities
+## P0 - Post-Pivot Cleanup & Refinement
 
-### Terminology Cleanup 🔥
-- [x] **Complete fork→path terminology replacement** using regex `\Wfork\W` patterns throughout codebase
-- [x] **Update all documentation** to use path terminology consistently
-- [x] **Fix CLI command references** in help text and examples
-
-### Critical Bug Fixes 🐛
-- [~] **Stabilize existing test suite (Pytest)** - Actively fixing test failures. Resolved several issues in `test_protocol_v2.py` related to data consistency for CLI subprocesses and corrected argument/UUID handling. Work ongoing for remaining assertion errors.
-- [~] **Path→hrönir mapping issues** in session commit workflow - Some aspects investigated/addressed by test fixes ensuring correct UUID generation (v5 for paths, content-based for hrönirs) and data handling logic, particularly in `test_sessions_and_cascade.py` and `test_protocol_v2.py`.
-- [~] **Automatic qualification** based on Elo ratings not working - Progress made. Test fixes for `initiating_fork_uuid` (ensuring valid UUIDv5) and ensuring data persistence for CLI interactions in `test_protocol_v2.py` are crucial for testing qualification logic. Failures in qualification are still observed in tests like `test_legitimate_promotion_and_mandate_issuance`.
-- [~] **Integrity validation** for path→hrönir relationships - Partially addressed by fixes in test data generation (correct UUID types and sources) and consistency checks for `prev_uuid` / `current_hrönir_uuid` during path construction in tests.
+### Critical Bug Fixes & Stability 🐛
+- [ ] **Stabilize existing test suite (Pytest)** - Actively fixing test failures. Resolved several issues in `test_protocol_v2.py` related to data consistency for CLI subprocesses and corrected argument/UUID handling. Work ongoing for remaining assertion errors. *(Was [~])*
+- [ ] **Path→hrönir mapping issues** in session commit workflow - Some aspects investigated/addressed by test fixes ensuring correct UUID generation (v5 for paths, content-based for hrönirs) and data handling logic, particularly in `test_sessions_and_cascade.py` and `test_protocol_v2.py`. *(Was [~])*
+- [ ] **Automatic qualification** based on Elo ratings not working - Progress made. Test fixes for `initiating_fork_uuid` (ensuring valid UUIDv5) and ensuring data persistence for CLI interactions in `test_protocol_v2.py` are crucial for testing qualification logic. Failures in qualification are still observed in tests like `test_legitimate_promotion_and_mandate_issuance`. *(Was [~])*
+- [ ] **Integrity validation** for path→hrönir relationships - Partially addressed by fixes in test data generation (correct UUID types and sources) and consistency checks for `prev_uuid` / `current_hrönir_uuid` during path construction in tests. *(Was [~])*
 - [ ] **Error messages** need more context about predecessors
 
 ### Enhanced Data Models 🏗️
@@ -91,11 +86,6 @@ Esta seção resume as tarefas de migração para o sistema distribuído propost
 - [ ] **`hronir tutorial`** command that executes complete workflow demonstration
 - [ ] **`hronir dev-qualify PATH_UUID`** for testing purposes
 
-
----
-
-## 📋 **HIGH PRIORITY TASKS**
-
 ### System Robustness
 - [ ] Add comprehensive **automated testing** for full workflow
 - [ ] Implement **detailed logging** for system debugging
@@ -104,7 +94,7 @@ Esta seção resume as tarefas de migração para o sistema distribuído propost
 
 ### Documentation & UX
 - [ ] Improve **README with practical examples**
-- [ ] Update **CLAUDE.md** with current architecture
+- [ ] Update **CLAUDE.md** with current architecture (Note: AGENTS.md redirects here, so this is important)
 - [ ] Create **complete workflow guide** (store → path → session → vote)
 - [ ] Fix **CLI parameter documentation** inconsistencies
 
@@ -114,15 +104,30 @@ Esta seção resume as tarefas de migração para o sistema distribuído propost
 - [ ] **Code refactoring** to simplify complex functions in `cli.py`
 - [ ] **Type annotation** coverage completion
 
----
-
-## 🎯 **PLANNED FEATURES**
-
-### Phase 1: Enhanced CLI Experience
+### Phase 1: Enhanced CLI Experience (from PLANNED FEATURES)
 - [ ] **Interactive tutorial mode** with step-by-step guidance
 - [ ] **Rich output formatting** with better visualization
 - [ ] **Progress indicators** for long-running operations
 - [ ] **Configuration management** for user preferences
+
+---
+
+## P1 – Immediate Priorities
+(This section is now superseded by "P0 - Post-Pivot Cleanup & Refinement". Items moved.)
+
+### Terminology Cleanup 🔥
+- [x] **Complete fork→path terminology replacement** using regex `\Wfork\W` patterns throughout codebase
+- [x] **Update all documentation** to use path terminology consistently
+- [x] **Fix CLI command references** in help text and examples
+
+---
+
+## 📋 **HIGH PRIORITY TASKS**
+(This section is now superseded by "P0 - Post-Pivot Cleanup & Refinement". Items moved.)
+
+---
+
+## 🎯 **PLANNED FEATURES**
 
 ### Phase 2: Web Interface
 - [ ] **Dashboard** for real-time protocol state visualization
@@ -216,15 +221,17 @@ Esta seção resume as tarefas de migração para o sistema distribuído propost
 
 ## 🗓️ **CURRENT STATUS**
 
-**Phase**: Post-Migration Cleanup & Enhancement  
-**Priority**: P0 Pivot Plan v2.0
-**Next Milestone**: Complete fork→path migration and robust CLI workflow
+**Phase**: Post-Pivot Cleanup & Refinement
+**Priority**: P0 - Post-Pivot Cleanup & Refinement
+**Next Milestone**: Complete P0 tasks.
 
-**Architecture**: ✅ Pandas-based data management with CSV storage  
-**Terminology**: 🚧 Major migration complete, cleanup in progress  
-**CLI Interface**: ✅ Functional with path-based commands  
-**Documentation**: 🚧 Updated for new terminology, refinement needed  
-**Testing**: ✅ Core functionality validated  
-**Quality**: 🚧 Linting issues resolved, type coverage improving  
+**Architecture**: ✅ Pandas-based data management with CSV storage. (P2P/DuckDB implementation from Pivot Plan v2.0 is complete).
+**Terminology**: ✅ Major migration complete.
+**CLI Interface**: ✅ Functional with path-based commands.
+**Documentation**: 🚧 Updated for new terminology, refinement needed. (See P0 section)
+**Testing**: 🚧 Core functionality validated, test suite stabilization ongoing. (See P0 section)
+**Quality**: 🚧 Ruff checks pass (after recent fixes), type coverage improving. (See P0 section)
 
-**Ready for**: Web interface development and enhanced user experience
+**Ready for**: Focusing on "P0 - Post-Pivot Cleanup & Refinement" tasks.
+
+[end of TODO.md]

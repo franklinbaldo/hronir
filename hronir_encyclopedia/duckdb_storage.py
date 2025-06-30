@@ -1,4 +1,5 @@
 import json
+import logging  # Added to fix Ruff F821
 from pathlib import Path
 
 import duckdb
@@ -6,8 +7,7 @@ from pydantic import ValidationError
 
 from .models import Path as PathModel
 from .models import Transaction, Vote
-from .sharding import ShardingManager, SnapshotManifest # Added
-from typing import Optional # Added
+from .sharding import ShardingManager, SnapshotManifest  # Added
 
 
 class DuckDBDataManager:
@@ -348,22 +348,22 @@ class DuckDBDataManager:
 
     # --- Snapshotting with ShardingManager ---
     def create_snapshot(
-        self, output_dir: Path, network_uuid: str, git_commit: Optional[str] = None
+        self, output_dir: Path, network_uuid: str, git_commit: str | None = None
     ) -> SnapshotManifest:
         """
         Creates a snapshot of the current DuckDB database, potentially sharded.
         The snapshot is saved to the specified output_dir.
         """
         if not self._initialized:
-            self.load_all_data() # Ensure data is loaded and DB is consistent
+            self.load_all_data()  # Ensure data is loaded and DB is consistent
 
-        self.conn.commit() # Ensure all current transactions are written to the DB file.
+        self.conn.commit()  # Ensure all current transactions are written to the DB file.
         # Checkpoint might be good too, but commit should suffice for file consistency.
         # self.conn.execute("CHECKPOINT;") # Force write WAL to main DB file.
 
         logging.info(f"Creating snapshot from DB: {self.db_path} into {output_dir}")
 
-        sharding_manager = ShardingManager() # Uses default temp dir
+        sharding_manager = ShardingManager()  # Uses default temp dir
 
         # Ensure the db_path for sharding manager is absolute, as it might run from different CWDs
         absolute_db_path = self.db_path.resolve()
@@ -372,7 +372,7 @@ class DuckDBDataManager:
             duckdb_path=absolute_db_path,
             output_dir=output_dir,
             network_uuid=network_uuid,
-            git_commit=git_commit
+            git_commit=git_commit,
         )
         logging.info(f"Snapshot manifest created by DuckDBDataManager: {manifest.merkle_root}")
         return manifest
