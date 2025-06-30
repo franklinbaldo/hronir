@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import unittest
 import uuid
@@ -75,6 +76,7 @@ class TestProtocolV2(unittest.TestCase):
             session_manager.CONSUMED_PATHS_FILE
         )  # Changed FORKS to PATHS
         self.original_storage_uuid_namespace = storage.UUID_NAMESPACE
+        self.original_env_library_dir = os.getenv("HRONIR_LIBRARY_DIR")
 
         self.original_dm_fork_csv_dir = storage.data_manager.fork_csv_dir
         self.original_dm_ratings_csv_dir = storage.data_manager.ratings_csv_dir
@@ -83,6 +85,12 @@ class TestProtocolV2(unittest.TestCase):
         storage.data_manager.fork_csv_dir = self.forking_path_dir
         storage.data_manager.ratings_csv_dir = self.ratings_dir
         storage.data_manager.transactions_json_dir = self.transactions_dir
+        # Set HRONIR_LIBRARY_DIR for DataManager instance to use temp library
+        os.environ["HRONIR_LIBRARY_DIR"] = str(self.library_path)
+        # Re-initialize DataManager's library_path after setting env var
+        storage.data_manager.library_path = self.library_path
+        storage.data_manager.library_path.mkdir(parents=True, exist_ok=True)
+
 
         transaction_manager.TRANSACTIONS_DIR = self.transactions_dir
         transaction_manager.HEAD_FILE = self.transactions_dir / "HEAD"
@@ -104,6 +112,15 @@ class TestProtocolV2(unittest.TestCase):
             self.original_sm_consumed_file
         )  # Changed FORKS to PATHS
         storage.UUID_NAMESPACE = self.original_storage_uuid_namespace
+        if self.original_env_library_dir is None:
+            del os.environ["HRONIR_LIBRARY_DIR"]
+        else:
+            os.environ["HRONIR_LIBRARY_DIR"] = self.original_env_library_dir
+        # Reset DataManager's library_path to default or original env var
+        default_library_path = Path("the_library")
+        original_library_path_str = os.getenv("HRONIR_LIBRARY_DIR")
+        storage.data_manager.library_path = Path(original_library_path_str) if original_library_path_str else default_library_path
+
 
         storage.data_manager.fork_csv_dir = self.original_dm_fork_csv_dir
         storage.data_manager.ratings_csv_dir = self.original_dm_ratings_csv_dir

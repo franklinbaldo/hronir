@@ -141,11 +141,11 @@ def test_migration_script_arg_parsing_defaults(temp_data_dirs):
         str(temp_data_dirs["backup_root"]),  # data/
     )
     assert res.returncode == 0, f"Script failed: {res.stderr}"
-    assert "Starting data migration to DuckDB" in res.stdout
-    assert "Data migration to" in res.stdout
+    assert "Starting data migration to DuckDB" in res.stderr  # Logging goes to stderr
+    assert "Data migration to" in res.stderr  # Logging goes to stderr
     assert (
-        str(temp_data_dirs["db_path"].name) in res.stdout
-    )  # Check if specified db name is mentioned
+        str(temp_data_dirs["db_path"].name) in res.stderr
+    )  # Check if specified db name is mentioned in stderr
 
 
 @pytest.mark.skipif(migrate_to_duckdb is None, reason="migrate_to_duckdb.py not found")
@@ -168,7 +168,7 @@ def test_backup_functionality(temp_data_dirs: dict[str, Path]):
         str(temp_data_dirs["backup_root"] / "backup"),  # Explicitly data/backup
     )
     assert res.returncode == 0, f"Script failed: {res.stderr}"
-    assert "Backing up data to" in res.stdout
+    assert "Backing up data to" in res.stderr  # Logging goes to stderr
 
     backup_base = temp_data_dirs["backup_root"] / "backup"  # data/backup
     assert backup_base.exists()
@@ -275,7 +275,7 @@ def test_enable_sharding_flag(temp_data_dirs: dict[str, Path], capsys):
     )
     assert res.returncode == 0, f"Script failed: {res.stderr}"
     assert (
-        "--enable-sharding is specified, but sharding logic is not fully implemented" in res.stdout
+        "--enable-sharding is specified, but sharding logic is not fully implemented" in res.stderr  # Logging goes to stderr
     )
 
 
@@ -303,8 +303,8 @@ def test_empty_or_missing_sources(temp_data_dirs: dict[str, Path]):
         str(temp_data_dirs["library"]),
     )
     assert res.returncode == 0, f"Script failed: {res.stderr}"
-    assert "No path CSV files found or processed" in res.stdout
-    assert "Votes CSV file not found" in res.stdout
+    assert "No path CSV files found or processed" in res.stderr  # Logging goes to stderr
+    assert "Votes CSV file not found" in res.stderr  # Logging goes to stderr
 
     conn = duckdb.connect(str(db_file), read_only=True)
     paths_count = conn.execute("SELECT COUNT(*) FROM paths;").fetchone()[0]

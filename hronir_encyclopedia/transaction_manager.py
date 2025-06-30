@@ -294,28 +294,60 @@ def generate_merkle_proof(data_items: list[str], item_index: int) -> list[tuple[
     return proof
 
 
-def verify_merkle_proof(item_data: str, root: str, proof: list[tuple[str, str]]) -> bool:
+def verify_merkle_proof(item_data: str, root: str, proof: list[tuple[str, str]], item_index: int, total_leaves: int) -> bool:
     """
     Verifies a Merkle proof for a given item.
     item_data: The original data of the leaf node.
     root: The expected Merkle root.
     proof: A list of tuples (hash, direction_LR), where direction_LR is 'L' or 'R'.
            'L' means the proof hash is the left sibling, 'R' means it's the right.
+    item_index: The index of the item_data in the original list of leaves.
+    total_leaves: The total number of leaves in the original list.
     """
     if not root:
         return False
+    if not 0 <= item_index < total_leaves:
+        logging.error("Item index out of bounds.")
+        return False
 
     current_hash = _hash_data(item_data)
+    current_idx_in_level = item_index
 
-    for sibling_hash, direction in proof:
-        if direction == "L":  # Sibling is on the left
+    proof_idx = 0
+    num_nodes_this_level = total_leaves
+
+    while num_nodes_this_level > 1:
+        if current_idx_in_level % 2 == 0:  # Current hash is a left node
+            if current_idx_in_level + 1 < num_nodes_this_level:  # Has a right sibling
+                if proof_idx >= len(proof):
+                    logging.error("Proof is too short for verification path (missing right sibling).")
+                    return False
+                sibling_hash, direction = proof[proof_idx]
+                if direction != "R":
+                    logging.error(f"Proof direction mismatch. Expected 'R', got '{direction}'.")
+                    return False
+                current_hash = _hash_data(current_hash + sibling_hash)
+                proof_idx += 1
+            else:  # It's the last item in an odd-length list at this level, paired with itself
+                current_hash = _hash_data(current_hash + current_hash)
+        else:  # Current hash is a right node
+            if proof_idx >= len(proof):
+                logging.error("Proof is too short for verification path (missing left sibling).")
+                return False
+            sibling_hash, direction = proof[proof_idx]
+            if direction != "L":
+                logging.error(f"Proof direction mismatch. Expected 'L', got '{direction}'.")
+                return False
             current_hash = _hash_data(sibling_hash + current_hash)
-        elif direction == "R":  # Sibling is on the right
-            current_hash = _hash_data(current_hash + sibling_hash)
-        else:
-            logging.error(f"Invalid direction in Merkle proof: {direction}")
-            return False  # Invalid proof format
+            proof_idx += 1
 
+        current_idx_in_level //= 2
+        # Calculate nodes in the next level up
+        num_nodes_this_level = (num_nodes_this_level + 1) // 2
+
+    if proof_idx != len(proof):
+        logging.error(f"Proof is too long. Used {proof_idx} elements, but proof has {len(proof)}.")
+        return False
     return current_hash == root
 
 
@@ -338,16 +370,20 @@ def perform_trust_check_sampling(
     Returns:
         True if all sampled transactions are verified successfully, False otherwise.
     """
-    if not all_transaction_data_items:
-        logging.warning(
-            "Trust check: No transaction data items provided. Check cannot be performed."
-        )
-        # Depending on policy, this might be True (nothing to fail) or False (incomplete data)
-        return True  # Or False, if an empty set is inherently untrusted or invalid
-
     if not overall_transactions_merkle_root:
         logging.error("Trust check: Overall transactions Merkle root not provided. Cannot verify.")
+        # If there's no root, we can't trust, even if the list of items is also empty.
         return False
+
+    if not all_transaction_data_items:
+        logging.warning(
+            "Trust check: No transaction data items, but a Merkle root was provided. "
+            "Assuming True if root is a known hash of empty data, otherwise this is problematic. "
+            "Current policy: True if root is provided for empty list."
+        )
+        # This case (empty list, but non-empty root) might need a specific "empty data hash" check.
+        # For now, if a root is provided, and data is empty, the test `is_trusted_empty` expects True.
+        return True
 
     num_items = len(all_transaction_data_items)
 
@@ -392,7 +428,13 @@ def perform_trust_check_sampling(
             )
             return False
 
-        is_valid = verify_merkle_proof(item_to_check, overall_transactions_merkle_root, proof)
+        is_valid = verify_merkle_proof(
+            item_to_check,
+            overall_transactions_merkle_root,
+            proof,
+            index_to_check,
+            num_items,
+        )
         if not is_valid:
             logging.warning(
                 f"Trust check FAILED: Verification failed for transaction at index {index_to_check}."

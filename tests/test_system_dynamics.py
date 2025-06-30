@@ -526,7 +526,7 @@ def test_merkle_tree_and_proof_dynamics(sample_transactions_data: list[str]):
         proof = generate_merkle_proof(sample_transactions_data, i)
         assert proof is not None, f"Proof should be generated for transaction at index {i}."
 
-        is_valid = verify_merkle_proof(tx_data, merkle_root, proof)  # type: ignore
+        is_valid = verify_merkle_proof(tx_data, merkle_root, proof, i, len(sample_transactions_data))
         assert is_valid, f"Merkle proof verification should pass for transaction at index {i}."
 
     # 3. Test with a modified transaction (should fail verification)
@@ -539,18 +539,18 @@ def test_merkle_tree_and_proof_dynamics(sample_transactions_data: list[str]):
         assert proof_for_original is not None
 
         # Verification should fail if data is tampered with
-        is_valid_modified = verify_merkle_proof(modified_tx_data, merkle_root, proof_for_original)  # type: ignore
+        is_valid_modified = verify_merkle_proof(modified_tx_data, merkle_root, proof_for_original, 0, len(sample_transactions_data))
         assert not is_valid_modified, "Verification should fail for tampered transaction data."
 
         # Verification should fail if root is incorrect
         is_valid_wrong_root = verify_merkle_proof(
-            original_tx_data, "incorrect_merkle_root_value", proof_for_original
-        )  # type: ignore
+            original_tx_data, "incorrect_merkle_root_value", proof_for_original, 0, len(sample_transactions_data)
+        )
         assert not is_valid_wrong_root, "Verification should fail for incorrect Merkle root."
 
         # Verification should fail if proof is incorrect/tampered
-        if proof_for_original:  # type: ignore
-            tampered_proof = list(proof_for_original)  # type: ignore
+        if proof_for_original:
+            tampered_proof = list(proof_for_original)
             if tampered_proof:
                 # Modify one hash in the proof
                 original_hash, direction = tampered_proof[0]
@@ -561,7 +561,7 @@ def test_merkle_tree_and_proof_dynamics(sample_transactions_data: list[str]):
                     direction,
                 )
                 is_valid_tampered_proof = verify_merkle_proof(
-                    original_tx_data, merkle_root, tampered_proof
+                    original_tx_data, merkle_root, tampered_proof, 0, len(sample_transactions_data)
                 )
                 assert not is_valid_tampered_proof, "Verification should fail for tampered proof."
 
