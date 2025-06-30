@@ -234,4 +234,61 @@ Esta seção resume as tarefas de migração para o sistema distribuído propost
 
 **Ready for**: Focusing on "P0 - Post-Pivot Cleanup & Refinement" tasks.
 
+---
+
+## 🔥 NEW HIGH PRIORITY TASKS (Identified YYYY-MM-DD)
+
+The following tasks have been identified as high priority based on recent test suite results and code review. They address critical failures and inconsistencies in core protocol functionality.
+
+- [ ] **Fix `determine_next_duel_entropy` Argument Error in Session Start**
+    - **Context**: Multiple tests in `test_protocol_v2.py` (e.g., `test_mandate_double_spend_prevention`, `test_temporal_cascade_trigger`) and `test_sessions_and_cascade.py` (e.g., `test_scenario_1_dossier_and_limited_verdict`) are failing with a `TypeError: determine_next_duel_entropy() got an unexpected keyword argument 'session'`. This error occurs during the `hronir session start` CLI command execution within these tests.
+    - **Problem**: The `determine_next_duel_entropy` function, likely called by `session_manager.create_session_dossier` or a related function, is being invoked with an incorrect set of arguments. The `session` argument seems to be unexpected.
+    - **Impact**: This is a critical failure blocking the session start mechanism, which is fundamental for users/agents to participate in judgment sessions and influence the narrative.
+    - **Action**:
+        1. Investigate the call stack leading to `determine_next_duel_entropy` within the `session start` workflow.
+        2. Identify where the unexpected `session` argument is introduced or if the function signature has changed and call sites were not updated.
+        3. Correct the function call or the function signature to align them. Ensure that `determine_next_duel_entropy` receives all necessary context (e.g., position, predecessor hrönir, existing ratings, canonical path) to correctly select duels.
+        4. Verify the fix by ensuring the aforementioned tests pass.
+
+- [ ] **Correct Mandate ID Generation and Verification**
+    - **Context**: The test `test_legitimate_promotion_and_mandate_issuance` in `test_protocol_v2.py` fails due to a mismatch between the generated `mandate_id` for a qualified path and the expected `mandate_id`. The test expects a Blake3 hash of `path_uuid + last_tx_hash_before_qualifying_tx`, but the actual `mandate_id` stored on the `PathModel` is a UUID (e.g., `e9e37a68-e268-4e1c-9375-8e7a800c8655`).
+    - **Problem**: There's a discrepancy in the logic for generating/assigning `mandate_id` in `transaction_manager.record_transaction` (which updates path status to QUALIFIED) and the test's expectation. The `PathModel.mandate_id` is typed as `Optional[uuid.UUID]`, but the test expects a Blake3-derived string.
+    - **Impact**: Incorrect mandate ID generation or validation could compromise the integrity of the "Tribunal of the Future" mechanism, potentially allowing unauthorized sessions or issues with tracking mandate usage.
+    - **Action**:
+        1. Clarify the intended algorithm for `mandate_id` generation: Is it a UUID or a hash-based string? The `PathModel` suggests UUID.
+        2. If UUID: Update the test expectation in `test_legitimate_promotion_and_mandate_issuance` to check for a valid UUID, not a specific Blake3 hash. The current promotion logic in `transaction_manager.record_transaction` assigns `uuid.uuid4()` to `mandate_id`.
+        3. If Blake3-based string: Update `PathModel.mandate_id` type to `Optional[str]` and modify `transaction_manager.record_transaction` to generate the mandate ID using the Blake3 algorithm as per the test's original expectation.
+        4. Ensure the chosen method is consistently applied and validated.
+
+- [ ] **Resolve Failures in Ranking and Filtering Logic**
+    - **Context**: Numerous tests in `test_ranking_filtering.py` (7 failures, e.g., `test_get_ranking_filters_by_canonical_predecessor`, `test_get_ranking_no_votes_for_heirs`) and `test_ratings_ranking.py` (`test_get_ranking`) are failing. These tests generally expect non-empty DataFrames with specific path rankings, but are receiving empty DataFrames.
+    - **Problem**: This indicates a systemic issue in `ratings.get_ranking` or the underlying data loading/filtering within the `DataManager` (Pandas or DuckDB backend). Paths might not be loaded correctly, votes might not be applied, or filtering logic (e.g., by predecessor hrönir) might be malfunctioning.
+    - **Impact**: The ranking system is fundamental to determining path quality, duel selection, and ultimately the canonical path. Failures here mean the core selection mechanism is broken.
+    - **Action**:
+        1. Debug `ratings.get_ranking` and its interaction with `DataManager` (specifically how paths and votes are loaded and provided for ranking calculations).
+        2. Verify that CSV/data file parsing in `PandasDataManager` (and `DuckDBDataManager` if active) correctly loads all necessary data for the test scenarios.
+        3. Check filtering logic within `get_ranking` or its helper functions, especially filtering by `predecessor_hrönir_uuid` and handling of position 0.
+        4. Ensure Elo calculations are performed correctly and that paths with and without votes are handled as expected by the tests.
+
+- [ ] **Fix Narrative Consistency Check for Cyclic Graphs**
+    - **Context**: The test `test_is_narrative_consistent` in `test_graph_logic.py` fails with `AssertionError: assert not True` when checking a graph known to contain a cycle. The function `graph_logic.is_narrative_consistent()` is expected to return `False` for a cyclic graph.
+    - **Problem**: The current implementation of `is_narrative_consistent` (or its underlying cycle detection, likely using NetworkX) is incorrectly identifying the test's cyclic graph as non-cyclic (consistent).
+    - **Impact**: If cycles are not correctly detected, the system might allow impossible narrative loops, compromising logical coherence.
+    - **Action**:
+        1. Review the graph construction logic within `is_narrative_consistent` to ensure nodes and edges correctly represent path dependencies.
+        2. Verify that the NetworkX function used for cycle detection (e.g., `nx.is_directed_acyclic_graph` or `nx.simple_cycles`) is appropriate and correctly interpreted.
+        3. Debug with the specific cyclic data from `test_is_narrative_consistent` to pinpoint why the cycle is not being detected.
+
+- [ ] **Implement Functional PGP Signing for Snapshots**
+    - **Context**: The "Security audit de Merkle + PGP" task was marked as complete in the Pivot Plan v2.0. However, the actual PGP signing mechanism in `transaction_manager.py` (`sign_manifest_pgp`) is a placeholder that returns a dummy signature and logs a warning.
+    - **Problem**: If PGP signatures are a required security feature for snapshot authenticity and integrity (as implied by including it in the audit and manifest structure), the current placeholder is insufficient.
+    - **Impact**: Snapshots lack a verifiable cryptographic signature, potentially undermining trust in the distributed P2P data sharing model.
+    - **Action**:
+        1. Integrate a Python PGP library (e.g., `python-gnupg` or `pgpy`).
+        2. Implement the `sign_manifest_pgp` function to use the chosen library to sign manifest data using a configured PGP private key.
+        3. Implement a corresponding verification function (e.g., `verify_manifest_pgp_signature`) that can be used by clients or other nodes to verify snapshot integrity.
+        4. Address PGP key management: How will the PGP private key be provided to the system (e.g., env variable, file, HSM)? This needs to be documented and securely handled.
+        5. Add tests for successful PGP signing and verification, and for failure modes (e.g., bad signature, wrong key).
+        6. Update GitHub Actions that might publish snapshots to include PGP key configuration and signing steps.
+
 [end of TODO.md]
