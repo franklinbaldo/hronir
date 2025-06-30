@@ -90,19 +90,13 @@ def create_session(
                 continue
             predecessor_hronir_uuid_for_duel_str = canonical_info_for_predecessor["hrönir_uuid"]
 
-        # Use database.open_database() which returns a context manager for the SQLAlchemy engine/connection
-        # ratings.determine_next_duel_entropy expects a session/connection object.
-        # The CsvDatabase context manager yields an Engine, from which a connection can be made.
-        # Or, if ratings.py can work with DuckDB directly via DataManager, this might change.
-        # For now, assuming ratings.py still needs a SQLAlchemy-like session.
-        with database.open_database() as db_engine_for_duel: # db_engine_for_duel is an sqlalchemy.engine.Engine
-            with db_engine_for_duel.connect() as db_connection_for_duel: # Get a Connection
-                duel_info_dict = ratings.determine_next_duel_entropy(
-                    position=p_idx,
-                    predecessor_hronir_uuid=predecessor_hronir_uuid_for_duel_str,
-                    session=db_connection_for_duel, # Pass the connection
-                )
-        # The connection and engine are automatically closed/disposed by the context managers.
+        # ratings.determine_next_duel_entropy currently instantiates its own DataManager,
+        # which handles its own database connections if using DuckDB.
+        # Therefore, we don't need to pass a session/connection object here.
+        duel_info_dict = ratings.determine_next_duel_entropy(
+            position=p_idx,
+            predecessor_hronir_uuid=predecessor_hronir_uuid_for_duel_str,
+        )
 
         if (
             duel_info_dict
