@@ -11,20 +11,26 @@ MandateID = uuid.UUID  # Represents the ID associated with a QUALIFIED path's ma
 
 # --- Pydantic Models for Data Validation and Business Logic ---
 class Vote(BaseModel):
-    uuid: str
-    position: int
-    voter: str
-    winner: str
-    loser: str
+    vote_id: uuid.UUID = Field(default_factory=uuid.uuid4) # vote_id is the PK
+    duel_id: uuid.UUID # Foreign key to the specific duel instance
+    voting_token_path_uuid: UUID5 # The path_uuid that cast this vote
+    chosen_winner_side: str # 'A' or 'B', referring to path_A_uuid or path_B_uuid in the duel
+    position: int # Denormalized from duel for easier querying, or could be joined
+    recorded_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
 
+    @field_validator("chosen_winner_side")
+    def side_must_be_A_or_B(cls, v):
+        if v not in ("A", "B"):
+            raise ValueError("chosen_winner_side must be 'A' or 'B'")
+        return v
 
 class Path(BaseModel):
     path_uuid: UUID5
     position: int
-    prev_uuid: UUID5 | None = None
-    uuid: UUID5
-    status: str = "PENDING"
-    mandate_id: MandateID | None = None
+    prev_uuid: UUID5 | None = None # Hrönir UUID of the predecessor content node
+    uuid: UUID5 # Hrönir UUID of the current content node this path leads to
+    # status field removed
+    # mandate_id field removed
 
 
 # --- Enhanced Transaction Models ---

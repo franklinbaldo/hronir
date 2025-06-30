@@ -1,6 +1,8 @@
 import json
-import logging  # Added to fix Ruff F821
+import logging
+import datetime # Added import
 from pathlib import Path
+import uuid # Added import for duel_id generation
 
 import duckdb
 from pydantic import ValidationError
@@ -13,12 +15,7 @@ from .sharding import ShardingManager, SnapshotManifest  # Added
 class DuckDBDataManager:
     """DuckDB-based data manager for ACID persistence."""
 
-    _instance = None
-
-    def __new__(cls, *args, **kwargs):
-        if not cls._instance:
-            cls._instance = super().__new__(cls)
-        return cls._instance
+    # Removed singleton pattern (_instance, __new__)
 
     def __init__(
         self,
@@ -46,22 +43,24 @@ class DuckDBDataManager:
                 path_uuid TEXT PRIMARY KEY,
                 position INTEGER,
                 prev_uuid TEXT,
-                uuid TEXT,
-                status TEXT,
-                mandate_id TEXT
+                uuid TEXT
             );
             """
+            # status TEXT, # Removed
+            # mandate_id TEXT # Removed
         )
         self.conn.execute(
             """
             CREATE TABLE IF NOT EXISTS votes(
-                uuid TEXT PRIMARY KEY,
+                vote_id TEXT PRIMARY KEY,
+                duel_id TEXT,
+                voting_token_path_uuid TEXT,
+                chosen_winner_side TEXT,
                 position INTEGER,
-                voter TEXT,
-                winner TEXT,
-                loser TEXT
+                recorded_at TIMESTAMP
             );
             """
+            # FOREIGN KEY (duel_id) REFERENCES pending_duels(duel_id) -- Can be added if desired
         )
         self.conn.execute(
             """
@@ -69,6 +68,32 @@ class DuckDBDataManager:
                 uuid TEXT PRIMARY KEY,
                 data TEXT
             );
+            """
+        )
+        self.conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS consumed_voting_tokens(
+                voting_token_path_uuid TEXT PRIMARY KEY,
+                consumed_at TIMESTAMP
+            );
+            """
+        )
+        self.conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS pending_duels(
+                duel_id TEXT PRIMARY KEY,
+                position INTEGER,
+                path_A_uuid TEXT,
+                path_B_uuid TEXT,
+                created_at TIMESTAMP,
+                is_active BOOLEAN
+            );
+            """
+        )
+        self.conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_pending_duels_pos_active
+            ON pending_duels (position, is_active);
             """
         )
 
@@ -86,21 +111,37 @@ class DuckDBDataManager:
                     row_dict = row.to_dict()
                     if "prev_uuid" in row_dict and pd.isna(row_dict["prev_uuid"]):
                         row_dict["prev_uuid"] = None
+
+                    # Select only relevant fields for the new PathModel schema
+                    path_model_data = {
+                        "path_uuid": row_dict.get("path_uuid"),
+                        "position": int(row_dict.get("position")) if pd.notna(row_dict.get("position")) else None,
+                        "prev_uuid": row_dict.get("prev_uuid"), # Already handles None
+                        "uuid": row_dict.get("uuid"),
+                    }
+                    # Validate required fields before creating PathModel
+                    if not all([path_model_data["path_uuid"], path_model_data["position"] is not None, path_model_data["uuid"]]):
+                        logging.warning(f"Skipping CSV row due to missing required fields: {row_dict}")
+                        continue
                     try:
-                        self.add_path(PathModel(**row_dict))
-                    except ValidationError:
+                        self.add_path(PathModel(**path_model_data))
+                    except ValidationError as e:
+                        logging.warning(f"Skipping CSV row due to PathModel validation error: {e}, row: {row_dict}")
                         continue
 
         votes_empty = self.conn.execute("SELECT COUNT(*) FROM votes").fetchone()[0] == 0
         if votes_empty:
             votes_file = self.ratings_csv_dir / "votes.csv"
             if votes_file.exists() and votes_file.stat().st_size > 0:
-                df = pd.read_csv(votes_file)
-                for _, row in df.iterrows():
-                    try:
-                        self.add_vote(Vote(**row.to_dict()))
-                    except ValidationError:
-                        continue
+                logging.info(f"Old format votes.csv found at {votes_file}. Skipping import due to schema change. New votes must be added via new system.")
+                # df = pd.read_csv(votes_file) # Old format: uuid,position,voter,winner,loser
+                # for _, row in df.iterrows():
+                #     try:
+                #         # Cannot directly map old vote structure to new Vote model
+                #         # self.add_vote(Vote(**row.to_dict()))
+                #         pass
+                #     except ValidationError:
+                #         continue
 
         tx_empty = self.conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0] == 0
         if tx_empty and self.transactions_json_dir.exists():
@@ -147,10 +188,9 @@ class DuckDBDataManager:
                 data = {
                     "path_uuid": row[0],
                     "position": row[1],
-                    "prev_uuid": row[2] if row[2] else None,
-                    "uuid": row[3],
-                    "status": row[4],
-                    "mandate_id": row[5] if row[5] else None,
+                    "prev_uuid": row[2] if row[2] else None, # Assuming column 2 is prev_uuid
+                    "uuid": row[3],                          # Assuming column 3 is uuid
+                    # status and mandate_id removed
                 }
                 paths.append(PathModel(**data))
             except ValidationError:
@@ -170,8 +210,7 @@ class DuckDBDataManager:
                     "position": row[1],
                     "prev_uuid": row[2] if row[2] else None,
                     "uuid": row[3],
-                    "status": row[4],
-                    "mandate_id": row[5] if row[5] else None,
+                    # status and mandate_id removed
                 }
                 paths.append(PathModel(**data))
             except ValidationError:
@@ -179,40 +218,28 @@ class DuckDBDataManager:
         return paths
 
     def add_path(self, path: PathModel) -> None:
-        data = path.model_dump()
+        # PathModel no longer has status or mandate_id
+        # model_dump() will only include fields defined in PathModel
+        data = path.model_dump(exclude_none=False) # Use exclude_none=False to get None for prev_uuid if it's None
+
+        # Ensure prev_uuid is correctly transformed for SQL (None becomes SQL NULL)
+        prev_uuid_for_sql = str(data["prev_uuid"]) if data["prev_uuid"] is not None else None
+
         self.conn.execute(
             """
-            INSERT INTO paths(path_uuid, position, prev_uuid, uuid, status, mandate_id)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO paths(path_uuid, position, prev_uuid, uuid)
+            VALUES (?, ?, ?, ?)
             ON CONFLICT(path_uuid) DO NOTHING
             """,
             (
                 str(data["path_uuid"]),
                 data["position"],
-                str(data["prev_uuid"] or ""),
+                prev_uuid_for_sql, # Correctly handles None for SQL NULL
                 str(data["uuid"]),
-                data.get("status", "PENDING"),
-                str(data["mandate_id"] or ""),
             ),
         )
 
-    def update_path_status(
-        self,
-        path_uuid: str,
-        status: str,
-        mandate_id: str | None = None,
-        set_mandate_explicitly: bool = False,
-    ) -> None:
-        if set_mandate_explicitly:
-            self.conn.execute(
-                "UPDATE paths SET status=?, mandate_id=? WHERE path_uuid=?",
-                (status, mandate_id, path_uuid),
-            )
-        else:
-            self.conn.execute(
-                "UPDATE paths SET status=? WHERE path_uuid=?",
-                (status, path_uuid),
-            )
+    # update_path_status method removed as path statuses are removed.
 
     def get_path_by_uuid(self, path_uuid: str) -> PathModel | None:
         row = self.conn.execute(
@@ -226,8 +253,7 @@ class DuckDBDataManager:
             "position": row[1],
             "prev_uuid": row[2] if row[2] else None,
             "uuid": row[3],
-            "status": row[4],
-            "mandate_id": row[5] if row[5] else None,
+            # status and mandate_id removed
         }
         try:
             return PathModel(**data)
@@ -239,34 +265,37 @@ class DuckDBDataManager:
         rows = self.conn.execute("SELECT * FROM votes").fetchall()
         votes: list[Vote] = []
         for row in rows:
+            # vote_id, duel_id, voting_token_path_uuid, chosen_winner_side, position, recorded_at
             try:
-                votes.append(
-                    Vote(
-                        uuid=row[0],
-                        position=row[1],
-                        voter=row[2],
-                        winner=row[3],
-                        loser=row[4],
-                    )
-                )
+                data = {
+                    "vote_id": row[0],
+                    "duel_id": row[1],
+                    "voting_token_path_uuid": row[2],
+                    "chosen_winner_side": row[3],
+                    "position": row[4],
+                    "recorded_at": row[5],
+                }
+                votes.append(Vote(**data))
             except ValidationError:
                 continue
         return votes
 
     def add_vote(self, vote: Vote) -> None:
-        data = vote.model_dump()
+        # Vote model now has: vote_id, duel_id, voting_token_path_uuid, chosen_winner_side, position, recorded_at
+        data = vote.model_dump(mode='json') # mode='json' ensures UUIDs are strings for DB
         self.conn.execute(
             """
-            INSERT INTO votes(uuid, position, voter, winner, loser)
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(uuid) DO NOTHING
+            INSERT INTO votes(vote_id, duel_id, voting_token_path_uuid, chosen_winner_side, position, recorded_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(vote_id) DO NOTHING
             """,
             (
-                data["uuid"],
+                data["vote_id"],
+                data["duel_id"],
+                data["voting_token_path_uuid"],
+                data["chosen_winner_side"],
                 data["position"],
-                data["voter"],
-                data["winner"],
-                data["loser"],
+                data["recorded_at"],
             ),
         )
 
@@ -277,16 +306,17 @@ class DuckDBDataManager:
         ).fetchall()
         votes: list[Vote] = []
         for row in rows:
+            # vote_id, duel_id, voting_token_path_uuid, chosen_winner_side, position, recorded_at
             try:
-                votes.append(
-                    Vote(
-                        uuid=row[0],
-                        position=row[1],
-                        voter=row[2],
-                        winner=row[3],
-                        loser=row[4],
-                    )
-                )
+                data = {
+                    "vote_id": row[0],
+                    "duel_id": row[1],
+                    "voting_token_path_uuid": row[2],
+                    "chosen_winner_side": row[3],
+                    "position": row[4], # This is already known from the WHERE clause, but good to include
+                    "recorded_at": row[5],
+                }
+                votes.append(Vote(**data))
             except ValidationError:
                 continue
         return votes
@@ -326,6 +356,64 @@ class DuckDBDataManager:
         except (json.JSONDecodeError, ValidationError):
             return None
 
+    # --- Consumed Voting Token operations ---
+    def add_consumed_token(self, voting_token_path_uuid: str, consumed_at: datetime.datetime) -> None:
+        self.conn.execute(
+            "INSERT INTO consumed_voting_tokens (voting_token_path_uuid, consumed_at) VALUES (?, ?)",
+            (voting_token_path_uuid, consumed_at)
+        )
+
+    def is_token_consumed(self, voting_token_path_uuid: str) -> bool:
+        res = self.conn.execute(
+            "SELECT COUNT(*) FROM consumed_voting_tokens WHERE voting_token_path_uuid = ?",
+            (voting_token_path_uuid,)
+        ).fetchone()
+        return res[0] > 0 if res else False
+
+    # --- Pending Duel operations ---
+    def add_pending_duel(self, position: int, path_A_uuid: str, path_B_uuid: str, created_at: datetime.datetime) -> str:
+        duel_id = str(uuid.uuid4()) # Generate a new unique ID for the duel
+        self.conn.execute(
+            """
+            INSERT INTO pending_duels (duel_id, position, path_A_uuid, path_B_uuid, created_at, is_active)
+            VALUES (?, ?, ?, ?, ?, TRUE)
+            """,
+            (duel_id, position, path_A_uuid, path_B_uuid, created_at)
+        )
+        return duel_id
+
+    def get_active_duel_for_position(self, position: int) -> dict | None:
+        res = self.conn.execute(
+            "SELECT duel_id, path_A_uuid, path_B_uuid FROM pending_duels WHERE position = ? AND is_active = TRUE",
+            (position,)
+        ).fetchone()
+        if res:
+            return {"duel_id": res[0], "path_A_uuid": res[1], "path_B_uuid": res[2]}
+        return None
+
+    def deactivate_duel(self, duel_id: str) -> None:
+        self.conn.execute(
+            "UPDATE pending_duels SET is_active = FALSE WHERE duel_id = ?",
+            (duel_id,)
+        )
+
+    def get_duel_details(self, duel_id: str) -> dict | None:
+        """Fetches details of a specific duel by its ID."""
+        res = self.conn.execute(
+            "SELECT position, path_A_uuid, path_B_uuid, created_at, is_active FROM pending_duels WHERE duel_id = ?",
+            (duel_id,)
+        ).fetchone()
+        if res:
+            return {
+                "duel_id": duel_id,
+                "position": res[0],
+                "path_A_uuid": res[1],
+                "path_B_uuid": res[2],
+                "created_at": res[3],
+                "is_active": res[4]
+            }
+        return None
+
     # --- Utility methods ---
     def initialize_if_needed(self) -> None:
         if not self._initialized:
@@ -335,6 +423,8 @@ class DuckDBDataManager:
         self.conn.execute("DELETE FROM paths")
         self.conn.execute("DELETE FROM votes")
         self.conn.execute("DELETE FROM transactions")
+        self.conn.execute("DELETE FROM consumed_voting_tokens")
+        self.conn.execute("DELETE FROM pending_duels") # Added this line
         self.conn.commit()
 
     def __enter__(self) -> "DuckDBDataManager":

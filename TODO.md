@@ -4,6 +4,64 @@ This document outlines the development roadmap for the **Hrönir Encyclopedia** 
 
 ---
 
+## 🔥 P0 - Implement Ledger-Based Voting Protocol (v2.1) (NEW)
+
+This section outlines tasks to implement the new Ledger-Based Voting Protocol, which includes making DuckDB the sole backend, removing path statuses for voting, and introducing a new atomic vote casting mechanism. This supersedes the previous "Finalize DuckDB-Only Architecture" and "Post-Pivot Cleanup & Refinement" P0 tasks for these items.
+
+**Phase 1: Core Data Model and Mandate Refactoring (DuckDB Focused)**
+
+1.  **Update `PathModel` and `paths` Table Schema (DuckDB):**
+    *   In `hronir_encyclopedia/models.py`: Remove `status` and `mandate_id` fields from `PathModel`.
+    *   In `hronir_encyclopedia/duckdb_storage.py`:
+        *   Modify the `CREATE TABLE paths` schema to remove `status` and `mandate_id` columns.
+        *   Update all methods interacting with the `paths` table (`add_path`, `get_path_by_uuid`, `get_all_paths`, `get_paths_by_position`) to reflect the new schema. The `update_path_status` method will be removed entirely.
+2.  **Create `consumed_voting_tokens` Table (DuckDB):**
+    *   In `hronir_encyclopedia/duckdb_storage.py`:
+        *   Define schema: `CREATE TABLE consumed_voting_tokens (voting_token_path_uuid TEXT PRIMARY KEY, consumed_at TIMESTAMP);`
+        *   Add methods: `add_consumed_token(voting_token_path_uuid: str, consumed_at: datetime)` and `is_token_consumed(voting_token_path_uuid: str) -> bool`.
+    *   Add corresponding interface methods to `hronir_encyclopedia/storage.py`'s `DataManager`.
+3.  **Create `pending_duels` Ledger Table (DuckDB):**
+    *   In `hronir_encyclopedia/duckdb_storage.py`:
+        *   Define schema: `CREATE TABLE pending_duels (duel_id TEXT PRIMARY KEY, position INT, path_A_uuid TEXT, path_B_uuid TEXT, created_at TIMESTAMP, is_active BOOLEAN);`
+        *   Add index on `(position, is_active)`.
+        *   Add methods:
+            *   `add_pending_duel(position: int, path_A_uuid: str, path_B_uuid: str, created_at: datetime) -> str_duel_id`
+            *   `get_active_duel_for_position(position: int) -> Optional[dict_duel_data]`
+            *   `deactivate_duel(duel_id: str)`.
+            *   `get_duel_details(duel_id: str) -> Optional[dict_duel_data]` (already added)
+    *   Add corresponding interface methods to `hronir_encyclopedia/storage.py`'s `DataManager`.
+4.  **Refactor `recorded_votes` Table and `Vote` Model:**
+    *   In `hronir_encyclopedia/models.py`: Change `Vote` model to `(vote_id TEXT, duel_id TEXT, voting_token_path_uuid TEXT, chosen_winner_side TEXT, position INT, recorded_at TIMESTAMP)`.
+    *   In `hronir_encyclopedia/duckdb_storage.py`: Update `CREATE TABLE votes` schema and refactor `add_vote`, `get_votes_by_position`, `get_all_votes`.
+5.  **Refactor `ratings.record_vote` and `ratings.get_ranking`:**
+    *   `ratings.record_vote`: Adapt signature (e.g., `duel_id, voting_token_path_uuid, chosen_winner_side, position`) and logic for new `Vote` model.
+    *   `ratings.get_ranking`: Adapt to use new `Vote` model structure, fetching duel details to determine winner/loser path UUIDs for Elo calculation.
+
+**Phase 2: Implement New Voting Logic & Refactor CLI**
+
+6.  **Implement Logic to Populate/Update `pending_duels` Ledger:**
+    *   Create `generate_and_store_new_pending_duel(position: int, predecessor_hrönir_uuid: str | None, dm: DataManager, created_at: datetime)` in `ratings.py` or a new `duel_manager.py`.
+    *   Update `hronir init-test` to call this for initial duel population.
+7.  **Implement `hronir cast-vote` CLI Command (detailed):**
+    *   Define in `cli.py` with inputs: `--voting-token TEXT` (path\_uuid), `--verdicts TEXT` (JSON `{"position_str": "chosen_winning_path_uuid"}`).
+    *   Full validation and processing logic as previously detailed (check token, power `ceil(sqrt(N))`, validate against active pending duel, record votes, consume token, update pending duels, trigger cascade).
+8.  **Create `hronir list-pending-duels` CLI Command.**
+9.  **Remove Old Session System (Final Pass):** Delete `cli.session_start/commit`, `session_app`. Update `init-test`, remove all `session_manager` imports/calls from tests.
+
+**Phase 3: Testing, Remaining Fixes, and Documentation**
+
+10. **Refactor Test Suite (`test_protocol_v2.py`, `test_sessions_and_cascade.py` -> `test_voting_and_cascade.py`):** Adapt all tests to new `cast-vote` command and duel ledger.
+11. **Refine `run_temporal_cascade` (Pos 0 Heuristic):** Implement "If position 0 no winner, replace" rule.
+12. **Fix `test_temporal_cascade_trigger`:** Ensure it passes with all new logic.
+13. **Address `test_mandate_double_spend_prevention` (now `test_token_reuse_prevention`):** Ensure a `voting_token_path_uuid` cannot vote twice via `consumed_voting_tokens`.
+14. **Complete DuckDB Transition:** Remove all residual CSV I/O from `DuckDBDataManager` for paths/votes. Rename `DataManager.save_all_data_to_csvs()` to `persist_changes()`.
+15. **Fix Other Test Failures (e.g. `test_sybil_resistance`, `test_graph_logic`, `test_ranking_filtering`).**
+16. **Improve Test Readability & Coverage.**
+17. **Update All Documentation (`README.md`, `docs/ledger_based_voting_protocol.md`, etc.).**
+18. **Submit Changes.**
+
+---
+
 ## ❗ P0 – Pivot Plan v2.0
 Esta seção resume as tarefas de migração para o sistema distribuído proposto em [pivot_plan_v2.md](docs/pivot_plan_v2.md).
 

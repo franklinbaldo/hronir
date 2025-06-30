@@ -13,21 +13,22 @@ from hronir_encyclopedia.models import Path as PathModel
 
 runner = CliRunner()
 
-TEST_ROOT = Path("temp_test_data")
+TEST_ROOT = Path("temp_test_data_sessions") # Unique name for this test file's temp data
+# Absolute paths for reference if needed, but tests will chdir
 LIBRARY_DIR_abs = (Path.cwd() / TEST_ROOT / "the_library").resolve()
-FORKING_PATH_DIR_abs = (Path.cwd() / TEST_ROOT / "narrative_paths").resolve()
-RATINGS_DIR_abs = (Path.cwd() / TEST_ROOT / "ratings").resolve()
-DATA_DIR_abs = (Path.cwd() / TEST_ROOT / "data").resolve()
-SESSIONS_DIR_fixture_abs = (DATA_DIR_abs / "sessions").resolve()
-TRANSACTIONS_DIR_fixture_abs = (DATA_DIR_abs / "transactions").resolve()
-CANONICAL_PATH_FILE_fixture_abs = (DATA_DIR_abs / "canonical_path.json").resolve()
+DATA_DIR_abs = (Path.cwd() / TEST_ROOT / "data").resolve() # Base for DB and JSON files
+DB_FILE_abs = (DATA_DIR_abs / "test_hronir_sessions.duckdb").resolve() # Test-specific DB
+SESSIONS_DIR_abs = (DATA_DIR_abs / "sessions").resolve()
+TRANSACTIONS_DIR_abs = (DATA_DIR_abs / "transactions").resolve()
+CANONICAL_PATH_FILE_abs = (DATA_DIR_abs / "canonical_path.json").resolve()
 
-FORKING_PATH_DIR_runtime = Path("narrative_paths")
-RATINGS_DIR_runtime = Path("ratings")
-DATA_DIR_runtime = Path("data")
+# Runtime paths, relative to TEST_ROOT after chdir
+# FORKING_PATH_DIR_runtime and RATINGS_DIR_runtime are removed (data in DuckDB)
+DATA_DIR_runtime = Path("data") # This will be data dir inside TEST_ROOT
 SESSIONS_DIR_runtime = DATA_DIR_runtime / "sessions"
 TRANSACTIONS_DIR_runtime = DATA_DIR_runtime / "transactions"
 CANONICAL_PATH_FILE_runtime = DATA_DIR_runtime / "canonical_path.json"
+# DB_FILE_runtime will be DATA_DIR_runtime / "test_hronir_sessions.duckdb"
 
 
 def compute_uuid_from_content_helper(content: str) -> uuid.UUID:
@@ -116,18 +117,18 @@ def _get_canonical_path() -> dict:
     return json.loads(CANONICAL_PATH_FILE_runtime.read_text())["path"]
 
 
-def _get_session_file_data(session_id: str) -> dict | None:
-    session_file = SESSIONS_DIR_runtime / f"{session_id}.json"
-    if not session_file.exists():
-        return None
-    return json.loads(session_file.read_text())
+# def _get_session_file_data(session_id: str) -> dict | None:
+#     session_file = SESSIONS_DIR_runtime / f"{session_id}.json"
+#     if not session_file.exists():
+#         return None
+#     return json.loads(session_file.read_text())
 
 
-def _get_consumed_forks_data() -> dict:
-    consumed_file = SESSIONS_DIR_runtime / "consumed_fork_uuids.json"
-    if not consumed_file.exists():
-        return {}
-    return json.loads(consumed_file.read_text())
+# def _get_consumed_paths_data() -> dict: # Renamed function
+#     consumed_file = SESSIONS_DIR_runtime / "consumed_path_uuids.json" # Corrected filename
+#     if not consumed_file.exists():
+#         return {}
+#     return json.loads(consumed_file.read_text())
 
 
 def _get_transaction_data(tx_uuid: str) -> dict | None:
@@ -223,125 +224,169 @@ def _qualify_fork(
 
 @pytest.fixture(autouse=True)
 def test_environment(monkeypatch):
-    resolved_test_root = Path.cwd() / TEST_ROOT
+    resolved_test_root = (Path.cwd() / TEST_ROOT).resolve()
 
     if resolved_test_root.exists():
         shutil.rmtree(resolved_test_root)
-
     resolved_test_root.mkdir(parents=True)
-    (resolved_test_root / "the_library").mkdir(parents=True, exist_ok=True)
-    (resolved_test_root / "narrative_paths").mkdir(parents=True, exist_ok=True)
-    (resolved_test_root / "ratings").mkdir(parents=True, exist_ok=True)
-    (resolved_test_root / "data").mkdir(parents=True, exist_ok=True)
-    (resolved_test_root / "data" / "sessions").mkdir(parents=True, exist_ok=True)
-    (resolved_test_root / "data" / "transactions").mkdir(parents=True, exist_ok=True)
+
+    # Create necessary subdirectories within the resolved_test_root
+    library_runtime_path = resolved_test_root / "the_library"
+    data_runtime_path = resolved_test_root / "data"
+    db_file_runtime_path = data_runtime_path / "test_hronir_sessions.duckdb" # Test-specific DB file
+
+    sessions_runtime_path = data_runtime_path / "sessions"
+    transactions_runtime_path = data_runtime_path / "transactions"
+
+    library_runtime_path.mkdir(parents=True, exist_ok=True)
+    data_runtime_path.mkdir(parents=True, exist_ok=True) # For DB and JSON files
+    sessions_runtime_path.mkdir(parents=True, exist_ok=True)
+    transactions_runtime_path.mkdir(parents=True, exist_ok=True)
 
     original_cwd = Path.cwd()
-    os.chdir(resolved_test_root)
+    os.chdir(resolved_test_root) # Change CWD to the test root for relative path consistency
 
-    original_fork_dir = storage.data_manager.fork_csv_dir
-    original_ratings_dir = storage.data_manager.ratings_csv_dir
-    original_tx_dir = storage.data_manager.transactions_json_dir
-    original_initialized = storage.data_manager._initialized
+    # Store and set environment variables for test-specific paths
+    original_env_library_dir = os.getenv("HRONIR_LIBRARY_DIR")
+    original_env_duckdb_path = os.getenv("HRONIR_DUCKDB_PATH")
 
-    storage.data_manager.fork_csv_dir = Path("narrative_paths")
-    storage.data_manager.ratings_csv_dir = Path("ratings")
-    storage.data_manager.transactions_json_dir = Path("data") / "transactions"
+    monkeypatch.setenv("HRONIR_LIBRARY_DIR", str(library_runtime_path))
+    monkeypatch.setenv("HRONIR_DUCKDB_PATH", str(db_file_runtime_path))
 
-    storage.data_manager._initialized = False
-    storage.data_manager.initialize_and_load(clear_existing_data=True)
+    # Delete test DB file if it exists from a previous run
+    if db_file_runtime_path.exists():
+        db_file_runtime_path.unlink()
 
-    yield
+    # Force re-instantiation and re-initialization of the global DataManager
+    if storage.data_manager._instance is not None:
+        if hasattr(storage.data_manager.backend, 'conn') and storage.data_manager.backend.conn is not None:
+            try:
+                storage.data_manager.backend.conn.close()
+            except Exception: pass # Ignore errors if already closed
+    monkeypatch.setattr(storage, "data_manager", storage.DataManager()) # Create new instance with new env vars
 
-    os.chdir(original_cwd)
+    # Initialize the new global DataManager instance
+    storage.data_manager.initialize_and_load(clear_existing_data=True) # Creates tables, clears them
 
-    storage.data_manager.fork_csv_dir = original_fork_dir
-    storage.data_manager.ratings_csv_dir = original_ratings_dir
-    storage.data_manager.transactions_json_dir = original_tx_dir
-    storage.data_manager._initialized = original_initialized
+    # Patch module-level paths for transaction_manager (for JSON files)
+    # Session manager specific paths are removed.
+    monkeypatch.setattr(transaction_manager, "TRANSACTIONS_DIR", Path("data/transactions"))
+    monkeypatch.setattr(transaction_manager, "HEAD_FILE", Path("data/transactions/HEAD"))
+    # monkeypatch.setattr(session_manager, "SESSIONS_DIR", Path("data/sessions")) # Removed
+    # monkeypatch.setattr(session_manager, "CONSUMED_PATHS_FILE", Path("data/sessions/consumed_path_uuids.json")) # Removed
 
-    if storage.data_manager._initialized:
-        storage.data_manager.clear_in_memory_data()
+    # Ensure HEAD file exists if transaction_manager relies on it
+    if not (Path("data/transactions/HEAD")).exists():
+        (Path("data/transactions/HEAD")).write_text("")
+
+
+    yield # Run the test
+
+    # Teardown
+    os.chdir(original_cwd) # Change back to original CWD
+
+    if storage.data_manager._instance is not None and hasattr(storage.data_manager.backend, 'conn') and storage.data_manager.backend.conn is not None:
+        try:
+            storage.data_manager.backend.conn.close()
+        except Exception: pass
+
+    # Restore original environment variables if they were set, otherwise unset
+    if original_env_library_dir is None:
+        monkeypatch.delenv("HRONIR_LIBRARY_DIR", raising=False)
+    else:
+        monkeypatch.setenv("HRONIR_LIBRARY_DIR", original_env_library_dir)
+
+    if original_env_duckdb_path is None:
+        monkeypatch.delenv("HRONIR_DUCKDB_PATH", raising=False)
+    else:
+        monkeypatch.setenv("HRONIR_DUCKDB_PATH", original_env_duckdb_path)
+
+    # Force DataManager to re-initialize on next access outside this test env
+    if storage.data_manager._instance is not None:
+        storage.data_manager._instance = None
 
     shutil.rmtree(resolved_test_root)
 
 
-class TestSessionWorkflow:
-    def test_scenario_1_dossier_and_limited_verdict(self):
-        h0a_content = "Hrönir 0A"
-        h0a_uuid = str(compute_uuid_from_content_helper(h0a_content))
-        _create_hronir(h0a_uuid, h0a_content)
-        f0a_path_uuid = _create_fork_entry(0, None, h0a_uuid)
+# class TestSessionWorkflow:
+# TODO: Refactor these tests for the new 'cast-votes' command and remove session-specific logic.
+# For now, all old session-based tests are commented out.
 
-        h0b_content = "Hrönir 0B"
-        h0b_uuid = str(compute_uuid_from_content_helper(h0b_content))
-        _create_hronir(h0b_uuid, h0b_content)
-        f0b_path_uuid = _create_fork_entry(0, None, h0b_uuid)
+    # def test_scenario_1_dossier_and_limited_verdict(self):
+    #     h0a_content = "Hrönir 0A"
+    #     h0a_uuid = str(compute_uuid_from_content_helper(h0a_content))
+    #     _create_hronir(h0a_uuid, h0a_content)
+    #     f0a_path_uuid = _create_fork_entry(0, None, h0a_uuid)
 
-        _init_canonical_path({"0": {"path_uuid": f0a_path_uuid, "hrönir_uuid": h0a_uuid}})
+    #     h0b_content = "Hrönir 0B"
+    #     h0b_uuid = str(compute_uuid_from_content_helper(h0b_content))
+    #     _create_hronir(h0b_uuid, h0b_content)
+    #     f0b_path_uuid = _create_fork_entry(0, None, h0b_uuid)
 
-        h1a_content = "Hrönir 1A from 0A"
-        h1a_uuid = str(compute_uuid_from_content_helper(h1a_content))
-        _create_hronir(h1a_uuid, h1a_content)
-        f1a_path_uuid = _create_fork_entry(1, h0a_uuid, h1a_uuid)
+    #     _init_canonical_path({"0": {"path_uuid": f0a_path_uuid, "hrönir_uuid": h0a_uuid}})
 
-        _init_canonical_path(
-            {
-                "0": {"path_uuid": f0a_path_uuid, "hrönir_uuid": h0a_uuid},
-                "1": {"path_uuid": f1a_path_uuid, "hrönir_uuid": h1a_uuid},
-            }
-        )
+    #     h1a_content = "Hrönir 1A from 0A"
+    #     h1a_uuid = str(compute_uuid_from_content_helper(h1a_content))
+    #     _create_hronir(h1a_uuid, h1a_content)
+    #     f1a_path_uuid = _create_fork_entry(1, h0a_uuid, h1a_uuid)
 
-        h2_judge_content = "Hrönir 2 Judge from 1A"
-        h2_judge_uuid = str(compute_uuid_from_content_helper(h2_judge_content))
-        _create_hronir(h2_judge_uuid, h2_judge_content)
-        f2_judge_path_uuid = _create_fork_entry(2, h1a_uuid, h2_judge_uuid)
+    #     _init_canonical_path(
+    #         {
+    #             "0": {"path_uuid": f0a_path_uuid, "hrönir_uuid": h0a_uuid},
+    #             "1": {"path_uuid": f1a_path_uuid, "hrönir_uuid": h1a_uuid},
+    #         }
+    #     )
 
-        _qualify_fork(f2_judge_path_uuid, h2_judge_uuid, 2, h1a_uuid)
+    #     h2_judge_content = "Hrönir 2 Judge from 1A"
+    #     h2_judge_uuid = str(compute_uuid_from_content_helper(h2_judge_content))
+    #     _create_hronir(h2_judge_uuid, h2_judge_content)
+    #     f2_judge_path_uuid = _create_fork_entry(2, h1a_uuid, h2_judge_uuid)
 
-        cmd_args_start = [
-            "session",
-            "start",
-            "--path-uuid",
-            f2_judge_path_uuid,
-        ]
+    #     _qualify_fork(f2_judge_path_uuid, h2_judge_uuid, 2, h1a_uuid)
 
-        result_start, output_start = _run_cli_command(cmd_args_start)
-        assert result_start.exit_code == 0, f"session start failed: {output_start}"
+    #     cmd_args_start = [
+    #         "session",
+    #         "start",
+    #         "--path-uuid",
+    #         f2_judge_path_uuid,
+    #     ]
 
-        start_output_data = json.loads(output_start)
-        session_id = start_output_data["session_id"]
+    #     result_start, output_start = _run_cli_command(cmd_args_start)
+    #     assert result_start.exit_code == 0, f"session start failed: {output_start}"
 
-        assert session_id is not None
+    #     start_output_data = json.loads(output_start)
+    #     session_id = start_output_data["session_id"]
 
-        assert SESSIONS_DIR_runtime.joinpath(f"{session_id}.json").exists()
-        consumed_forks = _get_consumed_forks_data()
-        assert consumed_forks.get(f2_judge_path_uuid) == session_id
+    #     assert session_id is not None
 
-        verdicts_json_str = json.dumps({"0": f0b_path_uuid})
-        cmd_args_commit = [
-            "session",
-            "commit",
-            "--session-id",
-            session_id,
-            "--verdicts",
-            verdicts_json_str,
-        ]
-        result_commit, output_commit = _run_cli_command(cmd_args_commit)
-        assert result_commit.exit_code == 0, f"session commit failed: {output_commit}"
+    #     # assert SESSIONS_DIR_runtime.joinpath(f"{session_id}.json").exists() # File check
+    #     # consumed_paths_data = _get_consumed_paths_data()
+    #     # assert consumed_paths_data.get(f2_judge_path_uuid) == session_id # Consumed check
 
-        tx_head_uuid = _get_head_transaction_uuid()
-        assert tx_head_uuid is not None
-        tx_data = _get_transaction_data(tx_head_uuid)
-        assert tx_data is not None
-        assert tx_data["content"]["session_id"] == session_id
-        assert tx_data["content"]["initiating_path_uuid"] == f2_judge_path_uuid
+    #     verdicts_json_str = json.dumps({"0": f0b_path_uuid})
+    #     cmd_args_commit = [
+    #         "session",
+    #         "commit",
+    #         "--session-id",
+    #         session_id,
+    #         "--verdicts",
+    #         verdicts_json_str,
+    #     ]
+    #     result_commit, output_commit = _run_cli_command(cmd_args_commit)
+    #     assert result_commit.exit_code == 0, f"session commit failed: {output_commit}"
 
-        session_file_data = _get_session_file_data(session_id)
-        assert session_file_data["status"] == "committed"
+    #     tx_head_uuid = _get_head_transaction_uuid()
+    #     assert tx_head_uuid is not None
+    #     tx_data = _get_transaction_data(tx_head_uuid)
+    #     assert tx_data is not None
+    #     # assert tx_data["content"]["session_id"] == session_id # session_id in transaction content will change
+    #     assert tx_data["content"]["initiating_path_uuid"] == f2_judge_path_uuid
 
-    def test_scenario_2_full_temporal_cascade(self):
-        pass
+    #     # session_file_data = _get_session_file_data(session_id) # Session file check
+    #     # assert session_file_data["status"] == "committed" # Status check
 
-    def test_scenario_3_dormant_vote_reactivation(self):
-        pass
+    # def test_scenario_2_full_temporal_cascade(self):
+    #     pass
+
+    # def test_scenario_3_dormant_vote_reactivation(self):
+    #     pass

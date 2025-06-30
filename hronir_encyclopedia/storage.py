@@ -1,12 +1,13 @@
 import os
 import shutil
 import uuid
+import datetime # Added for type hint
 from pathlib import Path
 
 from .duckdb_storage import DuckDBDataManager
 from .models import Path as PathModel
 from .models import Transaction, Vote
-from .pandas_data_manager import PandasDataManager
+# Removed: from .pandas_data_manager import PandasDataManager
 from .sharding import SnapshotManifest  # Added
 
 UUID_NAMESPACE = uuid.NAMESPACE_URL
@@ -25,32 +26,25 @@ class DataManager:
 
     def __init__(
         self,
-        path_csv_dir="narrative_paths",
-        ratings_csv_dir="ratings",
-        transactions_json_dir="data/transactions",
-        use_duckdb: bool | None = None,
+        path_csv_dir="narrative_paths", # Retained for DuckDBDataManager compatibility if it uses them for import/export or legacy reasons
+        ratings_csv_dir="ratings",       # Retained for DuckDBDataManager compatibility
+        transactions_json_dir="data/transactions", # Retained for DuckDBDataManager compatibility
     ):
         if hasattr(self, "_initialized") and self._initialized:
             return
 
-        if use_duckdb is None:
-            env = os.getenv("HRONIR_USE_DUCKDB", "0").lower()
-            use_duckdb = env in {"1", "true", "yes"}
+        # Enforce DuckDB backend
+        db_path = os.getenv("HRONIR_DUCKDB_PATH", "data/encyclopedia.duckdb")
+        # Ensure parent directory for db_path exists
+        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
 
-        if use_duckdb:
-            db_path = os.getenv("HRONIR_DUCKDB_PATH", "data/encyclopedia.duckdb")
-            self.backend = DuckDBDataManager(
-                db_path=db_path,
-                path_csv_dir=path_csv_dir,
-                ratings_csv_dir=ratings_csv_dir,
-                transactions_json_dir=transactions_json_dir,
-            )
-        else:
-            self.backend = PandasDataManager(
-                path_csv_dir=path_csv_dir,
-                ratings_csv_dir=ratings_csv_dir,
-                transactions_json_dir=transactions_json_dir,
-            )
+        self.backend = DuckDBDataManager(
+            db_path=db_path,
+            # Pass these paths to DuckDBDataManager; it might use them for initial import or schema reference
+            path_csv_dir=path_csv_dir,
+            ratings_csv_dir=ratings_csv_dir,
+            transactions_json_dir=transactions_json_dir,
+        )
 
         # Configurable library path
         default_library_path = Path("the_library")
@@ -197,11 +191,60 @@ class DataManager:
                 output_dir=output_dir, network_uuid=network_uuid, git_commit=git_commit
             )
         else:
-            # Fallback or error for backends that don't support snapshotting (e.g., PandasDataManager)
+            # This backend (DuckDBDataManager) is expected to support create_snapshot.
+            # If another backend were added that didn't, this warning would apply.
             print(
                 f"Warning: Backend {type(self.backend).__name__} does not support create_snapshot method."
             )
             return None
+
+    # --- Consumed Voting Token operations ---
+    def add_consumed_token(self, voting_token_path_uuid: str, consumed_at: datetime.datetime) -> None:
+        self.backend.initialize_if_needed()
+        if hasattr(self.backend, "add_consumed_token"):
+            self.backend.add_consumed_token(voting_token_path_uuid, consumed_at)
+        else:
+            # Fallback or error if backend doesn't support this
+            print(f"Warning: Backend {type(self.backend).__name__} does not support add_consumed_token.")
+
+
+    def is_token_consumed(self, voting_token_path_uuid: str) -> bool:
+        self.backend.initialize_if_needed()
+        if hasattr(self.backend, "is_token_consumed"):
+            return self.backend.is_token_consumed(voting_token_path_uuid)
+        # Fallback: if method doesn't exist, assume token is not consumed or raise error
+        print(f"Warning: Backend {type(self.backend).__name__} does not support is_token_consumed. Returning False.")
+        return False
+
+    # --- Pending Duel operations ---
+    def add_pending_duel(self, position: int, path_A_uuid: str, path_B_uuid: str, created_at: datetime.datetime) -> str | None:
+        self.backend.initialize_if_needed()
+        if hasattr(self.backend, "add_pending_duel"):
+            return self.backend.add_pending_duel(position, path_A_uuid, path_B_uuid, created_at)
+        print(f"Warning: Backend {type(self.backend).__name__} does not support add_pending_duel.")
+        return None
+
+    def get_active_duel_for_position(self, position: int) -> dict | None:
+        self.backend.initialize_if_needed()
+        if hasattr(self.backend, "get_active_duel_for_position"):
+            return self.backend.get_active_duel_for_position(position)
+        print(f"Warning: Backend {type(self.backend).__name__} does not support get_active_duel_for_position.")
+        return None
+
+    def deactivate_duel(self, duel_id: str) -> None:
+        self.backend.initialize_if_needed()
+        if hasattr(self.backend, "deactivate_duel"):
+            self.backend.deactivate_duel(duel_id)
+        else:
+            print(f"Warning: Backend {type(self.backend).__name__} does not support deactivate_duel.")
+
+    def get_duel_details(self, duel_id: str) -> dict | None:
+        """Gets details of a specific duel by its ID."""
+        self.backend.initialize_if_needed()
+        if hasattr(self.backend, "get_duel_details"):
+            return self.backend.get_duel_details(duel_id)
+        print(f"Warning: Backend {type(self.backend).__name__} does not support get_duel_details.")
+        return None
 
     # --- File operations ---
     def store_hrönir(self, file_path: Path) -> str:

@@ -20,14 +20,15 @@ from . import (
     database,
     gemini_util,
     ratings,
-    session_manager,
+    # session_manager, # Removed
     storage,
     transaction_manager,
 )
-from .models import SessionModel  # Import SessionModel for type hinting if needed
+# from .models import SessionModel # Removed
 from .transaction_manager import ConflictDetection  # For sync command
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO) # Temporary for debugging - set level early
 
 app = typer.Typer(
     help="Hrönir Encyclopedia CLI: A tool for managing and generating content for the encyclopedia.",
@@ -66,93 +67,106 @@ def recover_canon(
 @app.command("init-test", help="Generate a minimal sample narrative for quick testing.")
 def init_test(
     library_dir: Annotated[Path, typer.Option(help="Directory to store sample hrönirs.")] = Path(
-        "the_library"
+        "the_library" # This is for .md files, keep.
     ),
-    narrative_paths_dir: Annotated[Path, typer.Option(help="Directory for path CSV files.")] = Path(
-        "narrative_paths"
-    ),
-    ratings_dir: Annotated[Path, typer.Option(help="Directory for rating CSV files.")] = Path(
-        "ratings"
-    ),
-    data_dir: Annotated[Path, typer.Option(help="Directory for canonical data files.")] = Path(
+    # narrative_paths_dir and ratings_dir removed as data is now in DuckDB
+    data_dir: Annotated[Path, typer.Option(help="Directory for canonical data files, sessions, transactions, and DuckDB file.")] = Path(
         "data"
     ),
 ) -> None:
     import shutil
+    dm = storage.data_manager # Use the global DataManager instance
+    dm.initialize_if_needed()
 
+    # 1. Clear existing data from DuckDB tables
+    typer.echo("Clearing existing data from database tables (paths, votes, transactions)...")
+    dm.clear_in_memory_data() # This calls backend.clear_in_memory_data() which clears DuckDB tables
+
+    # 2. Clear filesystem artifacts (library, sessions, transactions JSONs, canonical_path.json)
     def clear_or_create_dir(dir_path: Path):
         if dir_path.exists():
             for item in dir_path.iterdir():
-                if item.is_dir():
-                    shutil.rmtree(item)
-                else:
+                if item.is_file() or item.is_symlink():
                     item.unlink()
-        else:
-            dir_path.mkdir(parents=True, exist_ok=True)
+                elif item.is_dir():
+                    shutil.rmtree(item)
+        dir_path.mkdir(parents=True, exist_ok=True) # Recreate after clearing
 
-    clear_or_create_dir(library_dir)
-    clear_or_create_dir(narrative_paths_dir)
-    clear_or_create_dir(ratings_dir)
+    typer.echo(f"Clearing and recreating hrönir library directory: {library_dir}...")
+    clear_or_create_dir(library_dir) # For .md files
 
-    sessions_dir = data_dir / "sessions"
-    transactions_dir = data_dir / "transactions"
+    # sessions_dir is no longer specifically cleared here as session files are removed.
+    # data_dir (its parent) will be created if it doesn't exist by DuckDB setup or other file ops.
+    # consumed_paths_file is also removed.
 
-    if not data_dir.exists():
-        data_dir.mkdir(parents=True, exist_ok=True)
-
-    clear_or_create_dir(sessions_dir)
+    transactions_dir = data_dir / "transactions" # For transaction JSON files
+    typer.echo(f"Clearing and recreating transactions directory: {transactions_dir}...")
     clear_or_create_dir(transactions_dir)
+    # Also clear HEAD file if it exists within transactions_dir
+    head_file = transactions_dir / "HEAD"
+    if head_file.exists():
+        head_file.unlink()
+
 
     canonical_file_path = data_dir / "canonical_path.json"
     if canonical_file_path.exists():
+        typer.echo(f"Deleting canonical path file: {canonical_file_path}...")
         canonical_file_path.unlink()
 
-    # Clear consumed paths file as well
-    consumed_paths_file = sessions_dir / "consumed_path_uuids.json"  # Using new name
-    if consumed_paths_file.exists():
-        consumed_paths_file.unlink()
+    # consumed_paths_file logic removed as it was part of the old session system.
+    # sessions_dir itself is still cleared if it exists as a general subdirectory of data_dir,
+    # but specific session artifact files are no longer managed here.
 
+    # Note: The DuckDB database file itself (e.g., data/encyclopedia.duckdb) is cleared by table deletions,
+    # not by deleting the file. If a completely fresh DB file is desired, that's a different operation.
+
+    # 3. Create sample hrönirs (writes .md files to library_dir)
+    typer.echo("Creating sample hrönir files...")
     h0_uuid_str = storage.store_chapter_text("Example Hrönir 0", base=library_dir)
     h1_uuid_str = storage.store_chapter_text("Example Hrönir 1", base=library_dir)
 
-    h0_uuid = uuid.UUID(h0_uuid_str)  # Convert to UUID objects
+    h0_uuid = uuid.UUID(h0_uuid_str)
     h1_uuid = uuid.UUID(h1_uuid_str)
 
-    from .models import Path as PathModel  # Correct import
+    from .models import Path as PathModel
 
-    data_manager = storage.DataManager()  # Already initialized by callback
-
+    # 4. Add sample paths to DataManager (which writes to DuckDB)
+    typer.echo("Adding sample paths to the database...")
     p0_path_uuid_val = storage.compute_narrative_path_uuid(0, "", h0_uuid_str)
-    path0 = PathModel(
-        path_uuid=p0_path_uuid_val,  # type: ignore
+    path0_model = PathModel(
+        path_uuid=p0_path_uuid_val,
         position=0,
         prev_uuid=None,
-        uuid=h0_uuid,  # type: ignore
-        status="PENDING",
+        uuid=h0_uuid, # hrönir uuid
+        status="PENDING", # Default status
     )
-    data_manager.add_path(path0)
+    dm.add_path(path0_model)
 
     p1_path_uuid_val = storage.compute_narrative_path_uuid(1, h0_uuid_str, h1_uuid_str)
-    path1 = PathModel(
-        path_uuid=p1_path_uuid_val,  # type: ignore
+    path1_model = PathModel(
+        path_uuid=p1_path_uuid_val,
         position=1,
-        prev_uuid=h0_uuid,  # type: ignore
-        uuid=h1_uuid,  # type: ignore
-        status="PENDING",
+        prev_uuid=h0_uuid, # hrönir uuid
+        uuid=h1_uuid, # hrönir uuid
+        status="PENDING", # Default status
     )
-    data_manager.add_path(path1)
+    dm.add_path(path1_model)
 
-    canonical = {
+    # 5. Create canonical_path.json
+    typer.echo(f"Creating sample canonical path file at {canonical_file_path}...")
+    canonical_content = {
         "title": "The Hrönir Encyclopedia - Canonical Path",
         "path": {
             "0": {"path_uuid": str(p0_path_uuid_val), "hrönir_uuid": h0_uuid_str},
             "1": {"path_uuid": str(p1_path_uuid_val), "hrönir_uuid": h1_uuid_str},
         },
     }
-    canonical_file = data_dir / "canonical_path.json"
-    canonical_file.write_text(json.dumps(canonical, indent=2))
+    data_dir.mkdir(parents=True, exist_ok=True) # Ensure data_dir exists
+    canonical_file_path.write_text(json.dumps(canonical_content, indent=2))
 
-    data_manager.save_all_data_to_csvs()
+    # 6. Persist changes in DataManager (e.g., commit DuckDB transaction)
+    dm.save_all_data_to_csvs() # This calls backend.save_all_data(), which for DuckDB commits.
+                               # The name save_all_data_to_csvs() is now misleading.
 
     typer.echo("Sample data initialized:")
     typer.echo(f"  Position 0 hrönir UUID: {h0_uuid_str}")
@@ -239,49 +253,62 @@ def _validate_and_normalize_path_inputs(
 @app.command(help="Create a narrative connection (path) between hrönirs.")
 def path(
     position: Annotated[int, typer.Option(help="Position in the narrative sequence")],
-    target: Annotated[str, typer.Option(help="Target hrönir UUID (destination content node)")],
+    target: Annotated[str, typer.Option(help="Target hrönir UUID (destination content node)")], # This is current_hrönir_uuid
     source: Annotated[
-        str, typer.Option(help="Source hrönir UUID (empty string for position 0)")
+        str, typer.Option(help="Source hrönir UUID (empty string for position 0)") # This is prev_hrönir_uuid
     ] = "",
 ):
-    from pathlib import Path  # Local import fine here
+    # storage.data_manager is initialized by the main_callback
+    dm = storage.data_manager
+    dm.initialize_if_needed() # Ensure backend (DB) is ready
 
-    # Note: The _validate_and_normalize_path_inputs function now includes the .md check
-    source = _validate_and_normalize_path_inputs(position, source, target, typer.secho, typer.echo)
+    # _validate_and_normalize_path_inputs checks if source and target hrönirs exist in the library
+    # and normalizes source to "" if position is 0.
+    source_hr_uuid_str = _validate_and_normalize_path_inputs(position, source, target, typer.secho, typer.echo)
+    target_hr_uuid_str = target # target is already validated by _validate_and_normalize_path_inputs
 
-    path_uuid = storage.compute_narrative_path_uuid(position, source, target)
-    narrative_paths_dir = Path("narrative_paths")
-    narrative_paths_dir.mkdir(exist_ok=True)
-    csv_file = (
-        narrative_paths_dir / f"narrative_paths_position_{position:03d}.csv"
-    )  # Ensure consistent naming with PandasDataManager
+    # compute_narrative_path_uuid expects string UUIDs
+    path_uuid_obj = storage.compute_narrative_path_uuid(position, source_hr_uuid_str, target_hr_uuid_str)
+    path_uuid_str = str(path_uuid_obj)
 
-    if not csv_file.exists():
-        # Ensure consistent headers with PandasDataManager expectations
-        # PandasDataManager uses: path_uuid,position,prev_uuid,uuid,status,mandate_id
-        csv_file.write_text("path_uuid,position,prev_uuid,uuid,status,mandate_id\n")
+    # Check if path already exists using DataManager
+    existing_path = dm.get_path_by_uuid(path_uuid_str)
+    if existing_path:
+        typer.echo(f"Path already exists: {path_uuid_str}")
+        # Optionally show details:
+        # typer.echo(f"  Existing Path Details: Pos={existing_path.position}, Prev={existing_path.prev_uuid}, Curr={existing_path.uuid}, Status={existing_path.status}")
+        return
 
-    import pandas as pd
-
+    # Prepare PathModel data
+    # PathModel expects UUID objects for UUID fields if not using Pydantic's string coercion everywhere.
+    # UUID5 fields in Pydantic can be initialized from valid UUID strings.
     try:
-        df = pd.read_csv(csv_file)
-        # Ensure path_uuid is compared as string if it's read as object
-        if not df.empty and ((df["path_uuid"].astype(str) == str(path_uuid)).any()):
-            typer.echo(f"Path already exists: {path_uuid}")
-            return
-    except (pd.errors.EmptyDataError, FileNotFoundError):
-        csv_file.write_text("path_uuid,position,prev_uuid,uuid,status,mandate_id\n")
+        path_model_data = {
+            "path_uuid": path_uuid_obj, # Pass the UUID object
+            "position": position,
+            "prev_uuid": uuid.UUID(source_hr_uuid_str) if source_hr_uuid_str else None, # hrönir UUID of predecessor
+            "uuid": uuid.UUID(target_hr_uuid_str), # hrönir UUID of current content
+            "status": "PENDING",
+            "mandate_id": None
+        }
+        new_path = PathModel(**path_model_data)
+        dm.add_path(new_path)
+        dm.save_all_data_to_csvs() # This will call backend.save_all_data() which commits to DuckDB
 
-    # Match CSV column order: path_uuid,position,prev_uuid,uuid,status,mandate_id
-    path_entry = f"{path_uuid},{position},{source},{target},PENDING,\n"  # mandate_id is empty
-    with csv_file.open("a") as f:
-        f.write(path_entry)
-
-    typer.echo(f"Created path: {path_uuid}")
-    typer.echo(f"  Position: {position}")
-    typer.echo(f"  Source: {source or '(none)'}")
-    typer.echo(f"  Target: {target}")
-    typer.echo("  Status: PENDING")
+        typer.echo(f"Created path: {path_uuid_str}")
+        typer.echo(f"  Position: {position}")
+        typer.echo(f"  Source Hrönir: {source_hr_uuid_str or '(none)'}") # Refers to predecessor hrönir
+        typer.echo(f"  Target Hrönir: {target_hr_uuid_str}") # Refers to current hrönir in path
+        typer.echo("  Status: PENDING")
+    except ValidationError as e:
+        typer.secho(f"Error creating path data model: {e}", fg=typer.colors.RED)
+        # For debugging, print the data that failed validation:
+        # typer.secho(f"Data for PathModel: {path_model_data}", fg=typer.colors.YELLOW)
+        raise typer.Exit(code=1)
+    except Exception as e:
+        typer.secho(f"Error saving path to database: {e}", fg=typer.colors.RED)
+        # import traceback; traceback.print_exc(); # For debugging
+        raise typer.Exit(code=1)
 
 
 @app.command(help="List existing paths at a position.")
@@ -341,25 +368,26 @@ def path_status(path_uuid: str) -> None:
     typer.echo(f"Status: {path_data.status}")
     if path_data.mandate_id:
         typer.echo(f"Mandate ID: {path_data.mandate_id}")
-
-    consumed_by_session_id = session_manager.is_path_consumed(path_uuid)
-    if consumed_by_session_id:
-        typer.echo(f"Consumed by session: {consumed_by_session_id}")
+    # consumed_by_session_id logic removed as sessions are removed.
+    # Path status 'SPENT' now indicates a mandate has been used.
 
 
 def _get_successor_hronir_for_path(path_uuid_to_find: str) -> str | None:
-    path_data_obj = storage.DataManager().get_path_by_uuid(path_uuid_to_find)
+    # Ensure DataManager is initialized before use
+    dm = storage.DataManager()
+    dm.initialize_if_needed()
+    path_data_obj = dm.get_path_by_uuid(path_uuid_to_find)
     if path_data_obj:
         return str(path_data_obj.uuid)
     return None
 
 
-def _calculate_status_counts(narrative_paths_dir: Path) -> dict[str, int]:
-    # This function might need to be updated if path data is solely managed by DataManager
-    # For now, assuming it can still work with directory structure if needed, or be replaced.
-    # DataManager().get_all_paths() would be the new way.
+def _calculate_status_counts() -> dict[str, int]: # Removed narrative_paths_dir parameter
     status_counts = {"PENDING": 0, "QUALIFIED": 0, "SPENT": 0, "UNKNOWN": 0}
-    all_paths = storage.DataManager().get_all_paths()
+    # Ensure DataManager is initialized before use
+    dm = storage.DataManager()
+    dm.initialize_if_needed()
+    all_paths = dm.get_all_paths()
     for path_obj in all_paths:
         status_val = path_obj.status.upper() if path_obj.status else "UNKNOWN"
         if status_val in status_counts:
@@ -378,13 +406,10 @@ def status(
         bool,
         typer.Option(
             "--counts",
-            help="Also show number of paths by status.",  # Uses DataManager now
+            help="Also show number of paths by status.",
         ),
     ] = False,
-    narrative_paths_dir: Annotated[  # No longer directly used by _calculate_status_counts
-        Path,
-        typer.Option(help="Directory containing narrative path CSV files (for --counts, legacy)."),
-    ] = Path("narrative_paths"),
+    # narrative_paths_dir option removed as path counts are now derived from DataManager (DuckDB)
 ) -> None:
     try:
         with open(canonical_path_file) as f:
@@ -409,8 +434,7 @@ def status(
 
     if counts:
         typer.echo("\nPath status counts (from DataManager):")
-        # Pass narrative_paths_dir for now, though _calculate_status_counts uses DataManager
-        counts_dict = _calculate_status_counts(narrative_paths_dir)
+        counts_dict = _calculate_status_counts() # Argument removed
         for status_val, count_val in counts_dict.items():
             typer.echo(f"  {status_val}: {count_val}")
 
@@ -722,92 +746,20 @@ def tutorial_command(
                 f"  Error auto-qualifying path: {e}. Session demo might fail.", fg=typer.colors.RED
             )
 
-    if not qualified_path_for_session_uuid_str:
-        typer.secho(
-            "  Skipping session demonstration as no path was qualified.", fg=typer.colors.YELLOW
-        )
-    else:
-        typer.secho(
-            f"Step 5: Starting judgment session with qualified path {qualified_path_for_session_uuid_str}...",
-            fg=typer.colors.BLUE,
-        )
-        session_model_instance: SessionModel | None = None
-        try:
-            path_data_obj = data_manager.get_path_by_uuid(qualified_path_for_session_uuid_str)
-            if (
-                not path_data_obj
-                or path_data_obj.status != "QUALIFIED"
-                or not path_data_obj.mandate_id
-            ):
-                raise ValueError(
-                    f"Path {qualified_path_for_session_uuid_str} not properly qualified."
-                )
-
-            session_model_instance = session_manager.create_session(
-                path_n_uuid_str=qualified_path_for_session_uuid_str,
-                position_n=path_data_obj.position,
-                mandate_id_str=str(path_data_obj.mandate_id),
-                canonical_path_file=Path("data/canonical_path.json"),  # Default path
-            )
-            typer.echo(f"  Session {session_model_instance.session_id} started.")
-            typer.echo("  Dossier created with duels:")
-            if session_model_instance.dossier.duels:
-                for pos_str_key, duel_details_model in session_model_instance.dossier.duels.items():
-                    typer.echo(
-                        f"    Pos {pos_str_key}: {duel_details_model.path_A_uuid} vs {duel_details_model.path_B_uuid}"
-                    )
-            else:
-                typer.echo(
-                    "    (No duels in dossier - expected if qualified path is at low position or no prior contention)"
-                )
-            typer.echo("")
-        except Exception as e:
-            typer.secho(f"  Error starting session: {e}", fg=typer.colors.RED)
-            session_model_instance = None  # Ensure it's None on failure
-
-        if session_model_instance and session_model_instance.dossier.duels:
-            typer.secho(
-                f"Step 6: Committing example verdicts for session {session_model_instance.session_id}...",
-                fg=typer.colors.BLUE,
-            )
-            example_verdicts_for_cli: dict[str, str] = {}
-
-            # Example: Choose P1A (p1a_path_uuid) over P1B (p1b_path_uuid) for position 1 duel
-            duel_at_pos_1 = session_model_instance.dossier.duels.get("1")
-            if duel_at_pos_1 and (
-                p1a_path_uuid == duel_at_pos_1.path_A_uuid
-                or p1a_path_uuid == duel_at_pos_1.path_B_uuid
-            ):
-                example_verdicts_for_cli["1"] = str(p1a_path_uuid)
-                typer.echo(f"  Verdict for Pos 1: Choose Path {p1a_path_uuid} (P1A)")
-
-            if example_verdicts_for_cli:
-                try:
-                    # Call session_commit directly, it handles the rest
-                    session_commit(
-                        session_id=str(session_model_instance.session_id),
-                        verdicts_input=json.dumps(example_verdicts_for_cli),
-                        canonical_path_file=Path("data/canonical_path.json"),  # Pass necessary args
-                        # ratings_dir and narrative_paths_dir are not used by commit directly
-                    )
-                    typer.echo("  Session commit finished.\n")
-                except Exception as e:
-                    typer.secho(f"  Error committing session: {e}", fg=typer.colors.RED)
-            else:
-                typer.echo("  No example verdicts to commit for this dossier's duels.\n")
-        elif session_model_instance:  # Session started but no duels in dossier
-            typer.echo(
-                f"  Session {session_model_instance.session_id} started, but no duels in dossier. Committing vacuous session."
-            )
-            try:
-                session_commit(
-                    session_id=str(session_model_instance.session_id),
-                    verdicts_input="{}",  # Empty verdicts
-                    canonical_path_file=Path("data/canonical_path.json"),
-                )
-                typer.echo("  Empty session committed.\n")
-            except Exception as e:
-                typer.secho(f"  Error committing empty session: {e}", fg=typer.colors.RED)
+    # TODO: Refactor tutorial to use new 'cast-votes' command or remove session-specific parts.
+    typer.secho("  Session-based part of tutorial is currently disabled due to removal of old session system.", fg=typer.colors.YELLOW)
+    # if not qualified_path_for_session_uuid_str:
+    #     typer.secho(
+    #         "  Skipping session demonstration as no path was qualified.", fg=typer.colors.YELLOW
+    #     )
+    # else:
+    #     typer.secho(
+    #         f"Step 5: (Old session logic removed) - Would have started session with {qualified_path_for_session_uuid_str}...",
+    #         fg=typer.colors.BLUE,
+    #     )
+        # OLD SESSION LOGIC REMOVED HERE
+        # ... session_manager.create_session ...
+        # ... session_commit ...
 
     typer.secho("Step 7: Showing resulting rankings and canonical status...", fg=typer.colors.BLUE)
     try:
@@ -913,372 +865,109 @@ def main_callback(ctx: typer.Context):
     logger.debug("Main callback finished successfully.")
 
 
-# TODO: Implement the actual temporal cascade logic. This is a critical missing piece.
 def run_temporal_cascade(
-    start_position: int,
-    max_positions_to_consolidate: int,
+    start_position: int, # The position from which recalculation should actively start.
+    max_positions_to_consolidate: int, # How many positions to check/rebuild AT MOST.
     canonical_path_file: Path,
     typer_echo: callable,
 ):
     """
-    Placeholder for the temporal cascade logic.
-    This function is responsible for recalculating the canonical path.
+    Recalculates the canonical path from a given start_position.
+    Earlier positions (before start_position) are preserved if they exist.
     """
-    logger.critical("CRITICAL: `run_temporal_cascade` is not implemented!")
-    typer_echo(
-        typer.style(
-            "CRITICAL WARNING: Temporal Cascade logic is NOT IMPLEMENTED. Canonical path will not be updated.",
-            fg=typer.colors.RED,
-            bold=True,
-        )
-    )
-    # Example of what it might do:
-    # 1. Load all relevant transactions and votes.
-    # 2. Starting from start_position, determine the winning path at each position based on Elo or other metrics.
-    # 3. Update the canonical_path_file.
-    # For now, it does nothing.
-    pass
+    typer_echo(f"Running Temporal Cascade: Recalculating canonical path from position {start_position}...")
+    dm = storage.DataManager()
+    dm.initialize_if_needed()
 
+    old_canonical_data = {}
+    if canonical_path_file.exists():
+        try:
+            old_canonical_data = json.loads(canonical_path_file.read_text())
+            if not isinstance(old_canonical_data.get("path"), dict):
+                typer_echo(typer.style(f"Warning: Existing canonical path file {canonical_path_file} has invalid format. Starting fresh.", fg=typer.colors.YELLOW))
+                old_canonical_data = {"path": {}}
+        except json.JSONDecodeError:
+            typer_echo(typer.style(f"Warning: Could not parse existing canonical path file {canonical_path_file}. Starting fresh.", fg=typer.colors.YELLOW))
+            old_canonical_data = {"path": {}}
+
+    old_canon_path_dict = old_canonical_data.get("path", {})
+    new_canon_path_dict = {}
+
+    current_predecessor_hrönir_uuid: str | None = None
+
+    # Determine the maximum position to iterate up to.
+    # This could be max_positions_to_consolidate or the highest position with any paths.
+    # For simplicity now, just use max_positions_to_consolidate as an upper bound for the loop.
+    # A more robust approach would find the actual max position with paths.
+
+    highest_pos_with_paths = -1
+    all_paths_models = dm.get_all_paths()
+    if all_paths_models:
+        highest_pos_with_paths = max(p.position for p in all_paths_models)
+
+    # Effective max position to check is min(max_positions_to_consolidate -1, highest_pos_with_paths)
+    # Loop goes from 0 up to this effective_max_pos.
+    effective_max_pos = min(max_positions_to_consolidate -1, highest_pos_with_paths)
+
+    typer_echo(f"Effective max position to check in cascade: {effective_max_pos} (Limit: {max_positions_to_consolidate-1}, Highest path at: {highest_pos_with_paths})")
+
+    for pos_idx in range(effective_max_pos + 1):
+        pos_key = str(pos_idx)
+
+        if pos_idx < start_position and pos_key in old_canon_path_dict:
+            # Preserve old canonical path before start_position
+            new_canon_path_dict[pos_key] = old_canon_path_dict[pos_key]
+            current_predecessor_hrönir_uuid = old_canon_path_dict[pos_key].get("hrönir_uuid")
+            typer_echo(f"  Pos {pos_idx}: Preserved from old canon (Path: {old_canon_path_dict[pos_key].get('path_uuid')[:8]}...). Predecessor for next: {current_predecessor_hrönir_uuid[:8] if current_predecessor_hrönir_uuid else 'None'}")
+            continue
+
+        # For pos_idx >= start_position, or if old canon doesn't have it: Recalculate
+        if pos_idx == 0:
+            current_predecessor_hrönir_uuid = None # Root position
+
+        typer_echo(f"  Pos {pos_idx}: Calculating winner. Predecessor: {current_predecessor_hrönir_uuid[:8] if current_predecessor_hrönir_uuid else 'None'}")
+
+        # ratings.get_ranking uses DataManager internally
+        ranking_df = ratings.get_ranking(position=pos_idx, predecessor_hronir_uuid=current_predecessor_hrönir_uuid)
+
+        if not ranking_df.empty:
+            winner_series = ranking_df.iloc[0]
+            winner_path_uuid = str(winner_series["path_uuid"])
+            winner_hronir_uuid = str(winner_series["hrönir_uuid"]) # This is PathModel.uuid (the content hrönir)
+
+            new_canon_path_dict[pos_key] = {
+                "path_uuid": winner_path_uuid,
+                "hrönir_uuid": winner_hronir_uuid,
+            }
+            current_predecessor_hrönir_uuid = winner_hronir_uuid # For the next iteration
+            typer_echo(f"    Winner: Path {winner_path_uuid[:8]}... (Hrönir: {winner_hronir_uuid[:8]}..., Elo: {winner_series['elo_rating']})")
+        else:
+            typer_echo(typer.style(f"    No paths or rankings found for Pos {pos_idx} with predecessor {current_predecessor_hrönir_uuid[:8] if current_predecessor_hrönir_uuid else 'None'}. Canonical path ends here.", fg=typer.colors.YELLOW))
+            # If a position cannot be filled, the canonical path effectively ends.
+            # Subsequent positions that might have depended on this one won't be processed further in this chain.
+            break
+            # Alternative: could check old_canon_path_dict here too if we want to be more conservative about truncating
+
+    # Construct the full canonical data
+    final_canonical_data = {
+        "title": old_canonical_data.get("title", "The Hrönir Encyclopedia - Canonical Path"),
+        "path": new_canon_path_dict,
+        "last_updated": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    }
+
+    try:
+        canonical_path_file.parent.mkdir(parents=True, exist_ok=True)
+        canonical_path_file.write_text(json.dumps(final_canonical_data, indent=2))
+        typer_echo(typer.style(f"Temporal Cascade complete. Canonical path updated and saved to {canonical_path_file}", fg=typer.colors.GREEN))
+    except IOError as e:
+        typer_echo(typer.style(f"Error writing canonical path file {canonical_path_file}: {e}", fg=typer.colors.RED))
+        logger.error(f"Error writing canonical path file {canonical_path_file}: {e}")
 
 def main(argv: list[str] | None = None):
     app(args=argv)
 
 
-session_app = typer.Typer(help="Manage Hrönir judgment sessions.", no_args_is_help=True)
-app.add_typer(session_app, name="session")
-
-
-@session_app.command("start", help="Initiate a Judgment Session using a QUALIFIED path's mandate.")
-def session_start(
-    path_uuid_str: Annotated[
-        str,
-        typer.Option(
-            "--path-uuid",
-            "-p",
-            help="The QUALIFIED path_uuid granting the mandate for this session.",
-        ),
-    ],
-    canonical_path_file: Annotated[
-        Path, typer.Option(help="Path to the canonical path JSON file.")
-    ] = Path("data/canonical_path.json"),
-):
-    path_data_obj = storage.DataManager().get_path_by_uuid(path_uuid_str)
-
-    if not path_data_obj:
-        typer.secho(
-            f"Error: Path UUID '{path_uuid_str}' not found. Cannot start session.",
-            fg=typer.colors.RED,
-        )
-        raise typer.Exit(code=1)
-
-    position_n = path_data_obj.position
-    mandate_id_obj = path_data_obj.mandate_id
-
-    if path_data_obj.status != "QUALIFIED":
-        typer.secho(
-            f"Error: Path UUID '{path_uuid_str}' is not QUALIFIED (status: '{path_data_obj.status}'). Cannot start session.",
-            fg=typer.colors.RED,
-        )
-        raise typer.Exit(code=1)
-
-    if not mandate_id_obj:
-        typer.secho(
-            f"Error: Path UUID '{path_uuid_str}' is QUALIFIED but has no mandate_id. This indicates an inconsistency.",
-            fg=typer.colors.RED,
-        )
-        raise typer.Exit(code=1)
-
-    consumed_by_session_id = session_manager.is_path_consumed(path_uuid_str)
-    if consumed_by_session_id:
-        typer.secho(
-            f"Error: Path UUID '{path_uuid_str}' has already been used for session '{consumed_by_session_id}'.",
-            fg=typer.colors.RED,
-        )
-        raise typer.Exit(code=1)
-
-    try:
-        session_model = session_manager.create_session(
-            path_n_uuid_str=path_uuid_str,
-            position_n=position_n,
-            mandate_id_str=str(mandate_id_obj),
-            canonical_path_file=canonical_path_file,
-        )
-
-        cli_dossier_output = {}
-        if session_model.dossier and session_model.dossier.duels:
-            for pos, duel in session_model.dossier.duels.items():
-                cli_dossier_output[pos] = {
-                    "path_A": str(duel.path_A_uuid),
-                    "path_B": str(duel.path_B_uuid),
-                    "entropy": round(duel.entropy, 4),
-                }
-        else:
-            cli_dossier_output = {}
-
-        output_data = {
-            "message": "Judgment session started successfully.",
-            "session_id": str(session_model.session_id),
-            "initiating_path_uuid": str(session_model.initiating_path_uuid),
-            "mandate_id_used": str(session_model.mandate_id),
-            "position_n": session_model.position_n,
-            "status": session_model.status,
-            "created_at": session_model.created_at.isoformat(),
-            "dossier": {"duels": cli_dossier_output},
-        }
-        typer.echo(json.dumps(output_data, indent=2))
-
-    except ValueError as ve:
-        typer.secho(f"Error creating session: {str(ve)}", fg=typer.colors.RED)
-        raise typer.Exit(code=1)
-    except Exception as e:
-        typer.secho(
-            f"An unexpected error occurred while creating the session: {str(e)}",
-            fg=typer.colors.RED,
-        )
-        # import traceback; traceback.print_exc();
-        raise typer.Exit(code=1)
-
-
-@session_app.command(
-    "commit",
-    help="Submit verdicts for a Judgment Session, record transaction, and trigger Temporal Cascade.",
-)
-def session_commit(
-    session_id: Annotated[
-        str,
-        typer.Option(
-            "--session-id",
-            "-s",
-            help="The ID of the active Judgment Session to commit.",
-        ),
-    ],
-    verdicts_input: Annotated[
-        str,
-        typer.Option(
-            "--verdicts",
-            "-v",
-            help='JSON string or path to a JSON file containing verdicts. Format: \'{"position_str": "winning_path_uuid"}\'. Example: \'{"0": "uuid_for_pos_0_winner", "1": "uuid_for_pos_1_winner"}\'. ',
-        ),
-    ],
-    canonical_path_file: Annotated[
-        Path, typer.Option(help="Path to the canonical path JSON file.")
-    ] = Path("data/canonical_path.json"),
-    max_cascade_positions: Annotated[
-        int,
-        typer.Option(help="Maximum number of positions for temporal cascade calculation."),
-    ] = 100,
-):
-    session_model = session_manager.get_session(session_id)
-    if not session_model:
-        typer.secho(
-            f"Error: Session ID '{session_id}' not found or failed to load.", fg=typer.colors.RED
-        )
-        raise typer.Exit(code=1)
-
-    if session_model.status != "active":
-        typer.secho(
-            f"Error: Session '{session_id}' is not active. Current status: '{session_model.status}'",
-            fg=typer.colors.RED,
-        )
-        raise typer.Exit(code=1)
-
-    verdicts: dict[str, str] = {}
-    verdicts_path = Path(verdicts_input)
-    if verdicts_path.is_file():
-        try:
-            verdicts = json.loads(verdicts_path.read_text())
-        except Exception as e:
-            typer.secho(
-                f"Error: Failed to parse verdicts JSON file {verdicts_input}: {e}",
-                fg=typer.colors.RED,
-            )
-            raise typer.Exit(code=1)
-    else:
-        try:
-            verdicts = json.loads(verdicts_input)
-        except Exception as e:
-            typer.secho(f"Error: Failed to parse verdicts JSON string: {e}", fg=typer.colors.RED)
-            raise typer.Exit(code=1)
-
-    if not isinstance(verdicts, dict):
-        typer.secho("Error: Verdicts must be a JSON object (dictionary).", fg=typer.colors.RED)
-        raise typer.Exit(code=1)
-
-    initiating_path_uuid_str = str(session_model.initiating_path_uuid)
-    dossier_duels_models = session_model.dossier.duels
-
-    valid_votes_for_tm: list[dict[str, Any]] = []
-    processed_verdicts_for_session_model: dict[str, uuid.UUID] = {}
-    oldest_voted_position = float("inf")
-
-    for pos_str, winning_path_uuid_verdict_str in verdicts.items():
-        if not isinstance(winning_path_uuid_verdict_str, str):
-            typer.echo(f"Warning: Verdict for position {pos_str} is not a string. Skipping.")
-            continue
-        try:
-            position_idx = int(pos_str)
-            if position_idx < 0:
-                raise ValueError("Position must be non-negative")
-        except ValueError:
-            typer.echo(f"Warning: Invalid position key '{pos_str}' in verdicts. Skipping.")
-            continue
-
-        duel_model_for_pos = dossier_duels_models.get(pos_str)
-        if not duel_model_for_pos:
-            typer.echo(
-                f"Warning: No duel found in dossier for position {pos_str}. Skipping verdict."
-            )
-            continue
-
-        path_a_uuid_obj = duel_model_for_pos.path_A_uuid
-        path_b_uuid_obj = duel_model_for_pos.path_B_uuid
-
-        try:
-            winning_path_uuid_verdict_obj = uuid.UUID(winning_path_uuid_verdict_str)
-        except ValueError:
-            typer.echo(
-                f"Warning: Verdict for position {pos_str}: winning path UUID '{winning_path_uuid_verdict_str}' is not a valid UUID. Skipping."
-            )
-            continue
-
-        if winning_path_uuid_verdict_obj not in [path_a_uuid_obj, path_b_uuid_obj]:
-            typer.echo(
-                f"Warning: Verdict for position {pos_str}: winning path {winning_path_uuid_verdict_str[:8]} is not part of the original duel ({str(path_a_uuid_obj)[:8]} vs {str(path_b_uuid_obj)[:8]}). Skipping."
-            )
-            continue
-
-        loser_path_uuid_obj = (
-            path_a_uuid_obj if winning_path_uuid_verdict_obj == path_b_uuid_obj else path_b_uuid_obj
-        )
-        winner_hronir_uuid_str = _get_successor_hronir_for_path(str(winning_path_uuid_verdict_obj))
-        loser_hronir_uuid_str = _get_successor_hronir_for_path(str(loser_path_uuid_obj))
-
-        if not winner_hronir_uuid_str or not loser_hronir_uuid_str:
-            typer.secho(
-                f"Error: Could not map duel paths for pos {pos_str} to hrönir UUIDs. Aborting.",
-                fg=typer.colors.RED,
-            )
-            raise typer.Exit(code=1)
-
-        path_data_for_winner = storage.DataManager().get_path_by_uuid(
-            str(winning_path_uuid_verdict_obj)
-        )
-        if not path_data_for_winner:
-            typer.secho(
-                f"Error: Path data for winning_path_uuid {winning_path_uuid_verdict_str} not found. Aborting.",
-                fg=typer.colors.RED,
-            )
-            raise typer.Exit(1)
-
-        predecessor_hrönir_uuid_str = (
-            str(path_data_for_winner.prev_uuid) if path_data_for_winner.prev_uuid else None
-        )
-        if position_idx == 0:
-            predecessor_hrönir_uuid_str = None
-
-        valid_votes_for_tm.append(
-            {
-                "position": position_idx,
-                "winner_hrönir_uuid": winner_hronir_uuid_str,
-                "loser_hrönir_uuid": loser_hronir_uuid_str,
-                "predecessor_hrönir_uuid": predecessor_hrönir_uuid_str,
-            }
-        )
-        processed_verdicts_for_session_model[pos_str] = winning_path_uuid_verdict_obj
-        if position_idx < oldest_voted_position:
-            oldest_voted_position = position_idx
-
-    if not valid_votes_for_tm:
-        typer.echo(
-            "No valid verdicts provided or matched dossier. No votes recorded. Session remains active."
-        )
-        raise typer.Exit(code=0)
-
-    typer.echo(f"{len(valid_votes_for_tm)} valid verdicts prepared for transaction processing.")
-    transaction_result: dict[str, Any]
-    try:
-        transaction_result = transaction_manager.record_transaction(
-            session_id=str(session_model.session_id),
-            initiating_path_uuid=initiating_path_uuid_str,
-            session_verdicts=valid_votes_for_tm,
-        )
-        typer.echo(
-            json.dumps(
-                {
-                    "message": "Transaction processing complete.",
-                    "transaction_uuid": transaction_result["transaction_uuid"],
-                    "promotions_granted": transaction_result.get("promotions_granted", []),
-                },
-                indent=2,
-            )
-        )
-    except Exception as e:
-        typer.secho(
-            f"Error: Failed to process transaction: {e}. Aborting commit.", fg=typer.colors.RED
-        )
-        session_manager.update_session_status(
-            str(session_model.session_id), "commit_failed_tx_processing"
-        )
-        raise typer.Exit(code=1)
-
-    try:
-        mandate_id_for_update = str(session_model.mandate_id) if session_model.mandate_id else None
-        storage.DataManager().update_path_status(
-            path_uuid_to_update=initiating_path_uuid_str,
-            new_status="SPENT",
-            mandate_id=mandate_id_for_update,
-            set_mandate_explicitly=True,
-        )
-        storage.DataManager().save_all_data_to_csvs()
-        typer.echo(f"Path {initiating_path_uuid_str} status updated to SPENT.")
-    except Exception as e:
-        typer.echo(
-            f"Warning: Error updating status for path {initiating_path_uuid_str} to SPENT: {e}."
-        )
-
-    session_model.committed_verdicts = processed_verdicts_for_session_model
-
-    tm_oldest_voted_position = transaction_result.get("oldest_voted_position", float("inf"))
-    if tm_oldest_voted_position != float("inf") and tm_oldest_voted_position >= 0:
-        typer.echo(
-            f"Oldest voted position: {tm_oldest_voted_position}. Triggering Temporal Cascade."
-        )
-        try:
-            run_temporal_cascade(
-                start_position=tm_oldest_voted_position,
-                max_positions_to_consolidate=max_cascade_positions,
-                canonical_path_file=canonical_path_file,
-                typer_echo=typer.echo,
-            )
-            typer.echo("Temporal Cascade completed.")
-        except Exception as e:
-            typer.secho(f"Error: Temporal Cascade failed: {e}.", fg=typer.colors.RED)
-            session_manager.update_session_status(
-                str(session_model.session_id), "commit_failed_cascade"
-            )
-            session_model.status = "commit_failed_cascade"  # also update local model before saving
-            session_model_file = session_manager.SESSIONS_DIR / f"{session_model.session_id}.json"
-            session_model_file.write_text(
-                session_model.model_dump_json(indent=2)
-            )  # Save with committed verdicts
-            raise typer.Exit(code=1)
-    else:
-        typer.echo(
-            "No valid votes cast, or oldest position not determined; Temporal Cascade not triggered."
-        )
-
-    if session_manager.update_session_status(str(session_model.session_id), "committed"):
-        session_model.status = "committed"
-        session_model.updated_at = datetime.datetime.now(datetime.timezone.utc)
-        session_model_file = session_manager.SESSIONS_DIR / f"{session_model.session_id}.json"
-        session_model_file.write_text(session_model.model_dump_json(indent=2))
-        typer.echo(f"Session {session_id} committed successfully. Committed verdicts saved.")
-    else:
-        typer.secho(
-            f"Error: Failed to update session {session_id} status to committed.",
-            fg=typer.colors.RED,
-        )
-
+# Old session system removed. New cast-votes command is below.
 
 @app.command(help="Download latest snapshot from Internet Archive to local DuckDB.")
 def sync(
@@ -1581,19 +1270,248 @@ def push(
 
 
 @app.command("metrics", help="Expose path status metrics in Prometheus format (TDD 2.6).")
-def metrics_command(
-    narrative_paths_dir: Annotated[  # This parameter is kept for now but _calculate_status_counts uses DataManager
-        Path, typer.Option(help="Directory containing narrative path CSV files (legacy).")
-    ] = Path("narrative_paths"),
-):
-    status_counts = _calculate_status_counts(
-        narrative_paths_dir
-    )  # narrative_paths_dir is not strictly needed by new version
+def metrics_command(): # narrative_paths_dir option removed
+    # _calculate_status_counts now uses DataManager internally and doesn't need narrative_paths_dir
+    status_counts = _calculate_status_counts() # Argument removed
+    # Path argument for _calculate_status_counts will be ignored by its new implementation.
+    # TODO: Refactor _calculate_status_counts to not require this dummy argument. # This TODO is now resolved.
 
     typer.echo("# HELP hronir_path_status_total Total number of paths by status.")
     typer.echo("# TYPE hronir_path_status_total gauge")
     for status_val, count in status_counts.items():
         typer.echo(f'hronir_path_status_total{{status="{status_val.lower()}"}} {count}')
+
+
+@app.command("cast-votes", help="Atomically cast votes, record transaction, and trigger Temporal Cascade.")
+def cast_votes(
+    voting_path_uuid_str: Annotated[
+        str,
+        typer.Option(
+            "--voting-path-uuid",
+            "-p",
+            help="The path_uuid whose voting power is being used.",
+        ),
+    ],
+    # mandate_id_str parameter removed from signature
+    verdicts_input: Annotated[
+        str,
+        typer.Option(
+            "--verdicts",
+            "-v",
+            help='JSON string or path to a JSON file containing verdicts. Format: \'{"position_str": "winning_path_uuid_str"}\'.',
+        ),
+    ],
+    canonical_path_file: Annotated[
+        Path, typer.Option(help="Path to the canonical path JSON file (for context).")
+    ] = Path("data/canonical_path.json"),
+    max_cascade_positions: Annotated[
+        int,
+        typer.Option(help="Maximum number of positions for temporal cascade calculation."),
+    ] = 100,
+):
+    """
+    Atomically casts votes for specified duels.
+    The voting path must be QUALIFIED and have a valid, unspent mandate.
+    Verdicts are processed, a transaction is recorded, the voting path is marked SPENT,
+    and the Temporal Cascade is triggered.
+    """
+    # logger.setLevel(logging.INFO) # Moved to module level for debugging this command
+
+    dm = storage.DataManager()
+    dm.initialize_if_needed()
+    logger.info("DEBUG cast_votes: DataManager initialized.")
+
+    try:
+        voting_path_uuid = uuid.UUID(voting_path_uuid_str)
+        mandate_id = uuid.UUID(mandate_id_str)
+    except ValueError:
+        logger.error("Error: Voting path UUID or Mandate ID is not a valid UUID.")
+        typer.secho("Error: Voting path UUID or Mandate ID is not a valid UUID.", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+    logger.info(f"DEBUG cast_votes: Parsed voting_path_uuid='{voting_path_uuid}', mandate_id='{mandate_id}'.")
+
+    # 1. Validate the voting_path_uuid and its mandate
+    voting_path_model = dm.get_path_by_uuid(str(voting_path_uuid))
+    logger.info(f"DEBUG cast_votes: Fetched voting_path_model: {voting_path_model.model_dump_json() if voting_path_model else 'None'}.")
+    if not voting_path_model:
+        logger.error(f"Error: Voting path {voting_path_uuid} not found.")
+        typer.secho(f"Error: Voting path {voting_path_uuid} not found.", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+    if voting_path_model.status != "QUALIFIED":
+        logger.error(f"Error: Voting path {voting_path_uuid} is not QUALIFIED (status: {voting_path_model.status}).")
+        typer.secho(f"Error: Voting path {voting_path_uuid} is not QUALIFIED (status: {voting_path_model.status}).", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+    logger.info(f"DEBUG cast_votes: Voting path status: {voting_path_model.status}.")
+    if voting_path_model.mandate_id != mandate_id:
+        logger.error(f"Error: Mandate ID {mandate_id} does not match mandate for path {voting_path_uuid} ({voting_path_model.mandate_id}).")
+        typer.secho(f"Error: Mandate ID {mandate_id} does not match mandate for path {voting_path_uuid} ({voting_path_model.mandate_id}).", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+    logger.info(f"DEBUG cast_votes: Mandate ID matched: {voting_path_model.mandate_id}.")
+
+    # TODO: Add a check here if a path's mandate can only be used once (e.g. by checking if a transaction already used this mandate_id as initiating_path_uuid's mandate)
+    # This might require a way to link transactions back to the specific mandate_id that was spent.
+    # For now, we rely on setting the path to SPENT.
+
+    # 2. Parse verdicts input (JSON string or file path)
+    verdicts_dict: dict[str, str] = {}
+    verdicts_path = Path(verdicts_input)
+    if verdicts_path.is_file():
+        try:
+            verdicts_dict = json.loads(verdicts_path.read_text())
+        except Exception as e:
+            typer.secho(f"Error: Failed to parse verdicts JSON file {verdicts_input}: {e}", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+    else:
+        try:
+            verdicts_dict = json.loads(verdicts_input)
+        except Exception as e:
+            typer.secho(f"Error: Failed to parse verdicts JSON string: {e}", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+
+    if not isinstance(verdicts_dict, dict):
+        logger.error("Error: Verdicts input must be a JSON object (dictionary).")
+        typer.secho("Error: Verdicts input must be a JSON object (dictionary).", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+    logger.info(f"DEBUG cast_votes: Parsed verdicts_dict: {verdicts_dict}.")
+
+    # 3. Process each verdict
+    valid_votes_for_tm: list[dict[str, Any]] = []
+    oldest_voted_position = float("inf")
+
+    # For determining predecessor_hrönir_uuid for a duel at position P, we need canon at P-1.
+    # We use the *current* canonical path for this context for all duels.
+    # A more complex system might re-evaluate predecessors based on prior votes in *this same batch*,
+    # but that adds significant complexity. The current model is simpler: all votes are against
+    # duels derived from the current canonical state.
+
+    current_canon_data = {}
+    if canonical_path_file.exists():
+        try:
+            current_canon_data = json.loads(canonical_path_file.read_text()).get("path", {})
+        except (json.JSONDecodeError, AttributeError):
+            typer.secho(f"Warning: Could not load or parse canonical path file {canonical_path_file} for duel context.", fg=typer.colors.YELLOW)
+
+    logger.info(f"DEBUG cast_votes: Processing verdicts_dict: {verdicts_dict}") # Log before loop
+    for pos_str, winning_path_uuid_str_from_verdict in verdicts_dict.items():
+        try:
+            logger.info(f"  DEBUG cast_votes: Processing pos '{pos_str}' with winner '{winning_path_uuid_str_from_verdict}'...")
+            pos_idx = int(pos_str)
+            if pos_idx < 0: raise ValueError("Position must be non-negative.")
+            winning_path_uuid_from_verdict = uuid.UUID(winning_path_uuid_str_from_verdict)
+        except ValueError as e:
+            typer.echo(f"Warning: Invalid position '{pos_str}' or path UUID '{winning_path_uuid_str_from_verdict}' in verdict. Skipping. Error: {e}")
+            continue
+
+        predecessor_hrönir_uuid_for_duel: str | None = None
+        if pos_idx > 0:
+            pred_pos_key = str(pos_idx - 1)
+            if pred_pos_key in current_canon_data:
+                predecessor_hrönir_uuid_for_duel = current_canon_data[pred_pos_key].get("hrönir_uuid")
+            if not predecessor_hrönir_uuid_for_duel:
+                typer.echo(f"Warning: No canonical predecessor hrönir found for position {pos_idx-1} to determine duel at pos {pos_idx}. Skipping verdict for pos {pos_idx}.")
+                continue
+
+        # Determine the "pending duel" for this position
+        # ratings.determine_next_duel_entropy uses DataManager internally
+        duel_info = ratings.determine_next_duel_entropy(position=pos_idx, predecessor_hronir_uuid=predecessor_hrönir_uuid_for_duel)
+
+        if not duel_info or "duel_pair" not in duel_info:
+            typer.echo(f"Warning: Could not determine a pending duel for position {pos_idx} (predecessor: {predecessor_hrönir_uuid_for_duel}). Skipping verdict.")
+            continue
+
+        path_A_uuid_str = duel_info["duel_pair"]["path_A"]
+        path_B_uuid_str = duel_info["duel_pair"]["path_B"]
+        path_A_uuid = uuid.UUID(path_A_uuid_str)
+        path_B_uuid = uuid.UUID(path_B_uuid_str)
+
+        if winning_path_uuid_from_verdict not in [path_A_uuid, path_B_uuid]:
+            typer.echo(f"Warning: Voted winner {winning_path_uuid_from_verdict} for pos {pos_idx} is not part of the pending duel ({path_A_uuid_str} vs {path_B_uuid_str}). Skipping.")
+            continue
+
+        loser_path_uuid = path_A_uuid if winning_path_uuid_from_verdict == path_B_uuid else path_B_uuid
+
+        winner_hrönir_uuid = _get_successor_hronir_for_path(str(winning_path_uuid_from_verdict))
+        loser_hrönir_uuid = _get_successor_hronir_for_path(str(loser_path_uuid))
+
+        if not winner_hrönir_uuid or not loser_hrönir_uuid:
+            typer.secho(f"Error: Could not map winning/losing paths to hrönir UUIDs for pos {pos_idx}. This may indicate inconsistent data. Verdict skipped.", fg=typer.colors.RED)
+            continue
+
+        # Determine predecessor_hrönir_uuid for the vote record itself (context of the paths in the duel)
+        # This is distinct from predecessor_hrönir_uuid_for_duel (which defined which duel was chosen)
+        # For a path at pos_idx, its predecessor is defined by its own prev_uuid.
+        # All paths in a duel at pos_idx (with predecessor_hrönir_uuid_for_duel) share that same predecessor.
+        vote_predecessor_hrönir_uuid = predecessor_hrönir_uuid_for_duel
+
+        valid_votes_for_tm.append({
+            "position": pos_idx,
+            "winner_hrönir_uuid": winner_hrönir_uuid,
+            "loser_hrönir_uuid": loser_hrönir_uuid,
+            "predecessor_hrönir_uuid": vote_predecessor_hrönir_uuid, # Context for the paths in the duel
+        })
+        if pos_idx < oldest_voted_position:
+            oldest_voted_position = pos_idx
+
+    if not valid_votes_for_tm:
+        typer.echo("No valid verdicts to process after validation against pending duels.")
+        # Still update path to SPENT as a voting attempt was made with a valid mandate
+        dm.update_path_status(str(voting_path_uuid), "SPENT", mandate_id=str(mandate_id), set_mandate_explicitly=True)
+        dm.save_all_data_to_csvs() # Commit
+        typer.echo(f"Voting path {voting_path_uuid} marked as SPENT due to voting attempt, though no votes were valid for current duels.")
+        raise typer.Exit(code=0)
+
+    typer.echo(f"Processing {len(valid_votes_for_tm)} valid vote(s).")
+
+    # 4. Record transaction
+    try:
+        # Using a new UUID for session_id as there's no session object anymore.
+        # This could be linked to the voting_path_uuid or mandate_id if needed for audit.
+        pseudo_session_id = str(uuid.uuid5(mandate_id, "atomic_vote_session"))
+
+        transaction_result = transaction_manager.record_transaction(
+            session_id=pseudo_session_id,
+            initiating_path_uuid=str(voting_path_uuid), # The path that is voting
+            session_verdicts=valid_votes_for_tm,
+        )
+        typer.echo(json.dumps({
+                "message": "Transaction recorded successfully.",
+                "transaction_uuid": transaction_result["transaction_uuid"],
+                "promotions_granted": transaction_result.get("promotions_granted", []),
+            }, indent=2))
+    except Exception as e:
+        typer.secho(f"Error recording transaction: {e}", fg=typer.colors.RED)
+        # import traceback; traceback.print_exc() # For debugging
+        raise typer.Exit(code=1)
+
+    # 5. Update voting path status to SPENT
+    try:
+        dm.update_path_status(str(voting_path_uuid), "SPENT", mandate_id=str(mandate_id), set_mandate_explicitly=True)
+        dm.save_all_data_to_csvs() # Commit this change
+        typer.echo(f"Voting path {voting_path_uuid} successfully marked as SPENT.")
+    except Exception as e:
+        typer.secho(f"Error marking voting path {voting_path_uuid} as SPENT: {e}", fg=typer.colors.YELLOW)
+        # Continue to temporal cascade even if this fails, as votes are recorded.
+
+    # 6. Trigger Temporal Cascade
+    effective_oldest_voted_pos = transaction_result.get("oldest_voted_position", float("inf"))
+    if effective_oldest_voted_pos != float("inf") and effective_oldest_voted_pos >= 0:
+        typer.echo(f"Oldest voted position: {effective_oldest_voted_pos}. Triggering Temporal Cascade.")
+        try:
+            run_temporal_cascade(
+                start_position=int(effective_oldest_voted_pos),
+                max_positions_to_consolidate=max_cascade_positions,
+                canonical_path_file=canonical_path_file,
+                typer_echo=typer.echo,
+            )
+            typer.echo("Temporal Cascade processing completed.")
+        except Exception as e:
+            typer.secho(f"Error during Temporal Cascade: {e}", fg=typer.colors.RED)
+            # import traceback; traceback.print_exc()
+            # Non-fatal for the vote casting itself, but indicates canon might be stale.
+    else:
+        typer.echo("No valid votes cast that affected specific positions, or oldest position not determined; Temporal Cascade not triggered by vote positions.")
+
+    typer.secho("Vote casting process complete.", fg=typer.colors.GREEN)
 
 
 if __name__ == "__main__":
