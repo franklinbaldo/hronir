@@ -2,6 +2,7 @@ import itertools
 import math
 import uuid
 import logging # Added import
+from pathlib import Path # Added import
 
 import pandas as pd
 
@@ -36,6 +37,15 @@ def record_vote(
     # They are attributes of the duel identified by duel_id.
 ) -> None:
     """Records a structured vote linked to a specific duel instance."""
+    # --- BEGIN Position 0 IMMUTABILITY CHECK ---
+    if position == 0:
+        logging.warning(
+            f"Attempted to record vote for position 0 (duel_id='{duel_id}', token='{voting_token_path_uuid}'). "
+            "Votes on position 0 are not allowed and will be ignored."
+        )
+        return  # Do not process the vote
+    # --- END Position 0 IMMUTABILITY CHECK ---
+
     logging.info(f"ratings.record_vote CALLED with: duel_id='{duel_id}', voting_token='{voting_token_path_uuid}', side='{chosen_winner_side}', pos='{position}'")
     data_manager = storage.DataManager()
 
@@ -175,10 +185,20 @@ def get_ranking(
 
     # Conditional logging for easier debugging
     if position == 0 and predecessor_hronir_uuid is None:
+        debug_log_file = Path("debug_ratings_get_ranking.log")
+        with open(debug_log_file, "a") as f:
+            f.write(f"Timestamp: {datetime.datetime.now().isoformat()}\n")
+            f.write(f"ratings.get_ranking for pos 0 (root) initial eligible_paths_models: {[p.path_uuid for p in eligible_paths_models]}\n")
+            f.write(f"ratings.get_ranking (pos 0) hronir_to_path_map:\n{hronir_to_path_map}\n")
+            # The df_votes local variable from old logic is gone. We need to log vote_models_for_position
+            # and how they are processed in the loop.
+            f.write(f"ratings.get_ranking (pos 0) vote_models_for_position: {[v.model_dump(mode='json') for v in vote_models_for_position]}\n")
+            f.write(f"ratings.get_ranking for pos 0 (root) final_df just before return:\n{final_df[output_columns].to_string(index=False)}\n\n")
+
+        # Also use standard logging for pytest capture if it works
         logging.info(f"ratings.get_ranking for pos 0 (root) final_df just before return:\n{final_df[output_columns].to_string(index=False)}")
-        # Log the Vote models again to confirm what was used by this point
         logged_votes_for_pos_0 = data_manager.get_votes_by_position(0)
-        logging.info(f"ratings.get_ranking for pos 0 (root) VOTE MODELS processed by end of func: {[v.model_dump(mode='json') for v in logged_votes_for_pos_0]}")
+        logging.info(f"ratings.get_ranking for pos 0 (root) VOTE MODELS retrieved by get_ranking: {[v.model_dump(mode='json') for v in logged_votes_for_pos_0]}")
 
     return final_df[output_columns]
 
@@ -282,3 +302,61 @@ def check_path_qualification(
         return True
 
     return False
+
+
+def generate_and_store_new_pending_duel(
+    position: int,
+    predecessor_hrönir_uuid: str | None,
+    data_manager: storage.DataManager, # Pass DataManager instance
+) -> str | None:
+    """
+    Determines the next duel for a given position and predecessor using max entropy,
+    and stores it in the pending_duels table.
+    Returns the duel_id if a duel was successfully created, otherwise None.
+    """
+    # --- BEGIN Position 0 IMMUTABILITY CHECK ---
+    if position == 0:
+        logging.info(f"Skipping duel generation for immutable position 0 (predecessor: {predecessor_hrönir_uuid}).")
+        return None
+    # --- END Position 0 IMMUTABILITY CHECK ---
+
+    logging.info(f"Attempting to generate duel for pos {position}, pred_hrönir {predecessor_hrönir_uuid}")
+
+    # Ensure DataManager is initialized (it should be if passed from CLI context)
+    # data_manager.initialize_if_needed() # This is typically handled by DataManager's context or first use
+
+    duel_info = determine_next_duel_entropy(
+        position=position, predecessor_hronir_uuid=predecessor_hrönir_uuid
+    )
+
+    if duel_info and duel_info.get("duel_pair"):
+        path_A_uuid = duel_info["duel_pair"]["path_A"]
+        path_B_uuid = duel_info["duel_pair"]["path_B"]
+
+        if not path_A_uuid or not path_B_uuid:
+            logging.warning(f"Duel determination for pos {position} resulted in missing path UUIDs: A='{path_A_uuid}', B='{path_B_uuid}'. No duel created.")
+            return None
+
+        try:
+            # The add_pending_duel in DuckDBDataManager already raises ValueError if position == 0
+            # So this function's initial check is a bit redundant but good for clarity.
+            duel_id = data_manager.add_pending_duel(
+                position=position,
+                path_A_uuid=str(path_A_uuid), # Ensure they are strings
+                path_B_uuid=str(path_B_uuid),
+                created_at=datetime.datetime.now(datetime.timezone.utc),
+            )
+            # data_manager.save_all_data_to_csvs() # Commit happens in add_pending_duel's backend
+            logging.info(f"New pending duel {duel_id} created for position {position} between {path_A_uuid} and {path_B_uuid}.")
+            return duel_id
+        except ValueError as ve: # Catch specific error from add_pending_duel if position is 0
+            logging.error(f"Error trying to add pending duel for pos {position}: {ve}")
+            return None
+        except Exception as e:
+            logging.error(f"Unexpected error storing new pending duel for pos {position}: {e}", exc_info=True)
+            return None
+    else:
+        logging.info(
+            f"No suitable duel pair found for position {position} (predecessor: {predecessor_hrönir_uuid}). Entropy: {duel_info.get('entropy') if duel_info else 'N/A'}"
+        )
+        return None

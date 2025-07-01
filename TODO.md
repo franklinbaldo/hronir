@@ -349,4 +349,13 @@ The following tasks have been identified as high priority based on recent test s
         5. Add tests for successful PGP signing and verification, and for failure modes (e.g., bad signature, wrong key).
         6. Update GitHub Actions that might publish snapshots to include PGP key configuration and signing steps.
 
+- [ ] **Review and remove legacy code querying `DataManager.get_active_duel_for_position(0)`**
+    - **Context**: With the implementation of position 0 immutability, no duels should ever be generated or queried for position 0.
+    - **Problem**: There might be legacy code paths that still attempt to get or process duels for position 0.
+    - **Impact**: Unnecessary processing, potential for unexpected behavior if `None` is not handled correctly by callers.
+    - **Action**:
+        1. Search the codebase for `get_active_duel_for_position(0)` or similar patterns.
+        2. Evaluate if these call sites are still necessary or if they can be removed/refactored given that position 0 has no duels.
+        3. Ensure that `DataManager.add_pending_duel` and `ratings.generate_and_store_new_pending_duel` correctly prevent creation of duels for position 0.
+
 [end of TODO.md]

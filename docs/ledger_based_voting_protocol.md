@@ -30,12 +30,14 @@ This document outlines the revised voting and mandate protocol for the Hrönir E
 4.  **Ledger of Pending Duels**:
     *   The system maintains a ledger of "pending duels."
     *   For each narrative `position` where duels are possible, there is (ideally) one currently active pending duel.
-    *   This ledger is stored in a `pending_duels` table: `(duel_id TEXT PRIMARY KEY, position INT, path_A_uuid TEXT, path_B_uuid TEXT, created_at TIMESTAMP, is_active BOOLEAN)`. An index on `(position, is_active)` allows efficient lookup of the active duel for a position.
-    *   Agents consult this ledger (e.g., via `hronir list-pending-duels` or `hronir get-pending-duel --position X`) to see current contestable pairs.
+    *   This ledger is stored in a `pending_duels` table: `(duel_id TEXT PRIMARY KEY, position INT, path_A_uuid TEXT, path_B_uuid TEXT, created_at TIMESTAMP, is_active BOOLEAN, CHECK (position > 0))`. An index on `(position, is_active)` allows efficient lookup of the active duel for a position.
+    *   **Position 0 is the genesis slot; it is set by direct path creation only and excluded from dueling.** Therefore, no entries for `position = 0` will exist in `pending_duels`.
+    *   Agents consult this ledger (e.g., via `hronir list-pending-duels` or `hronir get-pending-duel --position X`) to see current contestable pairs for positions > 0.
 
 5.  **Casting Votes (Atomic Transaction - `hronir cast-vote` command)**:
     *   The agent provides their chosen `voting_token_path_uuid` and a set of verdicts.
     *   Verdicts are of the form `{"position_string": "chosen_winning_path_uuid"}`.
+    *   **Voting on position 0 is not allowed** and will be rejected by the command.
     *   The command validates:
         *   The `voting_token_path_uuid` exists and its hrönirs are valid.
         *   The `voting_token_path_uuid` is not already in `consumed_voting_tokens`.

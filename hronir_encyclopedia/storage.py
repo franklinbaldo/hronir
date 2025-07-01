@@ -24,32 +24,39 @@ class DataManager:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(
-        self,
-        path_csv_dir="narrative_paths", # Retained for DuckDBDataManager compatibility if it uses them for import/export or legacy reasons
-        ratings_csv_dir="ratings",       # Retained for DuckDBDataManager compatibility
-        transactions_json_dir="data/transactions", # Retained for DuckDBDataManager compatibility
-    ):
+    def __init__(self): # Removed default args for CSV/JSON dirs
         if hasattr(self, "_initialized") and self._initialized:
             return
 
-        # Enforce DuckDB backend
-        db_path = os.getenv("HRONIR_DUCKDB_PATH", "data/encyclopedia.duckdb")
-        # Ensure parent directory for db_path exists
-        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+        # Determine base data directory from environment or use default
+        # This HRONIR_DATA_DIR is what tests should be setting for isolation.
+        base_data_dir = Path(os.getenv("HRONIR_DATA_DIR", "data"))
+        base_data_dir.mkdir(parents=True, exist_ok=True) # Ensure base data dir exists
+
+        # Resolve paths for DB and CSVs relative to base_data_dir or specific env vars
+        db_path = Path(os.getenv("HRONIR_DUCKDB_PATH", base_data_dir / "encyclopedia.duckdb"))
+        db_path.parent.mkdir(parents=True, exist_ok=True) # Ensure DB parent dir exists
+
+        path_csv_dir_resolved = base_data_dir / "narrative_paths"
+        ratings_csv_dir_resolved = base_data_dir / "ratings"
+        transactions_json_dir_resolved = base_data_dir / "transactions"
+
+        # Ensure these subdirectories also exist if DuckDBDataManager expects them
+        path_csv_dir_resolved.mkdir(parents=True, exist_ok=True)
+        ratings_csv_dir_resolved.mkdir(parents=True, exist_ok=True)
+        transactions_json_dir_resolved.mkdir(parents=True, exist_ok=True)
 
         self.backend = DuckDBDataManager(
-            db_path=db_path,
-            # Pass these paths to DuckDBDataManager; it might use them for initial import or schema reference
-            path_csv_dir=path_csv_dir,
-            ratings_csv_dir=ratings_csv_dir,
-            transactions_json_dir=transactions_json_dir,
+            db_path=str(db_path), # DuckDBDataManager expects string path
+            path_csv_dir=path_csv_dir_resolved,
+            ratings_csv_dir=ratings_csv_dir_resolved,
+            transactions_json_dir=transactions_json_dir_resolved,
         )
 
         # Configurable library path
-        default_library_path = Path("the_library")
+        default_project_library_path = Path("the_library") # Default if no env var
         library_path_str = os.getenv("HRONIR_LIBRARY_DIR")
-        self.library_path = Path(library_path_str) if library_path_str else default_library_path
+        self.library_path = Path(library_path_str) if library_path_str else default_project_library_path
         self.library_path.mkdir(parents=True, exist_ok=True) # Ensure it exists
 
         self._initialized = False
@@ -217,10 +224,18 @@ class DataManager:
         return False
 
     # --- Pending Duel operations ---
-    def add_pending_duel(self, position: int, path_A_uuid: str, path_B_uuid: str, created_at: datetime.datetime) -> str | None:
+    def add_pending_duel(
+        self,
+        position: int,
+        path_A_uuid: str,
+        path_B_uuid: str,
+        created_at: datetime.datetime,
+        duel_id_override: str | None = None # Add optional override
+    ) -> str | None:
         self.backend.initialize_if_needed()
         if hasattr(self.backend, "add_pending_duel"):
-            return self.backend.add_pending_duel(position, path_A_uuid, path_B_uuid, created_at)
+            # Pass the override to the backend method
+            return self.backend.add_pending_duel(position, path_A_uuid, path_B_uuid, created_at, duel_id_override=duel_id_override)
         print(f"Warning: Backend {type(self.backend).__name__} does not support add_pending_duel.")
         return None
 
@@ -417,4 +432,4 @@ def compute_narrative_path_uuid(
     return uuid.uuid5(UUID_NAMESPACE, path_key)
 
 
-data_manager = DataManager()
+# data_manager = DataManager() # Removed global instance to improve test isolation

@@ -1,0 +1,152 @@
+Timestamp: 2025-07-01T01:49:14.182103
+ratings.get_ranking for pos 0 (root) initial eligible_paths_models: [UUID('fd8e2e5a-6918-51c7-b293-bf40486029d1'), UUID('38864d5e-2aca-5bf8-9763-b43b34451b4b'), UUID('a9105889-f0ad-5d4f-89d4-c48d2cd6553c'), UUID('d0d30c40-6a95-5e7a-a313-211dc316d87f'), UUID('48bcab2b-4cc1-5e4d-9bbb-dc01ef9f915d'), UUID('5d2535a9-8862-5fe1-be1c-6e7fe9b64d6b'), UUID('3076a22b-c231-5fab-8d2b-d1b249de229b'), UUID('ce59ea18-3fea-5f9d-9637-8ccb7893639a'), UUID('61b16448-7934-5a2c-8701-ac795fe8393d'), UUID('7d0966d3-b938-50c9-b767-88966501c89d'), UUID('436e63f4-273b-5fc8-bdd3-5f48baf41231'), UUID('7b4f3b2e-e873-564f-84cb-dfd97eb87f1d'), UUID('aebbef7b-349a-5a04-af58-abd3bde79167'), UUID('b5b52a14-7225-585f-98a5-e89ec436bfe4'), UUID('df42e3e4-c78f-5022-8f5a-b96b0264092a'), UUID('13f102e9-fd0b-5fd7-aedd-d1dfa8366a11'), UUID('af332f2f-9aa5-511c-8650-6e4a0bbfb189'), UUID('c3ba6993-554a-5b68-b4c3-503a1472f3dc'), UUID('15abd333-c3d6-5535-ad2c-9968abfc62bf'), UUID('25b80f1e-e03f-5f1b-933e-20f24bf13be7'), UUID('222ee9c0-17d3-533a-869b-c8aa367b5117'), UUID('35a0da40-f94a-519d-83ff-67efde193db5'), UUID('1dd939e0-3cc5-5a38-94ba-6fcf52fd4623'), UUID('e6e36503-506f-5cdb-b182-4c116af38014'), UUID('4d0fef42-0bb3-5cd0-9351-fc09a0b9165d'), UUID('098ee34b-0c9b-5da3-9268-117da5688d01'), UUID('914f7c5c-3415-546a-979f-bab0864efd1d'), UUID('233dc1a4-cd7b-5568-9cad-15dd70411616'), UUID('8d986a9e-c366-547c-9829-1f8e9829396b'), UUID('8fa3d84f-fa29-56bd-b467-85586839b514'), UUID('76311467-8b99-5187-8f9a-df84a2311a54'), UUID('46a9477f-cf92-5bd4-b074-021ad8d9bbd0'), UUID('340e9c05-be05-5635-ac7c-2eb380fe1d0b')]
+ratings.get_ranking (pos 0) hronir_to_path_map:
+{'691c5c19-aac5-59a2-86d4-bc5b9a8a58a5': 'fd8e2e5a-6918-51c7-b293-bf40486029d1', '9d446165-7954-52ed-92be-d1a4efa6a704': '38864d5e-2aca-5bf8-9763-b43b34451b4b', 'cfae763e-1ba4-5ceb-8bd3-901d50529bf2': 'a9105889-f0ad-5d4f-89d4-c48d2cd6553c', 'c842cbb4-6729-599c-b74e-644062c1d419': 'd0d30c40-6a95-5e7a-a313-211dc316d87f', '61f36cf6-c729-533f-98e4-0b9add552766': '48bcab2b-4cc1-5e4d-9bbb-dc01ef9f915d', '7f1ccb2a-f33c-5e13-86a9-ba67f8303773': '5d2535a9-8862-5fe1-be1c-6e7fe9b64d6b', '15a99c58-4939-5bcf-91e8-edfbcc5e5774': '3076a22b-c231-5fab-8d2b-d1b249de229b', 'bcf7c145-5da4-5f1a-bacd-766fb89e1a15': 'ce59ea18-3fea-5f9d-9637-8ccb7893639a', '9420cd9b-b731-5cff-9cc0-6266c246f4a9': '61b16448-7934-5a2c-8701-ac795fe8393d', '2e367720-ad3d-503d-8652-3cbfdf345f49': '7d0966d3-b938-50c9-b767-88966501c89d', '3513db8b-d7c1-56c7-9db3-5ed34a2167c4': '436e63f4-273b-5fc8-bdd3-5f48baf41231', 'dbd7f218-ea63-5ddf-ac64-5555ed126ac0': '7b4f3b2e-e873-564f-84cb-dfd97eb87f1d', 'd5e61fb6-a674-590e-838a-805b8f1c0c01': 'aebbef7b-349a-5a04-af58-abd3bde79167', 'd91c1711-7d44-59fe-83b3-8bfe1342dd0c': 'b5b52a14-7225-585f-98a5-e89ec436bfe4', '87b95e83-fddf-5d44-aea5-769ae9846cbc': 'df42e3e4-c78f-5022-8f5a-b96b0264092a', 'ccee0227-7ffd-5994-b235-30ff814310e5': '13f102e9-fd0b-5fd7-aedd-d1dfa8366a11', 'bd52da33-66a2-5ca3-9c0c-627e26c36114': 'af332f2f-9aa5-511c-8650-6e4a0bbfb189', 'af07c485-5669-5313-825f-3b3865c70b6c': 'c3ba6993-554a-5b68-b4c3-503a1472f3dc', 'ff149407-a9dc-55dc-8e63-14be428c620c': '15abd333-c3d6-5535-ad2c-9968abfc62bf', '20cedd28-d08b-54d5-8f60-73d8cf469709': '25b80f1e-e03f-5f1b-933e-20f24bf13be7', 'decafc60-1bac-5f5e-9396-c54c70f111a3': '222ee9c0-17d3-533a-869b-c8aa367b5117', '5cbcc626-819e-5635-a296-7b88ef3575af': '35a0da40-f94a-519d-83ff-67efde193db5', '689ff159-cd7b-5f39-8c61-efa6a6d77b07': '1dd939e0-3cc5-5a38-94ba-6fcf52fd4623', '1c7b7aa9-1811-5e18-8316-b13b5a44fd85': 'e6e36503-506f-5cdb-b182-4c116af38014', '6e58f7b3-8d09-5a03-9bd4-ece49b8ea050': '4d0fef42-0bb3-5cd0-9351-fc09a0b9165d', '6b9c5dbb-f666-590b-a1b6-620384da7bab': '098ee34b-0c9b-5da3-9268-117da5688d01', '135967d5-e832-528a-8e63-d337062b3af8': '914f7c5c-3415-546a-979f-bab0864efd1d', '93132520-66b2-5073-9fa4-742ea2cf7eb4': '233dc1a4-cd7b-5568-9cad-15dd70411616', 'a54d28e2-c94a-5d2f-8774-42a10af22f6a': '8d986a9e-c366-547c-9829-1f8e9829396b', '24bed411-3085-51ef-9e40-a90235fee0d8': '8fa3d84f-fa29-56bd-b467-85586839b514', '546f6294-146c-5ead-82b7-11d3749770db': '76311467-8b99-5187-8f9a-df84a2311a54', 'ab45482a-68c9-532e-8dfa-1c6d8d46c05e': '46a9477f-cf92-5bd4-b074-021ad8d9bbd0', '6b3ec38f-c722-5bda-b977-d6dc1d3a2da7': '340e9c05-be05-5635-ac7c-2eb380fe1d0b'}
+ratings.get_ranking (pos 0) vote_models_for_position: []
+ratings.get_ranking for pos 0 (root) final_df just before return:
+                           path_uuid                          hrönir_uuid  elo_rating  games_played  wins  losses
+fd8e2e5a-6918-51c7-b293-bf40486029d1 691c5c19-aac5-59a2-86d4-bc5b9a8a58a5      1500.0             0     0       0
+38864d5e-2aca-5bf8-9763-b43b34451b4b 9d446165-7954-52ed-92be-d1a4efa6a704      1500.0             0     0       0
+a9105889-f0ad-5d4f-89d4-c48d2cd6553c cfae763e-1ba4-5ceb-8bd3-901d50529bf2      1500.0             0     0       0
+d0d30c40-6a95-5e7a-a313-211dc316d87f c842cbb4-6729-599c-b74e-644062c1d419      1500.0             0     0       0
+48bcab2b-4cc1-5e4d-9bbb-dc01ef9f915d 61f36cf6-c729-533f-98e4-0b9add552766      1500.0             0     0       0
+5d2535a9-8862-5fe1-be1c-6e7fe9b64d6b 7f1ccb2a-f33c-5e13-86a9-ba67f8303773      1500.0             0     0       0
+3076a22b-c231-5fab-8d2b-d1b249de229b 15a99c58-4939-5bcf-91e8-edfbcc5e5774      1500.0             0     0       0
+ce59ea18-3fea-5f9d-9637-8ccb7893639a bcf7c145-5da4-5f1a-bacd-766fb89e1a15      1500.0             0     0       0
+61b16448-7934-5a2c-8701-ac795fe8393d 9420cd9b-b731-5cff-9cc0-6266c246f4a9      1500.0             0     0       0
+7d0966d3-b938-50c9-b767-88966501c89d 2e367720-ad3d-503d-8652-3cbfdf345f49      1500.0             0     0       0
+436e63f4-273b-5fc8-bdd3-5f48baf41231 3513db8b-d7c1-56c7-9db3-5ed34a2167c4      1500.0             0     0       0
+7b4f3b2e-e873-564f-84cb-dfd97eb87f1d dbd7f218-ea63-5ddf-ac64-5555ed126ac0      1500.0             0     0       0
+aebbef7b-349a-5a04-af58-abd3bde79167 d5e61fb6-a674-590e-838a-805b8f1c0c01      1500.0             0     0       0
+b5b52a14-7225-585f-98a5-e89ec436bfe4 d91c1711-7d44-59fe-83b3-8bfe1342dd0c      1500.0             0     0       0
+df42e3e4-c78f-5022-8f5a-b96b0264092a 87b95e83-fddf-5d44-aea5-769ae9846cbc      1500.0             0     0       0
+13f102e9-fd0b-5fd7-aedd-d1dfa8366a11 ccee0227-7ffd-5994-b235-30ff814310e5      1500.0             0     0       0
+af332f2f-9aa5-511c-8650-6e4a0bbfb189 bd52da33-66a2-5ca3-9c0c-627e26c36114      1500.0             0     0       0
+c3ba6993-554a-5b68-b4c3-503a1472f3dc af07c485-5669-5313-825f-3b3865c70b6c      1500.0             0     0       0
+15abd333-c3d6-5535-ad2c-9968abfc62bf ff149407-a9dc-55dc-8e63-14be428c620c      1500.0             0     0       0
+25b80f1e-e03f-5f1b-933e-20f24bf13be7 20cedd28-d08b-54d5-8f60-73d8cf469709      1500.0             0     0       0
+222ee9c0-17d3-533a-869b-c8aa367b5117 decafc60-1bac-5f5e-9396-c54c70f111a3      1500.0             0     0       0
+35a0da40-f94a-519d-83ff-67efde193db5 5cbcc626-819e-5635-a296-7b88ef3575af      1500.0             0     0       0
+1dd939e0-3cc5-5a38-94ba-6fcf52fd4623 689ff159-cd7b-5f39-8c61-efa6a6d77b07      1500.0             0     0       0
+e6e36503-506f-5cdb-b182-4c116af38014 1c7b7aa9-1811-5e18-8316-b13b5a44fd85      1500.0             0     0       0
+4d0fef42-0bb3-5cd0-9351-fc09a0b9165d 6e58f7b3-8d09-5a03-9bd4-ece49b8ea050      1500.0             0     0       0
+098ee34b-0c9b-5da3-9268-117da5688d01 6b9c5dbb-f666-590b-a1b6-620384da7bab      1500.0             0     0       0
+914f7c5c-3415-546a-979f-bab0864efd1d 135967d5-e832-528a-8e63-d337062b3af8      1500.0             0     0       0
+233dc1a4-cd7b-5568-9cad-15dd70411616 93132520-66b2-5073-9fa4-742ea2cf7eb4      1500.0             0     0       0
+8d986a9e-c366-547c-9829-1f8e9829396b a54d28e2-c94a-5d2f-8774-42a10af22f6a      1500.0             0     0       0
+8fa3d84f-fa29-56bd-b467-85586839b514 24bed411-3085-51ef-9e40-a90235fee0d8      1500.0             0     0       0
+76311467-8b99-5187-8f9a-df84a2311a54 546f6294-146c-5ead-82b7-11d3749770db      1500.0             0     0       0
+46a9477f-cf92-5bd4-b074-021ad8d9bbd0 ab45482a-68c9-532e-8dfa-1c6d8d46c05e      1500.0             0     0       0
+340e9c05-be05-5635-ac7c-2eb380fe1d0b 6b3ec38f-c722-5bda-b977-d6dc1d3a2da7      1500.0             0     0       0
+
+Timestamp: 2025-07-01T01:57:26.002557
+ratings.get_ranking for pos 0 (root) initial eligible_paths_models: [UUID('fd8e2e5a-6918-51c7-b293-bf40486029d1'), UUID('38864d5e-2aca-5bf8-9763-b43b34451b4b'), UUID('a9105889-f0ad-5d4f-89d4-c48d2cd6553c'), UUID('d0d30c40-6a95-5e7a-a313-211dc316d87f'), UUID('48bcab2b-4cc1-5e4d-9bbb-dc01ef9f915d'), UUID('5d2535a9-8862-5fe1-be1c-6e7fe9b64d6b'), UUID('3076a22b-c231-5fab-8d2b-d1b249de229b'), UUID('ce59ea18-3fea-5f9d-9637-8ccb7893639a'), UUID('61b16448-7934-5a2c-8701-ac795fe8393d'), UUID('7d0966d3-b938-50c9-b767-88966501c89d'), UUID('436e63f4-273b-5fc8-bdd3-5f48baf41231'), UUID('7b4f3b2e-e873-564f-84cb-dfd97eb87f1d'), UUID('aebbef7b-349a-5a04-af58-abd3bde79167'), UUID('b5b52a14-7225-585f-98a5-e89ec436bfe4'), UUID('df42e3e4-c78f-5022-8f5a-b96b0264092a'), UUID('13f102e9-fd0b-5fd7-aedd-d1dfa8366a11'), UUID('af332f2f-9aa5-511c-8650-6e4a0bbfb189'), UUID('c3ba6993-554a-5b68-b4c3-503a1472f3dc'), UUID('15abd333-c3d6-5535-ad2c-9968abfc62bf'), UUID('25b80f1e-e03f-5f1b-933e-20f24bf13be7'), UUID('222ee9c0-17d3-533a-869b-c8aa367b5117'), UUID('35a0da40-f94a-519d-83ff-67efde193db5'), UUID('1dd939e0-3cc5-5a38-94ba-6fcf52fd4623'), UUID('e6e36503-506f-5cdb-b182-4c116af38014'), UUID('4d0fef42-0bb3-5cd0-9351-fc09a0b9165d'), UUID('098ee34b-0c9b-5da3-9268-117da5688d01'), UUID('914f7c5c-3415-546a-979f-bab0864efd1d'), UUID('233dc1a4-cd7b-5568-9cad-15dd70411616'), UUID('8d986a9e-c366-547c-9829-1f8e9829396b'), UUID('8fa3d84f-fa29-56bd-b467-85586839b514'), UUID('76311467-8b99-5187-8f9a-df84a2311a54'), UUID('46a9477f-cf92-5bd4-b074-021ad8d9bbd0'), UUID('340e9c05-be05-5635-ac7c-2eb380fe1d0b')]
+ratings.get_ranking (pos 0) hronir_to_path_map:
+{'691c5c19-aac5-59a2-86d4-bc5b9a8a58a5': 'fd8e2e5a-6918-51c7-b293-bf40486029d1', '9d446165-7954-52ed-92be-d1a4efa6a704': '38864d5e-2aca-5bf8-9763-b43b34451b4b', 'cfae763e-1ba4-5ceb-8bd3-901d50529bf2': 'a9105889-f0ad-5d4f-89d4-c48d2cd6553c', 'c842cbb4-6729-599c-b74e-644062c1d419': 'd0d30c40-6a95-5e7a-a313-211dc316d87f', '61f36cf6-c729-533f-98e4-0b9add552766': '48bcab2b-4cc1-5e4d-9bbb-dc01ef9f915d', '7f1ccb2a-f33c-5e13-86a9-ba67f8303773': '5d2535a9-8862-5fe1-be1c-6e7fe9b64d6b', '15a99c58-4939-5bcf-91e8-edfbcc5e5774': '3076a22b-c231-5fab-8d2b-d1b249de229b', 'bcf7c145-5da4-5f1a-bacd-766fb89e1a15': 'ce59ea18-3fea-5f9d-9637-8ccb7893639a', '9420cd9b-b731-5cff-9cc0-6266c246f4a9': '61b16448-7934-5a2c-8701-ac795fe8393d', '2e367720-ad3d-503d-8652-3cbfdf345f49': '7d0966d3-b938-50c9-b767-88966501c89d', '3513db8b-d7c1-56c7-9db3-5ed34a2167c4': '436e63f4-273b-5fc8-bdd3-5f48baf41231', 'dbd7f218-ea63-5ddf-ac64-5555ed126ac0': '7b4f3b2e-e873-564f-84cb-dfd97eb87f1d', 'd5e61fb6-a674-590e-838a-805b8f1c0c01': 'aebbef7b-349a-5a04-af58-abd3bde79167', 'd91c1711-7d44-59fe-83b3-8bfe1342dd0c': 'b5b52a14-7225-585f-98a5-e89ec436bfe4', '87b95e83-fddf-5d44-aea5-769ae9846cbc': 'df42e3e4-c78f-5022-8f5a-b96b0264092a', 'ccee0227-7ffd-5994-b235-30ff814310e5': '13f102e9-fd0b-5fd7-aedd-d1dfa8366a11', 'bd52da33-66a2-5ca3-9c0c-627e26c36114': 'af332f2f-9aa5-511c-8650-6e4a0bbfb189', 'af07c485-5669-5313-825f-3b3865c70b6c': 'c3ba6993-554a-5b68-b4c3-503a1472f3dc', 'ff149407-a9dc-55dc-8e63-14be428c620c': '15abd333-c3d6-5535-ad2c-9968abfc62bf', '20cedd28-d08b-54d5-8f60-73d8cf469709': '25b80f1e-e03f-5f1b-933e-20f24bf13be7', 'decafc60-1bac-5f5e-9396-c54c70f111a3': '222ee9c0-17d3-533a-869b-c8aa367b5117', '5cbcc626-819e-5635-a296-7b88ef3575af': '35a0da40-f94a-519d-83ff-67efde193db5', '689ff159-cd7b-5f39-8c61-efa6a6d77b07': '1dd939e0-3cc5-5a38-94ba-6fcf52fd4623', '1c7b7aa9-1811-5e18-8316-b13b5a44fd85': 'e6e36503-506f-5cdb-b182-4c116af38014', '6e58f7b3-8d09-5a03-9bd4-ece49b8ea050': '4d0fef42-0bb3-5cd0-9351-fc09a0b9165d', '6b9c5dbb-f666-590b-a1b6-620384da7bab': '098ee34b-0c9b-5da3-9268-117da5688d01', '135967d5-e832-528a-8e63-d337062b3af8': '914f7c5c-3415-546a-979f-bab0864efd1d', '93132520-66b2-5073-9fa4-742ea2cf7eb4': '233dc1a4-cd7b-5568-9cad-15dd70411616', 'a54d28e2-c94a-5d2f-8774-42a10af22f6a': '8d986a9e-c366-547c-9829-1f8e9829396b', '24bed411-3085-51ef-9e40-a90235fee0d8': '8fa3d84f-fa29-56bd-b467-85586839b514', '546f6294-146c-5ead-82b7-11d3749770db': '76311467-8b99-5187-8f9a-df84a2311a54', 'ab45482a-68c9-532e-8dfa-1c6d8d46c05e': '46a9477f-cf92-5bd4-b074-021ad8d9bbd0', '6b3ec38f-c722-5bda-b977-d6dc1d3a2da7': '340e9c05-be05-5635-ac7c-2eb380fe1d0b'}
+ratings.get_ranking (pos 0) vote_models_for_position: []
+ratings.get_ranking for pos 0 (root) final_df just before return:
+                           path_uuid                          hrönir_uuid  elo_rating  games_played  wins  losses
+fd8e2e5a-6918-51c7-b293-bf40486029d1 691c5c19-aac5-59a2-86d4-bc5b9a8a58a5      1500.0             0     0       0
+38864d5e-2aca-5bf8-9763-b43b34451b4b 9d446165-7954-52ed-92be-d1a4efa6a704      1500.0             0     0       0
+a9105889-f0ad-5d4f-89d4-c48d2cd6553c cfae763e-1ba4-5ceb-8bd3-901d50529bf2      1500.0             0     0       0
+d0d30c40-6a95-5e7a-a313-211dc316d87f c842cbb4-6729-599c-b74e-644062c1d419      1500.0             0     0       0
+48bcab2b-4cc1-5e4d-9bbb-dc01ef9f915d 61f36cf6-c729-533f-98e4-0b9add552766      1500.0             0     0       0
+5d2535a9-8862-5fe1-be1c-6e7fe9b64d6b 7f1ccb2a-f33c-5e13-86a9-ba67f8303773      1500.0             0     0       0
+3076a22b-c231-5fab-8d2b-d1b249de229b 15a99c58-4939-5bcf-91e8-edfbcc5e5774      1500.0             0     0       0
+ce59ea18-3fea-5f9d-9637-8ccb7893639a bcf7c145-5da4-5f1a-bacd-766fb89e1a15      1500.0             0     0       0
+61b16448-7934-5a2c-8701-ac795fe8393d 9420cd9b-b731-5cff-9cc0-6266c246f4a9      1500.0             0     0       0
+7d0966d3-b938-50c9-b767-88966501c89d 2e367720-ad3d-503d-8652-3cbfdf345f49      1500.0             0     0       0
+436e63f4-273b-5fc8-bdd3-5f48baf41231 3513db8b-d7c1-56c7-9db3-5ed34a2167c4      1500.0             0     0       0
+7b4f3b2e-e873-564f-84cb-dfd97eb87f1d dbd7f218-ea63-5ddf-ac64-5555ed126ac0      1500.0             0     0       0
+aebbef7b-349a-5a04-af58-abd3bde79167 d5e61fb6-a674-590e-838a-805b8f1c0c01      1500.0             0     0       0
+b5b52a14-7225-585f-98a5-e89ec436bfe4 d91c1711-7d44-59fe-83b3-8bfe1342dd0c      1500.0             0     0       0
+df42e3e4-c78f-5022-8f5a-b96b0264092a 87b95e83-fddf-5d44-aea5-769ae9846cbc      1500.0             0     0       0
+13f102e9-fd0b-5fd7-aedd-d1dfa8366a11 ccee0227-7ffd-5994-b235-30ff814310e5      1500.0             0     0       0
+af332f2f-9aa5-511c-8650-6e4a0bbfb189 bd52da33-66a2-5ca3-9c0c-627e26c36114      1500.0             0     0       0
+c3ba6993-554a-5b68-b4c3-503a1472f3dc af07c485-5669-5313-825f-3b3865c70b6c      1500.0             0     0       0
+15abd333-c3d6-5535-ad2c-9968abfc62bf ff149407-a9dc-55dc-8e63-14be428c620c      1500.0             0     0       0
+25b80f1e-e03f-5f1b-933e-20f24bf13be7 20cedd28-d08b-54d5-8f60-73d8cf469709      1500.0             0     0       0
+222ee9c0-17d3-533a-869b-c8aa367b5117 decafc60-1bac-5f5e-9396-c54c70f111a3      1500.0             0     0       0
+35a0da40-f94a-519d-83ff-67efde193db5 5cbcc626-819e-5635-a296-7b88ef3575af      1500.0             0     0       0
+1dd939e0-3cc5-5a38-94ba-6fcf52fd4623 689ff159-cd7b-5f39-8c61-efa6a6d77b07      1500.0             0     0       0
+e6e36503-506f-5cdb-b182-4c116af38014 1c7b7aa9-1811-5e18-8316-b13b5a44fd85      1500.0             0     0       0
+4d0fef42-0bb3-5cd0-9351-fc09a0b9165d 6e58f7b3-8d09-5a03-9bd4-ece49b8ea050      1500.0             0     0       0
+098ee34b-0c9b-5da3-9268-117da5688d01 6b9c5dbb-f666-590b-a1b6-620384da7bab      1500.0             0     0       0
+914f7c5c-3415-546a-979f-bab0864efd1d 135967d5-e832-528a-8e63-d337062b3af8      1500.0             0     0       0
+233dc1a4-cd7b-5568-9cad-15dd70411616 93132520-66b2-5073-9fa4-742ea2cf7eb4      1500.0             0     0       0
+8d986a9e-c366-547c-9829-1f8e9829396b a54d28e2-c94a-5d2f-8774-42a10af22f6a      1500.0             0     0       0
+8fa3d84f-fa29-56bd-b467-85586839b514 24bed411-3085-51ef-9e40-a90235fee0d8      1500.0             0     0       0
+76311467-8b99-5187-8f9a-df84a2311a54 546f6294-146c-5ead-82b7-11d3749770db      1500.0             0     0       0
+46a9477f-cf92-5bd4-b074-021ad8d9bbd0 ab45482a-68c9-532e-8dfa-1c6d8d46c05e      1500.0             0     0       0
+340e9c05-be05-5635-ac7c-2eb380fe1d0b 6b3ec38f-c722-5bda-b977-d6dc1d3a2da7      1500.0             0     0       0
+
+Timestamp: 2025-07-01T03:35:27.097835
+ratings.get_ranking for pos 0 (root) initial eligible_paths_models: [UUID('fd8e2e5a-6918-51c7-b293-bf40486029d1'), UUID('38864d5e-2aca-5bf8-9763-b43b34451b4b'), UUID('a9105889-f0ad-5d4f-89d4-c48d2cd6553c'), UUID('d0d30c40-6a95-5e7a-a313-211dc316d87f'), UUID('48bcab2b-4cc1-5e4d-9bbb-dc01ef9f915d'), UUID('5d2535a9-8862-5fe1-be1c-6e7fe9b64d6b'), UUID('3076a22b-c231-5fab-8d2b-d1b249de229b'), UUID('ce59ea18-3fea-5f9d-9637-8ccb7893639a'), UUID('61b16448-7934-5a2c-8701-ac795fe8393d'), UUID('7d0966d3-b938-50c9-b767-88966501c89d'), UUID('436e63f4-273b-5fc8-bdd3-5f48baf41231'), UUID('7b4f3b2e-e873-564f-84cb-dfd97eb87f1d'), UUID('aebbef7b-349a-5a04-af58-abd3bde79167'), UUID('b5b52a14-7225-585f-98a5-e89ec436bfe4'), UUID('df42e3e4-c78f-5022-8f5a-b96b0264092a'), UUID('13f102e9-fd0b-5fd7-aedd-d1dfa8366a11'), UUID('af332f2f-9aa5-511c-8650-6e4a0bbfb189'), UUID('c3ba6993-554a-5b68-b4c3-503a1472f3dc'), UUID('15abd333-c3d6-5535-ad2c-9968abfc62bf'), UUID('25b80f1e-e03f-5f1b-933e-20f24bf13be7'), UUID('222ee9c0-17d3-533a-869b-c8aa367b5117'), UUID('35a0da40-f94a-519d-83ff-67efde193db5'), UUID('1dd939e0-3cc5-5a38-94ba-6fcf52fd4623'), UUID('e6e36503-506f-5cdb-b182-4c116af38014'), UUID('4d0fef42-0bb3-5cd0-9351-fc09a0b9165d'), UUID('098ee34b-0c9b-5da3-9268-117da5688d01'), UUID('914f7c5c-3415-546a-979f-bab0864efd1d'), UUID('233dc1a4-cd7b-5568-9cad-15dd70411616'), UUID('8d986a9e-c366-547c-9829-1f8e9829396b'), UUID('8fa3d84f-fa29-56bd-b467-85586839b514'), UUID('76311467-8b99-5187-8f9a-df84a2311a54'), UUID('46a9477f-cf92-5bd4-b074-021ad8d9bbd0'), UUID('340e9c05-be05-5635-ac7c-2eb380fe1d0b')]
+ratings.get_ranking (pos 0) hronir_to_path_map:
+{'691c5c19-aac5-59a2-86d4-bc5b9a8a58a5': 'fd8e2e5a-6918-51c7-b293-bf40486029d1', '9d446165-7954-52ed-92be-d1a4efa6a704': '38864d5e-2aca-5bf8-9763-b43b34451b4b', 'cfae763e-1ba4-5ceb-8bd3-901d50529bf2': 'a9105889-f0ad-5d4f-89d4-c48d2cd6553c', 'c842cbb4-6729-599c-b74e-644062c1d419': 'd0d30c40-6a95-5e7a-a313-211dc316d87f', '61f36cf6-c729-533f-98e4-0b9add552766': '48bcab2b-4cc1-5e4d-9bbb-dc01ef9f915d', '7f1ccb2a-f33c-5e13-86a9-ba67f8303773': '5d2535a9-8862-5fe1-be1c-6e7fe9b64d6b', '15a99c58-4939-5bcf-91e8-edfbcc5e5774': '3076a22b-c231-5fab-8d2b-d1b249de229b', 'bcf7c145-5da4-5f1a-bacd-766fb89e1a15': 'ce59ea18-3fea-5f9d-9637-8ccb7893639a', '9420cd9b-b731-5cff-9cc0-6266c246f4a9': '61b16448-7934-5a2c-8701-ac795fe8393d', '2e367720-ad3d-503d-8652-3cbfdf345f49': '7d0966d3-b938-50c9-b767-88966501c89d', '3513db8b-d7c1-56c7-9db3-5ed34a2167c4': '436e63f4-273b-5fc8-bdd3-5f48baf41231', 'dbd7f218-ea63-5ddf-ac64-5555ed126ac0': '7b4f3b2e-e873-564f-84cb-dfd97eb87f1d', 'd5e61fb6-a674-590e-838a-805b8f1c0c01': 'aebbef7b-349a-5a04-af58-abd3bde79167', 'd91c1711-7d44-59fe-83b3-8bfe1342dd0c': 'b5b52a14-7225-585f-98a5-e89ec436bfe4', '87b95e83-fddf-5d44-aea5-769ae9846cbc': 'df42e3e4-c78f-5022-8f5a-b96b0264092a', 'ccee0227-7ffd-5994-b235-30ff814310e5': '13f102e9-fd0b-5fd7-aedd-d1dfa8366a11', 'bd52da33-66a2-5ca3-9c0c-627e26c36114': 'af332f2f-9aa5-511c-8650-6e4a0bbfb189', 'af07c485-5669-5313-825f-3b3865c70b6c': 'c3ba6993-554a-5b68-b4c3-503a1472f3dc', 'ff149407-a9dc-55dc-8e63-14be428c620c': '15abd333-c3d6-5535-ad2c-9968abfc62bf', '20cedd28-d08b-54d5-8f60-73d8cf469709': '25b80f1e-e03f-5f1b-933e-20f24bf13be7', 'decafc60-1bac-5f5e-9396-c54c70f111a3': '222ee9c0-17d3-533a-869b-c8aa367b5117', '5cbcc626-819e-5635-a296-7b88ef3575af': '35a0da40-f94a-519d-83ff-67efde193db5', '689ff159-cd7b-5f39-8c61-efa6a6d77b07': '1dd939e0-3cc5-5a38-94ba-6fcf52fd4623', '1c7b7aa9-1811-5e18-8316-b13b5a44fd85': 'e6e36503-506f-5cdb-b182-4c116af38014', '6e58f7b3-8d09-5a03-9bd4-ece49b8ea050': '4d0fef42-0bb3-5cd0-9351-fc09a0b9165d', '6b9c5dbb-f666-590b-a1b6-620384da7bab': '098ee34b-0c9b-5da3-9268-117da5688d01', '135967d5-e832-528a-8e63-d337062b3af8': '914f7c5c-3415-546a-979f-bab0864efd1d', '93132520-66b2-5073-9fa4-742ea2cf7eb4': '233dc1a4-cd7b-5568-9cad-15dd70411616', 'a54d28e2-c94a-5d2f-8774-42a10af22f6a': '8d986a9e-c366-547c-9829-1f8e9829396b', '24bed411-3085-51ef-9e40-a90235fee0d8': '8fa3d84f-fa29-56bd-b467-85586839b514', '546f6294-146c-5ead-82b7-11d3749770db': '76311467-8b99-5187-8f9a-df84a2311a54', 'ab45482a-68c9-532e-8dfa-1c6d8d46c05e': '46a9477f-cf92-5bd4-b074-021ad8d9bbd0', '6b3ec38f-c722-5bda-b977-d6dc1d3a2da7': '340e9c05-be05-5635-ac7c-2eb380fe1d0b'}
+ratings.get_ranking (pos 0) vote_models_for_position: []
+ratings.get_ranking for pos 0 (root) final_df just before return:
+                           path_uuid                          hrönir_uuid  elo_rating  games_played  wins  losses
+fd8e2e5a-6918-51c7-b293-bf40486029d1 691c5c19-aac5-59a2-86d4-bc5b9a8a58a5      1500.0             0     0       0
+38864d5e-2aca-5bf8-9763-b43b34451b4b 9d446165-7954-52ed-92be-d1a4efa6a704      1500.0             0     0       0
+a9105889-f0ad-5d4f-89d4-c48d2cd6553c cfae763e-1ba4-5ceb-8bd3-901d50529bf2      1500.0             0     0       0
+d0d30c40-6a95-5e7a-a313-211dc316d87f c842cbb4-6729-599c-b74e-644062c1d419      1500.0             0     0       0
+48bcab2b-4cc1-5e4d-9bbb-dc01ef9f915d 61f36cf6-c729-533f-98e4-0b9add552766      1500.0             0     0       0
+5d2535a9-8862-5fe1-be1c-6e7fe9b64d6b 7f1ccb2a-f33c-5e13-86a9-ba67f8303773      1500.0             0     0       0
+3076a22b-c231-5fab-8d2b-d1b249de229b 15a99c58-4939-5bcf-91e8-edfbcc5e5774      1500.0             0     0       0
+ce59ea18-3fea-5f9d-9637-8ccb7893639a bcf7c145-5da4-5f1a-bacd-766fb89e1a15      1500.0             0     0       0
+61b16448-7934-5a2c-8701-ac795fe8393d 9420cd9b-b731-5cff-9cc0-6266c246f4a9      1500.0             0     0       0
+7d0966d3-b938-50c9-b767-88966501c89d 2e367720-ad3d-503d-8652-3cbfdf345f49      1500.0             0     0       0
+436e63f4-273b-5fc8-bdd3-5f48baf41231 3513db8b-d7c1-56c7-9db3-5ed34a2167c4      1500.0             0     0       0
+7b4f3b2e-e873-564f-84cb-dfd97eb87f1d dbd7f218-ea63-5ddf-ac64-5555ed126ac0      1500.0             0     0       0
+aebbef7b-349a-5a04-af58-abd3bde79167 d5e61fb6-a674-590e-838a-805b8f1c0c01      1500.0             0     0       0
+b5b52a14-7225-585f-98a5-e89ec436bfe4 d91c1711-7d44-59fe-83b3-8bfe1342dd0c      1500.0             0     0       0
+df42e3e4-c78f-5022-8f5a-b96b0264092a 87b95e83-fddf-5d44-aea5-769ae9846cbc      1500.0             0     0       0
+13f102e9-fd0b-5fd7-aedd-d1dfa8366a11 ccee0227-7ffd-5994-b235-30ff814310e5      1500.0             0     0       0
+af332f2f-9aa5-511c-8650-6e4a0bbfb189 bd52da33-66a2-5ca3-9c0c-627e26c36114      1500.0             0     0       0
+c3ba6993-554a-5b68-b4c3-503a1472f3dc af07c485-5669-5313-825f-3b3865c70b6c      1500.0             0     0       0
+15abd333-c3d6-5535-ad2c-9968abfc62bf ff149407-a9dc-55dc-8e63-14be428c620c      1500.0             0     0       0
+25b80f1e-e03f-5f1b-933e-20f24bf13be7 20cedd28-d08b-54d5-8f60-73d8cf469709      1500.0             0     0       0
+222ee9c0-17d3-533a-869b-c8aa367b5117 decafc60-1bac-5f5e-9396-c54c70f111a3      1500.0             0     0       0
+35a0da40-f94a-519d-83ff-67efde193db5 5cbcc626-819e-5635-a296-7b88ef3575af      1500.0             0     0       0
+1dd939e0-3cc5-5a38-94ba-6fcf52fd4623 689ff159-cd7b-5f39-8c61-efa6a6d77b07      1500.0             0     0       0
+e6e36503-506f-5cdb-b182-4c116af38014 1c7b7aa9-1811-5e18-8316-b13b5a44fd85      1500.0             0     0       0
+4d0fef42-0bb3-5cd0-9351-fc09a0b9165d 6e58f7b3-8d09-5a03-9bd4-ece49b8ea050      1500.0             0     0       0
+098ee34b-0c9b-5da3-9268-117da5688d01 6b9c5dbb-f666-590b-a1b6-620384da7bab      1500.0             0     0       0
+914f7c5c-3415-546a-979f-bab0864efd1d 135967d5-e832-528a-8e63-d337062b3af8      1500.0             0     0       0
+233dc1a4-cd7b-5568-9cad-15dd70411616 93132520-66b2-5073-9fa4-742ea2cf7eb4      1500.0             0     0       0
+8d986a9e-c366-547c-9829-1f8e9829396b a54d28e2-c94a-5d2f-8774-42a10af22f6a      1500.0             0     0       0
+8fa3d84f-fa29-56bd-b467-85586839b514 24bed411-3085-51ef-9e40-a90235fee0d8      1500.0             0     0       0
+76311467-8b99-5187-8f9a-df84a2311a54 546f6294-146c-5ead-82b7-11d3749770db      1500.0             0     0       0
+46a9477f-cf92-5bd4-b074-021ad8d9bbd0 ab45482a-68c9-532e-8dfa-1c6d8d46c05e      1500.0             0     0       0
+340e9c05-be05-5635-ac7c-2eb380fe1d0b 6b3ec38f-c722-5bda-b977-d6dc1d3a2da7      1500.0             0     0       0
+
+Timestamp: 2025-07-01T03:37:57.638969
+ratings.get_ranking for pos 0 (root) initial eligible_paths_models: [UUID('46a9477f-cf92-5bd4-b074-021ad8d9bbd0'), UUID('340e9c05-be05-5635-ac7c-2eb380fe1d0b')]
+ratings.get_ranking (pos 0) hronir_to_path_map:
+{'ab45482a-68c9-532e-8dfa-1c6d8d46c05e': '46a9477f-cf92-5bd4-b074-021ad8d9bbd0', '6b3ec38f-c722-5bda-b977-d6dc1d3a2da7': '340e9c05-be05-5635-ac7c-2eb380fe1d0b'}
+ratings.get_ranking (pos 0) vote_models_for_position: []
+ratings.get_ranking for pos 0 (root) final_df just before return:
+                           path_uuid                          hrönir_uuid  elo_rating  games_played  wins  losses
+46a9477f-cf92-5bd4-b074-021ad8d9bbd0 ab45482a-68c9-532e-8dfa-1c6d8d46c05e      1500.0             0     0       0
+340e9c05-be05-5635-ac7c-2eb380fe1d0b 6b3ec38f-c722-5bda-b977-d6dc1d3a2da7      1500.0             0     0       0
+
+Timestamp: 2025-07-01T03:42:45.377004
+ratings.get_ranking for pos 0 (root) initial eligible_paths_models: [UUID('46a9477f-cf92-5bd4-b074-021ad8d9bbd0'), UUID('340e9c05-be05-5635-ac7c-2eb380fe1d0b')]
+ratings.get_ranking (pos 0) hronir_to_path_map:
+{'ab45482a-68c9-532e-8dfa-1c6d8d46c05e': '46a9477f-cf92-5bd4-b074-021ad8d9bbd0', '6b3ec38f-c722-5bda-b977-d6dc1d3a2da7': '340e9c05-be05-5635-ac7c-2eb380fe1d0b'}
+ratings.get_ranking (pos 0) vote_models_for_position: []
+ratings.get_ranking for pos 0 (root) final_df just before return:
+                           path_uuid                          hrönir_uuid  elo_rating  games_played  wins  losses
+46a9477f-cf92-5bd4-b074-021ad8d9bbd0 ab45482a-68c9-532e-8dfa-1c6d8d46c05e      1500.0             0     0       0
+340e9c05-be05-5635-ac7c-2eb380fe1d0b 6b3ec38f-c722-5bda-b977-d6dc1d3a2da7      1500.0             0     0       0
+
+Timestamp: 2025-07-01T03:51:17.958449
+ratings.get_ranking for pos 0 (root) initial eligible_paths_models: [UUID('46a9477f-cf92-5bd4-b074-021ad8d9bbd0'), UUID('340e9c05-be05-5635-ac7c-2eb380fe1d0b')]
+ratings.get_ranking (pos 0) hronir_to_path_map:
+{'ab45482a-68c9-532e-8dfa-1c6d8d46c05e': '46a9477f-cf92-5bd4-b074-021ad8d9bbd0', '6b3ec38f-c722-5bda-b977-d6dc1d3a2da7': '340e9c05-be05-5635-ac7c-2eb380fe1d0b'}
+ratings.get_ranking (pos 0) vote_models_for_position: []
+ratings.get_ranking for pos 0 (root) final_df just before return:
+                           path_uuid                          hrönir_uuid  elo_rating  games_played  wins  losses
+46a9477f-cf92-5bd4-b074-021ad8d9bbd0 ab45482a-68c9-532e-8dfa-1c6d8d46c05e      1500.0             0     0       0
+340e9c05-be05-5635-ac7c-2eb380fe1d0b 6b3ec38f-c722-5bda-b977-d6dc1d3a2da7      1500.0             0     0       0
