@@ -908,11 +908,11 @@ security final review
 
 **✅ APROVAR v2.0** - Robustez vale as 3 semanas extras  
 **🔄 APROVAR v1.0** - Implementar v2.0 features iterativamente  
-**❌ REJEITAR** - Razão: ********\_\_\_\_********
+**❌ REJEITAR** - Razão: **\*\*\*\***\_\_\_\_**\*\*\*\***
 
-**Data da Decisão**: ****\_\_\_****  
-**Assinatura Tech Lead**: ****\_\_\_****  
-**Assinatura Security Lead**: ****\_\_\_****
+**Data da Decisão**: \***\*\_\_\_\*\***  
+**Assinatura Tech Lead**: \***\*\_\_\_\*\***  
+**Assinatura Security Lead**: \***\*\_\_\_\*\***
 
 ---
 

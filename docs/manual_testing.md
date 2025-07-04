@@ -129,6 +129,6 @@ This document outlines manual test cases for verifying the conflict resolution m
 **Notes on Simulating "Remote":**
 
 - The `ConflictDetection.discover_latest_remote_snapshot_robust()` currently uses `_get_latest_local_manifest()` as a placeholder. This means the "remote" state is effectively the highest sequence manifest found in the local `data/snapshots_meta/` directory for the given `NETWORK_UUID`.
-- To simulate two users, ensure they are operating in separate working directories but configure their `hronir` commands (or environment variables) such_that `ConflictDetection` reads/writes manifest metadata to a _shared_ `data/snapshots_meta/` path if you want them to see each other's pushes as "remote". Alternatively, manually copy the relevant `_seq_X.json` file from User A's meta dir to User B's meta dir before User B does a push to simulate User B "seeing" User A's push.
+- To simulate two users, ensure they are operating in separate working directories but configure their `hronir` commands (or environment variables) such*that `ConflictDetection` reads/writes manifest metadata to a \_shared* `data/snapshots_meta/` path if you want them to see each other's pushes as "remote". Alternatively, manually copy the relevant `_seq_X.json` file from User A's meta dir to User B's meta dir before User B does a push to simulate User B "seeing" User A's push.
 
 This setup allows testing the sequence number conflict logic effectively even before full IA integration for discovery.
