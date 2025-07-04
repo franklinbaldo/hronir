@@ -37,4 +37,3 @@ Garantir que o protocolo possa ser executado por vários nós independentes, man
 - Prototipar sincronização Git automatizada.
 - Definir esquema de mensagens e assinaturas digitais.
 - Testar replicação em ambiente controlado com dois nós.
-

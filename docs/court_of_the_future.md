@@ -1,57 +1,61 @@
 # 🔒 Tribunal do Futuro – Defesa Contra o Mantenedor Malicioso (v3.0 – sem dependências externas)
 
 ## 1. Problema Central
+
 O mantenedor do ledger pode:
-- **Reordenar** merges manualmente  
-- **Bloquear/censurar** branches indesejados  
-- **Rollbacks** forçar histórico alternativo  
+
+- **Reordenar** merges manualmente
+- **Bloquear/censurar** branches indesejados
+- **Rollbacks** forçar histórico alternativo
 
 Tudo isso mina a confiança na narrativa emergente.
 
 ---
 
 ## 2. Objetivos da Solução
-1. **Ordens objetivas**: merge só por regra interna.  
-2. **Liveness garantido**: nenhum ramo preso indefinidamente.  
-3. **Resistência a splits artificiais**: divisão não dribla a regra.  
-4. **Imutabilidade interna**: sem push-force bem-sucedido.  
+
+1. **Ordens objetivas**: merge só por regra interna.
+2. **Liveness garantido**: nenhum ramo preso indefinidamente.
+3. **Resistência a splits artificiais**: divisão não dribla a regra.
+4. **Imutabilidade interna**: sem push-force bem-sucedido.
 5. **Zero dependências externas**: nada de PoW ou serviços fora do protocolo.
 
 ---
 
 ## 3. Regra Principal: Merge Só Entre Ramos do Mesmo Tamanho Válido
+
 ```yaml
 Rule_Merge_Same_Size:
   branches_must_be: QUALIFIED
   merge_condition: valid_tx_count_A == valid_tx_count_B
-````
+```
 
 ---
 
 ## 4. Garantia de Liveness
 
-* **Timeout T = 10 epochs**
+- **Timeout T = 10 epochs**
   Após T epochs sem par exato, **merge** com bucket adjacente (±1), mantendo densidade de transações válidas.
-* **Prova**: em qualquer conjunto finito, pelo menos um merge ocorre em ≤ T+1 ciclos.
+- **Prova**: em qualquer conjunto finito, pelo menos um merge ocorre em ≤ T+1 ciclos.
 
 ---
 
 ## 5. Defesa Contra Particionamento Artificial
 
-* **K\_max\_splits = 2**
+- **K_max_splits = 2**
   Cada branch QUALIFIED só pode ser dividido até 2×; mais → `EXPIRED`.
-* **Só contam transações válidas**
+- **Só contam transações válidas**
   Duelo vencedor ou Elo ≥ mediana; no-ops são descartados antes de contar `valid_tx_count`.
 
 ---
 
 ## 6. Segurança de Rollback – Protocolo Interno
 
-* **Merge bidirecional**
+- **Merge bidirecional**
   Cada super-block registra `parent_A` e `parent_B`.
-* **Verificação de ancestors**
+- **Verificação de ancestors**
   Clientes recusam qualquer cadeia cujo HEAD refira pai ausente no histórico local.
-* **Rejeição de force-push**
+- **Rejeição de force-push**
   Se mantiver histórico faltando blocks antigos, o CLI não avança o HEAD.
 
 ---
@@ -70,7 +74,7 @@ Rule_Merge_Same_Size:
 
 1. **Path criado** → `PENDING`
 2. **Duelos internos** → atinge limiar → `QUALIFIED`
-3. **Entra em waiting\_branches\[valid\_tx\_count]**
+3. **Entra em waiting_branches\[valid_tx_count]**
 4. **Merge** por Regra 3 ou fallback Regra 4
 5. **Super-block** com `parent_A`+`parent_B` → append-only
 
@@ -81,15 +85,15 @@ Rule_Merge_Same_Size:
 ### 9.1 Honesto
 
 ```text
-E1: A(3) QUALIFIED → espera  
-E2: B(3) QUALIFIED → merge A↔B → HEAD → progresso  
+E1: A(3) QUALIFIED → espera
+E2: B(3) QUALIFIED → merge A↔B → HEAD → progresso
 ```
 
 ### 9.2 Malicioso
 
 ```text
-- Tenta split D(4)→D1(2)+D2(2): cada metade perde densidade → dificil QUALIFY  
-- Tenta push-force sem parent_X: CLI recusa por missing ancestor  
+- Tenta split D(4)→D1(2)+D2(2): cada metade perde densidade → dificil QUALIFY
+- Tenta push-force sem parent_X: CLI recusa por missing ancestor
 ```
 
 ---
@@ -98,10 +102,10 @@ E2: B(3) QUALIFIED → merge A↔B → HEAD → progresso
 
 Sem notarização externa ou multisig, este design:
 
-* **Elimina discricionariedade** do mantenedor
-* **Garante liveness** via timeout/fallback
-* **Impede rollback** com verificação interna de ancestors
-* **Mantém simplicidade** e coerência com filosofia Hrönir
+- **Elimina discricionariedade** do mantenedor
+- **Garante liveness** via timeout/fallback
+- **Impede rollback** com verificação interna de ancestors
+- **Mantém simplicidade** e coerência com filosofia Hrönir
 
 Pronto para v3.0-alpha, totalmente self-contained.
 
@@ -115,25 +119,25 @@ Pronto para v3.0-alpha, totalmente self-contained.
 
 | Vantagem                             | Mecanismo                                                                                                                                      | Resultado                                                                                                                |
 | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| **Neutraliza o “avalanche merge”**   | Cada merge combina *duas* cadeias que já custaram esforço narrativo idêntico.                                                                  | Um bot não consegue atropelar a linha do tempo com uma super-cadeia gigante: ela estagna até surgir igual-em-peso.       |
+| **Neutraliza o “avalanche merge”**   | Cada merge combina _duas_ cadeias que já custaram esforço narrativo idêntico.                                                                  | Um bot não consegue atropelar a linha do tempo com uma super-cadeia gigante: ela estagna até surgir igual-em-peso.       |
 | **Sybil vira autodestrutivo**        | Para ganhar influência, o adversário precisa criar **dois** ramos do mesmo tamanho — dobrando o custo narrativo/computacional.                 | O ROI de spam cai pela metade de cara; e cai mais a cada round, pois o tamanho exigido cresce exponencialmente (2→4→8…). |
 | **Seleção darwiniana intra-ramo**    | Inflar com transações inúteis **não** é isca gratuita: só as válidas contam, e o ramo internaliza seu próprio lixo (é purgado antes do merge). | O atacante que infla perde densidade de “qualidade por bloco”, dificultando futuras vitórias no Elo.                     |
 | **Ordenação determinística natural** | “Quem chega primeiro” não importa: pares são formados por **tamanho**, não por timestamp, evitando corridas maliciosas.                        | Elimina a manipulação de relógio e flash-publishing.                                                                     |
 | **Escalonamento binário**            | O sistema vira um torneio de bracket: 2 → 4 → 8 → 16… blocos.                                                                                  | Crescimento log₂ mantém verificação barata e previsível.                                                                 |
-| **Liveness sob controle**            | Um ramo ímpar só espera até aparecer outro de mesmo tamanho; se ninguém produzir, significa que a cadeia perdeu relevância.                    | Tempo de espera vira *proxy* de interesse: conteúdo sem eco morre por inanição natural, sem exigir árbitro.              |
+| **Liveness sob controle**            | Um ramo ímpar só espera até aparecer outro de mesmo tamanho; se ninguém produzir, significa que a cadeia perdeu relevância.                    | Tempo de espera vira _proxy_ de interesse: conteúdo sem eco morre por inanição natural, sem exigir árbitro.              |
 
 ---
 
 ### 2 · Resposta aos principais ataques
 
 1. **“O bot corta a própria cadeia em dois pedaços iguais.”**
-   *Corte tem preço:* cada metade sacrifica profundidade narrativa (menos vitórias, Elo menor) ⇒ menor chance de vencer duelos futuros. Além disso, cada divisão reinicia o relógio de espera; não há ganho instantâneo.
+   _Corte tem preço:_ cada metade sacrifica profundidade narrativa (menos vitórias, Elo menor) ⇒ menor chance de vencer duelos futuros. Além disso, cada divisão reinicia o relógio de espera; não há ganho instantâneo.
 
 2. **“Ele infla com no-ops.”**
-   Antes do merge roda-se `garbage_collect()` que descarta transações sem duelo ou com Elo < *ε*. Como só as válidas contam para o tamanho, o inflador só troca spam por atraso.
+   Antes do merge roda-se `garbage_collect()` que descarta transações sem duelo ou com Elo < _ε_. Como só as válidas contam para o tamanho, o inflador só troca spam por atraso.
 
 3. **“Liveness falha se o número de ramos for ímpar.”**
-   Estatisticamente, em rede aberta sempre surge novo ramo — mas para casos extremos adiciona-se **timeout T**: se esperar > T epochs, o ramo menor é *promovido* a par do maior imediato (garante progresso).
+   Estatisticamente, em rede aberta sempre surge novo ramo — mas para casos extremos adiciona-se **timeout T**: se esperar > T epochs, o ramo menor é _promovido_ a par do maior imediato (garante progresso).
 
 ---
 
@@ -142,7 +146,7 @@ Pronto para v3.0-alpha, totalmente self-contained.
 | Camada existente                     | Ajuste mínimo                                                                                                   |
 | ------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
 | **Qualificação por Mérito (SC .13)** | Continua igual: só ramos QUALIFIED entram na fila de merge.                                                     |
-| **Mandate único por path**           | O *mandate* só nasce após primeiro merge bem-sucedido. Multiplica a fricção para Sybil.                         |
+| **Mandate único por path**           | O _mandate_ só nasce após primeiro merge bem-sucedido. Multiplica a fricção para Sybil.                         |
 | **Enum de status**                   | `WAITING_FOR_PAIR` novo status intermediário.                                                                   |
 | **Ledger append-only**               | Ao fundir, grava um “super-bloco” com `parent_A`, `parent_B`, `size=N`. O hash desse super-bloco é o novo head. |
 
@@ -167,7 +171,7 @@ def try_merge(branch):
         return None
 ```
 
-*Tempo total de verificação:*
+_Tempo total de verificação:_
 `O(log₂ total_tx)` – cresce suavemente, ideal para agentes off-chain de baixo poder.
 
 ---
@@ -184,9 +188,9 @@ def try_merge(branch):
 
 ### 6 · Por que vale experimentar
 
-* Concretiza a estética “babel binária” — cada merge dobra a *granularidade histórica*.
-* É **trivial de auditar**: basta contar linhas; nenhum hash-score obscuro.
-* Mantém a filosofia de “fricção como filtro”, mas usa fricção **simétrica**: o adversário paga o mesmo pedágio que qualquer agente honesto.
+- Concretiza a estética “babel binária” — cada merge dobra a _granularidade histórica_.
+- É **trivial de auditar**: basta contar linhas; nenhum hash-score obscuro.
+- Mantém a filosofia de “fricção como filtro”, mas usa fricção **simétrica**: o adversário paga o mesmo pedágio que qualquer agente honesto.
 
 ---
 

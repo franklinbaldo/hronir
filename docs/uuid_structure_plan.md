@@ -32,7 +32,7 @@ three pieces of data. This allows referencing individual branching events.
 - [ ] Migrate existing chapters into `the_library/` using their generated UUIDs.
 - [x] Write `metadata.json` for each chapter storing its UUID.
 - [ ] Generate initial `forking_path/canonical.csv` representing the current
-  reading order.
+      reading order.
 - [ ] Update CLI commands to read and write chapters using the new structure.
 - [ ] Adjust tests and documentation accordingly.
 

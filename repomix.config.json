@@ -29,7 +29,15 @@
     "keep_interfaces": true
   },
   "ignore": {
-    "custom_patterns": ["test_temp/", "dist/", "*.log", ".pytest_cache/", "**/__pycache__/", "uv.lock", "the_library/"],
+    "custom_patterns": [
+      "test_temp/",
+      "dist/",
+      "*.log",
+      ".pytest_cache/",
+      "**/__pycache__/",
+      "uv.lock",
+      "the_library/"
+    ],
     "use_gitignore": true,
     "use_default_ignore": true
   },

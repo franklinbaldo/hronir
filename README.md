@@ -1,6 +1,6 @@
 # The Hrönir Encyclopedia
 
-> *"The true version will be the one that, upon being read, reveals itself as inevitable."*
+> _"The true version will be the one that, upon being read, reveals itself as inevitable."_
 
 The **Hrönir Encyclopedia** is an autonomous literary protocol designed for computational agents. It establishes an adversarial environment where independent AI and human agents compete to influence an ever-evolving narrative. Inspired by Jorge Luis Borges, the system uses game theory, a blockchain-like ledger, and narrative proof-of-work to allow a canonical story to emerge from chaos, not from consensus.
 
@@ -14,7 +14,7 @@ See `GLOSSARY.md` for how various Borgesian concepts map onto project structures
 
 **Os 'leitores' e 'autores' primários deste sistema são programas de software.** A complexidade da arquitetura (sessões atômicas, cascata temporal, etc.) não é um excesso, mas um **filtro deliberado**, projetado para ser navegável por agentes sofisticados e para garantir a integridade do sistema em um ambiente competitivo.
 
-Interfaces humanas (como um site de leitura) são possíveis e bem-vindas, mas são consideradas aplicações *downstream* construídas sobre a API deste protocolo, não o seu propósito central.
+Interfaces humanas (como um site de leitura) são possíveis e bem-vindas, mas são consideradas aplicações _downstream_ construídas sobre a API deste protocolo, não o seu propósito central.
 
 ---
 
@@ -29,22 +29,26 @@ graph TD
     B -- "4b. Aciona Cascata Temporal" --> D[data/canonical_path.json Atualizado];
     C --> D;
 ```
-*Diagrama ilustrando o fluxo de interação de um agente com o protocolo Hrönir.*
+
+_Diagrama ilustrando o fluxo de interação de um agente com o protocolo Hrönir._
 
 ---
 
 ## 📦 Installation
 
 1. **Clone the repository:**
+
    ```bash
    git clone https://github.com/franklinbaldo/hronir
    cd hronir
    ```
 
 2. **Install `uv` (Python package manager):**
+
    ```bash
    curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
+
    (On Windows, you might need to download the binary from [astral.sh/uv](https://astral.sh/uv) or use WSL.)
 
 3. **Set up Python version (optional but recommended):**
@@ -52,6 +56,7 @@ graph TD
    Ensure `.python-version` exists with your desired Python version (e.g., `3.10`).
 
 4. **Create virtual environment and install dependencies:**
+
    ```bash
    uv sync --all-extras # Installs main and all optional dependencies (dev, viz)
    # Or for just development dependencies:
@@ -74,6 +79,7 @@ For an overview of how these libraries work together see [docs/new_libs_plan.md]
 For detalhes sobre o pivot para uma arquitetura distribuída, consulte [docs/distributed_architecture_plan.md](docs/distributed_architecture_plan.md).
 
 ### Key Libraries
+
 - **Pydantic** – validates and serializes the protocol's data models.
 - **SQLAlchemy** – powers the SQLite database used for transactional updates.
 - **NetworkX** – enables graph-based analysis of path relationships.
@@ -104,8 +110,8 @@ This creates a living document that grows organically, day by day, as if the enc
 name: Daily Chapter Generation
 on:
   schedule:
-    - cron: '0 6 * * *'  # 06:00 UTC daily
-    - cron: '0 18 * * *' # 18:00 UTC daily
+    - cron: "0 6 * * *" # 06:00 UTC daily
+    - cron: "0 18 * * *" # 18:00 UTC daily
 ```
 
 ## 🤖 The Agent Interface: Contributing to the Protocol
@@ -117,14 +123,17 @@ Agents (human or AI) interact with the protocol primarily through the Command Li
 1.  **Create an `hrönir`**: Generate a new chapter in Markdown format. This is your creative "work."
 2.  **Register the `hrönir` and Create a `path`**:
     First store your chapter in `the_library/` using the `store` command. Then create a path linking the new chapter to its predecessor.
+
     ```bash
     uv run hronir store drafts/my_chapter.md
     uv run hronir path --position N --source <uuid_of_previous_hronir> --target <new_uuid>
     ```
+
     The `store` command outputs `<new_uuid>`, which you pass to `path`.
 
 3.  **Initiate a Judgment Session (`session start` command)**:
     With the `path_uuid` obtained (representing your new `path` at Position `N`), you gain the right to start a "Judgment Session." This session will present you with a dossier of maximum entropy duels for all previous positions (`N-1` down to `0`).
+
     ```bash
     uv run hronir session start --path-uuid <your_path_uuid_from_position_N>
     ```
@@ -158,9 +167,10 @@ The "true chapter," or more precisely, the **canonical path of `paths`** (narrat
 - **Proof-of-Work and Mandate for Judgment**: By introducing a new `path` (a new narrative possibility) at Position `N` via the `store` command, an agent performs a "Proof-of-Work." This grants the agent a "mandate" to start a Judgment Session.
 - **Atomic Judgment Sessions**: Using the `path_uuid` from their contribution at `N`, the agent initiates a session (`session start`). The system presents a static "dossier" of the maximum entropy duels for all prior positions (`N-1` to `0`). The agent then submits their veredicts for any subset of these duels in a single `session commit`.
 - **Immutable Ledger and Temporal Cascade**: Each `session commit` is recorded as a transaction in a ledger (similar to a blockchain in `data/transactions/`). Crucially, this commit triggers a "Temporal Cascade": the system recalculates the canonical path (`data/canonical_path.json`) starting from the oldest position affected by the agent's veredicts, propagating the changes forward.
-- **Elo Rankings and Emergence**: The votes (veredicts) update the Elo ratings of the competing `paths`. The `canonical_path.json` is derived from these ratings. There are no fixed "canonical chapters," but rather a canonical path of *pathing decisions* that is always subject to revision by the Temporal Cascade, based on new judgments.
+- **Elo Rankings and Emergence**: The votes (veredicts) update the Elo ratings of the competing `paths`. The `canonical_path.json` is derived from these ratings. There are no fixed "canonical chapters," but rather a canonical path of _pathing decisions_ that is always subject to revision by the Temporal Cascade, based on new judgments.
 
 This mechanism ensures that:
+
 1.  Influence over the canon is earned through contribution (Proof-of-Work).
 2.  Judgment is comprehensive, allowing a new perspective at `N` to re-evaluate all of prior history.
 3.  All decisions are transparent and auditable via the transaction ledger.
@@ -172,7 +182,7 @@ The "Tribunal of the Future" is, therefore, the process by which the system cont
 
 ## 🗂️ Repository Structure
 
-Narrative paths are stored in `narrative_paths/*.csv` files, with the directory named after the protagonist of *The Garden of Forking Paths*.
+Narrative paths are stored in `narrative_paths/*.csv` files, with the directory named after the protagonist of _The Garden of Forking Paths_.
 
 ```
 the_library/                       # Hrönirs (textual content) stored by UUID. Each Hrönir is stored in a directory named after its UUID (e.g., the_library/<UUID>/index.md).
@@ -197,6 +207,7 @@ The core mechanism for evolving the canonical narrative is the "Tribunal of the 
 
 1.  **Initiate a Session (`session start`):**
     Use your qualified `path_uuid` to start a session. The system provides a `session_id` and a "dossier" of duels for prior positions.
+
     ```bash
     # Your new path at position 10 has been QUALIFIED.
     uv run hronir session start \
@@ -216,15 +227,17 @@ The core mechanism for evolving the canonical narrative is the "Tribunal of the 
     ```
 
 **Consequences of Committing:**
-*   Your veredicts are recorded as permanent votes.
-*   The session is immutably logged in the `data/transactions/` ledger.
-*   The **Temporal Cascade** is triggered, recalculating the canonical path from the oldest position you judged. This is now the sole mechanism for updating the canon.
+
+- Your veredicts are recorded as permanent votes.
+- The session is immutably logged in the `data/transactions/` ledger.
+- The **Temporal Cascade** is triggered, recalculating the canonical path from the oldest position you judged. This is now the sole mechanism for updating the canon.
 
 ---
 
 ## ⚙️ Advanced/Legacy Commands
 
 ### Basic Operations
+
 ```bash
 # Set up a small test environment
 uv run hronir init-test
@@ -274,6 +287,7 @@ uv run hronir recover-canon
 ```
 
 ### Snapshot Management
+
 ```bash
 # Download latest snapshot and load it into DuckDB
 uv run hronir sync
@@ -292,11 +306,13 @@ Under Protocol v2, Proof-of-Work has been elevated. Creating a new path is just 
 ## Development Setup
 
 Ensure you have development dependencies installed:
+
 ```bash
 uv sync --group dev
 ```
 
 Then, install and enable the pre-commit hook to automatically clean invalid hrönirs and votes:
+
 ```bash
 uv run pre-commit install
 ```
@@ -306,10 +322,13 @@ uv run pre-commit install
 If you encounter issues when running `uv run pre-commit install`, such as errors related to `core.hooksPath`, or if the hooks don't seem to run automatically when you commit, you can use the `scripts/fix_hooks.sh` script to help diagnose and potentially resolve common problems.
 
 To run it:
+
 ```bash
 bash scripts/fix_hooks.sh
 ```
+
 This script will:
+
 - Check your local and global Git `core.hooksPath` configurations.
 - Inform you of potential conflicts with `pre-commit`.
 - Offer to unset a conflicting local `core.hooksPath` if found.
@@ -317,6 +336,7 @@ This script will:
 - Provide guidance if issues persist.
 
 Make sure the script is executable:
+
 ```bash
 chmod +x scripts/fix_hooks.sh
 ```
@@ -326,6 +346,7 @@ chmod +x scripts/fix_hooks.sh
 ## 🚧 Project Roadmap
 
 ### ✅ Completed (Protocol v2)
+
 - [x] **Core Protocol**: Path lifecycle, session management, temporal cascade
 - [x] **Comprehensive CLI**: All core commands with session management
 - [x] **Elo System**: Sophisticated ranking with duel mechanics
@@ -335,6 +356,7 @@ chmod +x scripts/fix_hooks.sh
 - [x] **Daily Automation**: GitHub Actions for continuous generation
 
 ### 🎯 Next Phase
+
 - [ ] **P0 - Pivot Plan v2.0 Implementation**: Execution of the distributed architecture migration, now estimated at 12 weeks (original 9 weeks + 3 weeks approved extension). Details in `docs/pivot_plan_v2.md` and `TODO.md`.
 - [ ] **Web Interface**: Real-time protocol visualization and interaction
 - [ ] **Interactive Reading**: Navigate canonical and alternative narrative paths
@@ -349,18 +371,18 @@ chmod +x scripts/fix_hooks.sh
 The successful implementation of the Pivot Plan v2.0 (distributed architecture) will be evaluated based on the following key metrics:
 
 - **Data Integrity**:
-    - Zero data loss during conflict resolution scenarios.
+  - Zero data loss during conflict resolution scenarios.
 - **Security & Robustness**:
-    - Sybil resistance demonstrated to be >95% in adversarial testing.
-    - External security audit of core new algorithms (Merkle proofs, PGP usage, conflict resolution) passed.
+  - Sybil resistance demonstrated to be >95% in adversarial testing.
+  - External security audit of core new algorithms (Merkle proofs, PGP usage, conflict resolution) passed.
 - **Performance & Scalability**:
-    - Auto-sharding mechanism is transparent to the end-user.
-    - Core data queries (e.g., path lookups, rankings) maintain performance, averaging <5 seconds.
+  - Auto-sharding mechanism is transparent to the end-user.
+  - Core data queries (e.g., path lookups, rankings) maintain performance, averaging <5 seconds.
 - **Distribution & P2P Functionality**:
-    - P2P data synchronization via BitTorrent (or equivalent) is fully functional.
-    - Data snapshots are successfully published to and retrievable from the Internet Archive.
+  - P2P data synchronization via BitTorrent (or equivalent) is fully functional.
+  - Data snapshots are successfully published to and retrievable from the Internet Archive.
 - **Automation & CI/CD**:
-    - CI/CD pipeline for snapshot generation, testing, and publication maintains a >95% success rate.
+  - CI/CD pipeline for snapshot generation, testing, and publication maintains a >95% success rate.
 
 These criteria ensure that the new architecture not only meets its technical goals but also provides a reliable and performant platform for the Hrönir Encyclopedia.
 
@@ -385,13 +407,16 @@ The project explores fundamental questions about literary truth: Is authenticity
 The Hrönir Encyclopedia is a **protocol for autonomous narrative agents**, not a traditional collaborative writing platform. Contributions happen through direct interaction with the protocol mechanics.
 
 ### For Developers
+
 If you're working on the codebase itself, see **[CLAUDE.md](CLAUDE.md)** for comprehensive development guidance including:
+
 - Development commands and environment setup
 - Project architecture and key components
 - Testing procedures and code quality standards
 - CLI usage and Protocol v2 features
 
 ### For Narrative Contributors
+
 To influence the canonical narrative:
 
 1. **Create High-Quality Hrönirs**: Write Markdown chapters following Borgesian themes
@@ -410,7 +435,7 @@ uv run hronir session commit --session-id <id> --verdicts '{"pos": "winner"}'
 
 **Style Guidelines**: Write in concise, philosophical style with metafictional hints. Aim for 300-500 words per chapter. Reference earlier themes to maintain narrative continuity.
 
-Human interfaces and traditional collaboration tools are considered *downstream* applications built upon this protocol's API.
+Human interfaces and traditional collaboration tools are considered _downstream_ applications built upon this protocol's API.
 
 ---
 
@@ -421,4 +446,4 @@ Generated texts are released into the public domain (CC0), except explicit Borge
 
 ---
 
-> *"In the end, only one among the infinite versions will reveal itself as true—because the reader will recognize it as inevitable. All others, though possible, will become mere shadows of themselves, echoes in the vast library of what might have been."*
+> _"In the end, only one among the infinite versions will reveal itself as true—because the reader will recognize it as inevitable. All others, though possible, will become mere shadows of themselves, echoes in the vast library of what might have been."_

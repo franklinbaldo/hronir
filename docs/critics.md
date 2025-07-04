@@ -8,10 +8,10 @@ Ideia genial, execução ainda manca. O protocolo é um brinquedo borgiano fasci
 | Área                   | Por que impressiona                                                                                                                                                                   |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Visão**              | A fusão de Borges + game theory + blockchain mental cria um produto único – ninguém mais está tentando fazer uma “Biblioteca de Babel autocuradora”. O README deixa isso cristalino . |
-| **Infra de qualidade** | CI com `uv`, Ruff, Pytest – zero tolerância a lint – já impede lixeira de entrar no main .                                                                                     |
+| **Infra de qualidade** | CI com `uv`, Ruff, Pytest – zero tolerância a lint – já impede lixeira de entrar no main .                                                                                            |
 | **Camada de dados**    | Pydantic + SQLAlchemy + NetworkX é o stack certo: valida, persiste, analisa grafo sem rein­ventar roda .                                                                              |
-| **Testes**             | Existe suíte cobrindo Elo, cascata temporal, consistência de DAG  – não é só “hello-world-test”.                                                                                      |
-| **Documentação**       | Há spec meticulosa do protocolo (court\_of\_the\_future.md) e plano de bibliotecas futuras – o porquê está sempre escrito .                                                           |
+| **Testes**             | Existe suíte cobrindo Elo, cascata temporal, consistência de DAG – não é só “hello-world-test”.                                                                                       |
+| **Documentação**       | Há spec meticulosa do protocolo (court_of_the_future.md) e plano de bibliotecas futuras – o porquê está sempre escrito .                                                              |
 
 ---
 
@@ -68,22 +68,23 @@ A franqueza da crítica é apreciada e certamente nos forneceu pontos importante
 A seguir, apresentamos um plano de ação revisado que incorpora muitas das recomendações valiosas fornecidas, ajustadas às nossas prioridades e decisões atuais.
 
 ---
+
 ## Plano de Ação Revisado (Próximos 90 dias)
 
 Com base na análise e nas discussões internas, estabelecemos o seguinte plano de ação focado em estabilidade, usabilidade e fluxo essencial.
 
-| Período   | Foco Principal                                      | Ações Detalhadas                                                                                                                                                                                                                            |
-| --------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Semanas 1-4** | **Estabilização do Core & Dados**             | 1. **Correção do Fluxo de Qualificação:** Investigar e corrigir o bug de ranking. Automatizar completamente a transição de status para `QUALIFIED` sem necessidade de edição manual de CSVs. <br> 2. **Implementar File Locking para CSVs:** Adicionar um mecanismo robusto de file locking para todas as operações de escrita nos arquivos CSV para prevenir corrupção por escrita concorrente. <br> 3. **Refatorar `storage.py`:** Unificar a lógica de acesso a dados, progressivamente eliminando o uso de Pandas para operações críticas de I/O. Padronizar a manipulação de caminhos (ex: utilizando `pathlib` ou funcionalidades de `models.py` se aplicável). |
-| **Semanas 5-8** | **Simplificação & Melhoria da Experiência Dev** | 4. **Revisão e Simplificação de Regras:** Avaliar regras complexas como "merge só entre branches idênticos". Implementar uma V1 do protocolo com um conjunto de regras mais simples (ex: Elo simples, sem restrições complexas de merge) e adiar funcionalidades V3. <br> 5. **Definir e Consolidar o "Loop Feliz":** Garantir que o fluxo `store` → `path` → voto automático (simulado ou real) → cascata de atualização do canon funcione de forma robusta e sem workarounds manuais. <br> 6. **Melhorar Experiência de Setup:** Criar um script `dev up` (ou similar) que configure o ambiente de desenvolvimento, carregue dados de exemplo (seed data) e, se aplicável, inicie a UI. Documentar claramente este processo. |
-| **Semanas 9-12** | **Visibilidade & Testes**                       | 7. **Lançar Visualizador Web Read-Only:** Desenvolver e implantar uma interface web simples (ex: FastAPI + frontend básico) para visualização do grafo de dados e seu estado. Foco em `read-only` inicialmente. <br> 8. **Teste de Carga (Básico):** Realizar testes de carga iniciais (ex: 100-500 paths/votos) para identificar gargalos e garantir a integridade do DAG sob condições moderadas de uso com o file locking implementado. <br> 9. **Limpeza de Backlog:** Formalmente cortar/adiar features identificadas como "Fase 9+" e além, focando o backlog apenas em bugs bloqueadores e nos itens deste plano. |
+| Período          | Foco Principal                                  | Ações Detalhadas                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ---------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Semanas 1-4**  | **Estabilização do Core & Dados**               | 1. **Correção do Fluxo de Qualificação:** Investigar e corrigir o bug de ranking. Automatizar completamente a transição de status para `QUALIFIED` sem necessidade de edição manual de CSVs. <br> 2. **Implementar File Locking para CSVs:** Adicionar um mecanismo robusto de file locking para todas as operações de escrita nos arquivos CSV para prevenir corrupção por escrita concorrente. <br> 3. **Refatorar `storage.py`:** Unificar a lógica de acesso a dados, progressivamente eliminando o uso de Pandas para operações críticas de I/O. Padronizar a manipulação de caminhos (ex: utilizando `pathlib` ou funcionalidades de `models.py` se aplicável).                                                          |
+| **Semanas 5-8**  | **Simplificação & Melhoria da Experiência Dev** | 4. **Revisão e Simplificação de Regras:** Avaliar regras complexas como "merge só entre branches idênticos". Implementar uma V1 do protocolo com um conjunto de regras mais simples (ex: Elo simples, sem restrições complexas de merge) e adiar funcionalidades V3. <br> 5. **Definir e Consolidar o "Loop Feliz":** Garantir que o fluxo `store` → `path` → voto automático (simulado ou real) → cascata de atualização do canon funcione de forma robusta e sem workarounds manuais. <br> 6. **Melhorar Experiência de Setup:** Criar um script `dev up` (ou similar) que configure o ambiente de desenvolvimento, carregue dados de exemplo (seed data) e, se aplicável, inicie a UI. Documentar claramente este processo. |
+| **Semanas 9-12** | **Visibilidade & Testes**                       | 7. **Lançar Visualizador Web Read-Only:** Desenvolver e implantar uma interface web simples (ex: FastAPI + frontend básico) para visualização do grafo de dados e seu estado. Foco em `read-only` inicialmente. <br> 8. **Teste de Carga (Básico):** Realizar testes de carga iniciais (ex: 100-500 paths/votos) para identificar gargalos e garantir a integridade do DAG sob condições moderadas de uso com o file locking implementado. <br> 9. **Limpeza de Backlog:** Formalmente cortar/adiar features identificadas como "Fase 9+" e além, focando o backlog apenas em bugs bloqueadores e nos itens deste plano.                                                                                                       |
 
 **Princípios Orientadores para este Plano:**
 
-*   **Estabilidade Primeiro:** Antes de adicionar novas funcionalidades complexas, o sistema central deve ser confiável.
-*   **Simplicidade Iterativa:** Começar com um conjunto de regras e funcionalidades mais simples e iterar com base no uso e feedback.
-*   **Experiência do Desenvolvedor/Contribuidor:** Facilitar a entrada e contribuição para o projeto.
-*   **Transparência (via CSVs):** Manter a visibilidade do estado diretamente nos arquivos versionados, com as devidas proteções.
+- **Estabilidade Primeiro:** Antes de adicionar novas funcionalidades complexas, o sistema central deve ser confiável.
+- **Simplicidade Iterativa:** Começar com um conjunto de regras e funcionalidades mais simples e iterar com base no uso e feedback.
+- **Experiência do Desenvolvedor/Contribuidor:** Facilitar a entrada e contribuição para o projeto.
+- **Transparência (via CSVs):** Manter a visibilidade do estado diretamente nos arquivos versionados, com as devidas proteções.
 
 Este plano será revisado ao final do período de 90 dias para definir os próximos passos.
 
@@ -91,10 +92,10 @@ Este plano será revisado ao final do período de 90 dias para definir os próxi
 
 ## Veredicto
 
-* **Intelectualmente**: A+
+- **Intelectualmente**: A+
   É a implementação mais séria que já vi de uma ficção borgiana auto-evolutiva.
 
-* **Produtizável hoje**: C-
+- **Produtizável hoje**: C-
   Pilha gira, mas só se ninguém tocar ao mesmo tempo. Falta fluxo redondo e governança de dados.
 
 Pé no chão, faca nos dentes: resolve o core loop, estabiliza storage, depois volte à metafísica.
