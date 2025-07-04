@@ -7,7 +7,7 @@
 **This repository uses CLAUDE.md as the primary source of development guidance.** The CLAUDE.md file contains comprehensive, accurate, and up-to-date information about:
 
 - Development commands and workflows
-- Project architecture and key components  
+- Project architecture and key components
 - Testing procedures and code style
 - CLI usage and Protocol v2 features
 
@@ -29,6 +29,7 @@ uv run hronir           # Access CLI
 ## Why This Redirect?
 
 The CLAUDE.md file is:
+
 - ✅ **Accurate**: Reflects the actual Protocol v2 implementation
 - ✅ **Complete**: Covers all CLI commands and architecture details
 - ✅ **Current**: Updated to match the sophisticated current codebase

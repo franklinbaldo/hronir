@@ -9,6 +9,7 @@ The Hrönir Encyclopedia is a Python-based literary protocol inspired by Jorge L
 ## Development Commands
 
 ### Environment Setup
+
 ```bash
 # Install dependencies with uv
 uv sync --all-extras
@@ -24,19 +25,21 @@ uv run python script.py
 uv run pytest
 uv run hronir store chapter.md
 
-# ❌ Wrong - may use system Python or wrong environment  
+# ❌ Wrong - may use system Python or wrong environment
 python script.py
 pytest
 hronir store chapter.md
 ```
 
 This ensures:
+
 - Correct Python version and dependencies
 - Project-specific package versions
 - Proper module resolution
 - Consistent environment across all operations
 
 ### Core Development Commands
+
 ```bash
 # Run tests
 uv run pytest
@@ -96,6 +99,7 @@ uv run pytest             # All tests must pass
 - Manual fixes required for complex linting issues (unused variables, etc.)
 
 ### CLI Usage
+
 ```bash
 # Main CLI entry point
 uv run hronir
@@ -146,6 +150,7 @@ uv run hronir recover-canon
 - **Graph Operations**: NetworkX for narrative consistency validation
 
 **Why this approach:**
+
 - CSV files remain human-readable and git-friendly
 - Pandas provides powerful data manipulation without ORM complexity
 - Direct CSV operations eliminate unnecessary database layers
@@ -153,15 +158,18 @@ uv run hronir recover-canon
 - No database dependencies or integrity constraint errors
 
 ### Core System Flow
+
 The system follows a Protocol v2 architecture with these key phases:
+
 1. **Path Creation**: Agents store new chapters and then register paths using the `path` command
-2. **Qualification**: Paths earn `QUALIFIED` status through duel performance 
+2. **Qualification**: Paths earn `QUALIFIED` status through duel performance
 3. **Judgment Sessions**: Qualified paths grant mandate to judge prior history
 4. **Temporal Cascade**: Session commits trigger canonical path recalculation
 
 ### Key Components
 
 #### `hronir_encyclopedia/` Package
+
 - **`cli.py`**: Main CLI interface with Typer commands for all user interactions
 - **`storage.py`**: Core data persistence, UUID management, and file validation using pandas
 - **`pandas_data_manager.py`**: Pure pandas-based data access layer for CSV operations
@@ -174,6 +182,7 @@ The system follows a Protocol v2 architecture with these key phases:
 - **`database.py`**: SQLAlchemy database utilities (secondary to CSV storage)
 
 #### Data Structure
+
 ```
 the_library/           # Hrönirs (chapters) stored by UUID
 data/
@@ -187,35 +196,42 @@ ratings/                 # Vote records and Elo calculations (CSV files)
 ### Key Protocol Concepts
 
 #### Path Status Lifecycle
+
 - `PENDING` → `QUALIFIED` → `SPENT`
 - Only `QUALIFIED` paths can initiate judgment sessions
 - Qualification requires strong duel performance (Elo-based)
 
 #### Session Workflow
+
 1. Agent creates hrönir → receives `path_uuid`
 2. Path becomes `QUALIFIED` through competitive performance
 3. Agent uses qualified path to start session → receives dossier of maximum entropy duels
 4. Agent submits verdicts → triggers transaction recording and temporal cascade
 
 #### Temporal Cascade
+
 - Recalculates canonical path from oldest voted position forward
 - Ensures narrative consistency after judgment sessions
 - Updates `data/canonical_path.json`
 
 ### UUID System
+
 - All content uses deterministic UUIDv5 generation
 - Path UUIDs: `uuid5(position:prev_uuid:current_uuid)`
 - Content UUIDs: `uuid5(text_content)`
 - Mandate IDs: `blake3(path_uuid + previous_transaction_hash)[:16]`
 
 ### Testing Strategy
+
 Tests focus on protocol dynamics:
+
 - `test_storage_and_votes.py`: Core storage and voting mechanics
 - `test_sessions_and_cascade.py`: Session management and temporal cascade
 - `test_protocol_v2.py`: End-to-end protocol validation
 - `test_system_dynamics.py`: Game theory and agent interactions
 
 ### File Validation
+
 - `audit` command validates all stored content integrity
 - `clean` command removes invalid entries (use `--git` to stage deletions)
 
@@ -247,17 +263,19 @@ Tests focus on protocol dynamics:
 For comprehensive testing of the Hrönir Encyclopedia, follow this standardized workflow:
 
 #### 1. Create Test Content (10 Meta Hrönirs)
+
 ```bash
 # Create test content in test_temp/ directory
 # Each hrönir should be meta-commentary about:
 # - Project development journey and technical insights
-# - AI-human collaboration in code development  
+# - AI-human collaboration in code development
 # - System architecture and philosophical implications
 # - Protocol evolution and design decisions
 # - User experience and interface considerations
 ```
 
 #### 2. Execute Complete Protocol Testing
+
 ```bash
 # Test the full happy path: store → path → session → vote
 
@@ -279,16 +297,18 @@ uv run hronir status --counts
 ```
 
 #### 3. Collect Development Insights
+
 ```bash
 # Document findings in TODO.md with rationale:
 # - Workflow friction points and UX issues
-# - Performance bottlenecks or error conditions  
+# - Performance bottlenecks or error conditions
 # - Missing CLI commands or functionality gaps
 # - Architecture improvements needed
 # - Documentation clarifications required
 ```
 
 #### 4. System Validation
+
 ```bash
 # Ensure system integrity after testing
 uv run hronir audit              # Validate all stored content
