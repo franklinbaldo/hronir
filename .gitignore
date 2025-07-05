@@ -24,3 +24,6 @@ data/canonical_path.json
 # However, *.db should cover it.
 # Test output files in the_library if any remain despite fixes (should be temporary now)
 # Example: the_library/test_*.md
+
+# Un-ignore the main DuckDB database file
+!data/encyclopedia.duckdb

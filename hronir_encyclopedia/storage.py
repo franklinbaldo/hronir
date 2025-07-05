@@ -6,7 +6,7 @@ from pathlib import Path
 from .duckdb_storage import DuckDBDataManager
 from .models import Path as PathModel
 from .models import Transaction, Vote
-from .pandas_data_manager import PandasDataManager
+# Removed PandasDataManager import
 from .sharding import SnapshotManifest  # Added
 
 UUID_NAMESPACE = uuid.NAMESPACE_URL
@@ -25,35 +25,26 @@ class DataManager:
 
     def __init__(
         self,
-        path_csv_dir="narrative_paths",
-        ratings_csv_dir="ratings",
-        transactions_json_dir="data/transactions",
-        use_duckdb: bool | None = None,
+        path_csv_dir="narrative_paths", # Still used by DuckDBDataManager for initial load
+        ratings_csv_dir="ratings", # Still used by DuckDBDataManager for initial load
+        transactions_json_dir="data/transactions", # Still used by DuckDBDataManager for initial load
     ):
         if hasattr(self, "_initialized") and self._initialized:
             return
 
-        if use_duckdb is None:
-            env = os.getenv("HRONIR_USE_DUCKDB", "0").lower()
-            use_duckdb = env in {"1", "true", "yes"}
+        # Always use DuckDBDataManager
+        db_path = os.getenv("HRONIR_DUCKDB_PATH", "data/encyclopedia.duckdb")
+        self.backend = DuckDBDataManager(
+            db_path=db_path,
+            path_csv_dir=path_csv_dir, # Pass through for initial loading if DB is empty
+            ratings_csv_dir=ratings_csv_dir, # Pass through for initial loading if DB is empty
+            transactions_json_dir=transactions_json_dir, # Pass through for initial loading if DB is empty
+        )
 
-        if use_duckdb:
-            db_path = os.getenv("HRONIR_DUCKDB_PATH", "data/encyclopedia.duckdb")
-            self.backend = DuckDBDataManager(
-                db_path=db_path,
-                path_csv_dir=path_csv_dir,
-                ratings_csv_dir=ratings_csv_dir,
-                transactions_json_dir=transactions_json_dir,
-            )
-        else:
-            self.backend = PandasDataManager(
-                path_csv_dir=path_csv_dir,
-                ratings_csv_dir=ratings_csv_dir,
-                transactions_json_dir=transactions_json_dir,
-            )
-
-        # Configurable library path
-        default_library_path = Path("the_library")
+        # Configurable library path - this will need to be re-evaluated
+        # as hrönirs are now stored in DuckDB. For now, keep initialization
+        # but operations like store_hrönir will change.
+        default_library_path = Path("the_library") # This directory will be deleted.
         library_path_str = os.getenv("HRONIR_LIBRARY_DIR")
         self.library_path = Path(library_path_str) if library_path_str else default_library_path
         self.library_path.mkdir(parents=True, exist_ok=True) # Ensure it exists
@@ -100,8 +91,8 @@ class DataManager:
         if hasattr(self.backend, "clear_in_memory_data"):
             self.backend.clear_in_memory_data()
 
-    def save_all_data_to_csvs(self):
-        """Save all data back to CSV files."""
+    def save_all_data(self):
+        """Saves all data to the backend (e.g., commits DB transaction)."""
         self.backend.save_all_data()
 
     # --- Path operations ---
@@ -203,43 +194,43 @@ class DataManager:
             )
             return None
 
-    # --- File operations ---
+    # --- Hrönir operations (now interacting with DuckDB) ---
     def store_hrönir(self, file_path: Path) -> str:
-        """Store a hrönir file and return its UUID."""
-        # Read the file content
+        """Store a hrönir's content from a file into DuckDB and return its UUID."""
         with open(file_path, encoding="utf-8") as f:
             content = f.read()
 
-        # Generate UUID from content
         content_uuid = str(uuid.uuid5(UUID_NAMESPACE, content))
 
-        # Create target directory and file (using configurable library_path)
-        # self.library_path is initialized in __init__
-        target_file = self.library_path / f"{content_uuid}.md"
-
-        # Copy the file
-        shutil.copy2(file_path, target_file)
+        # Delegate to backend to store hrönir content
+        if hasattr(self.backend, "add_hronir"):
+            # metadata and created_at can be extended here if needed
+            self.backend.add_hronir(hronir_uuid=content_uuid, content=content)
+        else:
+            raise NotImplementedError("Backend does not support add_hronir method.")
 
         return content_uuid
 
-    def get_hrönir_path(self, content_uuid: str) -> Path:
-        """Get the path to a stored hrönir."""
-        return self.library_path / f"{content_uuid}.md"
+    def get_hrönir_path(self, content_uuid: str) -> Path | None:
+        """Returns None as hrönirs are stored in DB, not as files. Path is no longer relevant."""
+        # This method might need to be deprecated or re-evaluated based on usage.
+        # For now, it signals that paths are not how hrönirs are accessed.
+        print(f"Warning: get_hrönir_path for {content_uuid} called. Hrönirs are stored in DB, file paths are not directly applicable.")
+        return None
 
     def hrönir_exists(self, content_uuid: str) -> bool:
-        """Check if a hrönir exists."""
-        # Ensure content_uuid is a string and not None or empty before creating Path object
+        """Check if a hrönir exists in DuckDB."""
         if not content_uuid or not isinstance(content_uuid, str):
-            return False  # Or raise an error, depending on desired strictness
-        return self.get_hrönir_path(content_uuid).exists()
+            return False
+        if hasattr(self.backend, "get_hronir_content"):
+            return self.backend.get_hronir_content(content_uuid) is not None
+        raise NotImplementedError("Backend does not support get_hronir_content method.")
 
     def get_hrönir_content(self, content_uuid: str) -> str | None:
-        """Get the content of a hrönir."""
-        hrönir_path = self.get_hrönir_path(content_uuid)
-        if hrönir_path.exists():
-            with open(hrönir_path, encoding="utf-8") as f:
-                return f.read()
-        return None
+        """Get the content of a hrönir from DuckDB."""
+        if hasattr(self.backend, "get_hronir_content"):
+            return self.backend.get_hronir_content(content_uuid)
+        raise NotImplementedError("Backend does not support get_hronir_content method.")
 
     # --- Utility methods ---
     def validate_data_integrity(self) -> list[str]:
@@ -251,19 +242,19 @@ class DataManager:
         paths = self.get_all_paths()
         for path in paths:
             # Check existence of the current hrönir (uuid)
-            if not self.hrönir_exists(str(path.uuid)):  # self.hrönir_exists uses file system
+            if not self.hrönir_exists(str(path.uuid)):
                 issues.append(
                     f"Path {path.path_uuid} (Pos: {path.position}, Prev: {path.prev_uuid}, Curr: {path.uuid}) "
-                    f"references non-existent current hrönir {path.uuid}."
+                    f"references non-existent current hrönir {path.uuid} in the database."
                 )
 
             # Check existence of the predecessor hrönir (prev_uuid), if applicable
             if path.prev_uuid and not self.hrönir_exists(str(path.prev_uuid)):
                 issues.append(
                     f"Path {path.path_uuid} (Position: {path.position}, Predecessor: {path.prev_uuid}, Current Hrönir: {path.uuid}) "
-                    f"references a non-existent predecessor hrönir '{path.prev_uuid}'. "
+                    f"references a non-existent predecessor hrönir '{path.prev_uuid}' in the database. "
                     f"This breaks the narrative chain for this path. "
-                    f"Please ensure the hrönir file '{path.prev_uuid}.md' exists in 'the_library/' or verify the predecessor UUID."
+                    f"Please ensure the hrönir with UUID '{path.prev_uuid}' exists in the database or verify the predecessor UUID."
                 )
 
             # Validate deterministic path_uuid
@@ -305,7 +296,7 @@ class DataManager:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit - save data."""
-        self.save_all_data_to_csvs()
+        self.save_all_data()
 
 
 # Legacy compatibility functions for CLI

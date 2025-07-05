@@ -30,15 +30,17 @@ def record_vote(
     winner: str,
     loser: str,
 ) -> None:
-    """Record a vote using the pandas-based data manager."""
+    """Record a vote using the DataManager.""" # Updated docstring
     data_manager = storage.DataManager()
+    # initialize_and_load ensures DataManager is ready (e.g. DB connection open)
+    # and that schema exists if it's a fresh DB.
     data_manager.initialize_and_load()
 
     vote_uuid = str(uuid.uuid4())
     vote = Vote(uuid=vote_uuid, position=position, voter=voter, winner=winner, loser=loser)
 
     data_manager.add_vote(vote)
-    data_manager.save_all_data_to_csvs()
+    data_manager.save_all_data() # Corrected method name, commits to DuckDB
 
 
 def get_ranking(

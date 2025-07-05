@@ -7,49 +7,29 @@ import pytest
 from hronir_encyclopedia import ratings, storage  # ratings.py and storage for DataManager
 
 
-# Helper function to manage DataManager and call determine_next_duel_entropy
-def _call_determine_next_duel_entropy_with_setup(
-    position, predecessor_hronir_uuid, forking_dir, ratings_dir
-):
-    # Store original values from the singleton
-    original_fork_dir_attr = storage.data_manager.fork_csv_dir
-    original_ratings_dir_attr = storage.data_manager.ratings_csv_dir
-    original_initialized_attr = storage.data_manager._initialized
-    original_cwd = Path.cwd()  # Store current CWD
-    import os  # Make sure os is imported
-
+# Helper function to call determine_next_duel_entropy with a clean DataManager state
+def _call_determine_next_duel_entropy_with_setup(position, predecessor_hronir_uuid):
+    """
+    Calls ratings.determine_next_duel_entropy.
+    It assumes DataManager is already configured by conftest.py to use a test DuckDB.
+    This helper ensures data is cleared before the call.
+    """
     try:
-        # Change CWD to the parent of the temp directory structure for this test
-        # This ensures that if DataManager re-initializes using default relative paths,
-        # they resolve correctly within the test's temporary space.
-        os.chdir(Path(forking_dir).parent)
-
-        # 1. Set paths on the DataManager instance. Using names now relative to new CWD.
-        storage.data_manager.fork_csv_dir = Path(Path(forking_dir).name)
-        storage.data_manager.ratings_csv_dir = Path(Path(ratings_dir).name)
-
-        # 2. Mark as uninitialized
-        storage.data_manager._initialized = False
-
-        # 3. Initialize, which will clear and load from the (empty) temp dirs
-        storage.data_manager.initialize_and_load(clear_existing_data=True)
+        # Ensure DataManager is initialized and its DB is clean for the test
+        # conftest.py should ensure storage.data_manager is a fresh instance pointing to a test DB
+        if not storage.data_manager._initialized:
+             storage.data_manager.initialize_and_load(clear_existing_data=True)
+        else:
+            storage.data_manager.clear_in_memory_data() # Clears tables in the test DB
 
         # The function being tested
         duel_info = ratings.determine_next_duel_entropy(
             position=position,
             predecessor_hronir_uuid=predecessor_hronir_uuid,
-            # session=None,  # Will get its own session, using current DataManager state
         )
         return duel_info
     finally:
-        # Restore original attributes on the singleton
-        storage.data_manager.fork_csv_dir = original_fork_dir_attr
-        storage.data_manager.ratings_csv_dir = original_ratings_dir_attr
-        storage.data_manager._initialized = original_initialized_attr
-        os.chdir(original_cwd)  # Restore CWD
-
-        # Clean up any data loaded/created by this test from the DB
-        # Check _initialized on the instance, not the potentially restored original_initialized_attr
+        # Clean up data from the test DB after the test
         if storage.data_manager._initialized:
             storage.data_manager.clear_in_memory_data()
 
@@ -171,17 +151,10 @@ class TestDetermineNextDuelPurelyEntropic:
             ]
         )
 
-        forking_dir = tmp_path / "narrative_paths"
-        forking_dir.mkdir()
-        ratings_dir = tmp_path / "ratings"  # Adicionado para consistência
-        ratings_dir.mkdir()
-
-        # Call the helper which handles DataManager setup and teardown
+        # Call the helper, no need for forking_dir or ratings_dir setup
         duel_info = _call_determine_next_duel_entropy_with_setup(
             position=1,
             predecessor_hronir_uuid="any-pred-uuid",
-            forking_dir=forking_dir,
-            ratings_dir=ratings_dir,
         )
 
         assert duel_info is not None
@@ -213,16 +186,9 @@ class TestDetermineNextDuelPurelyEntropic:
             ]
         )
 
-        forking_dir = tmp_path / "narrative_paths"
-        forking_dir.mkdir()
-        ratings_dir = tmp_path / "ratings"
-        ratings_dir.mkdir()
-
         duel_info = _call_determine_next_duel_entropy_with_setup(
             position=1,
             predecessor_hronir_uuid="any-pred-uuid",
-            forking_dir=forking_dir,
-            ratings_dir=ratings_dir,
         )
 
         assert duel_info is not None
@@ -232,30 +198,18 @@ class TestDetermineNextDuelPurelyEntropic:
     def test_edge_case_no_hronirs(self, tmp_path, mock_ratings_get_ranking):
         set_df_data = mock_ratings_get_ranking
         set_df_data([])
-        forking_dir = tmp_path / "narrative_paths"
-        forking_dir.mkdir()
-        ratings_dir = tmp_path / "ratings"
-        ratings_dir.mkdir()
         duel_info = _call_determine_next_duel_entropy_with_setup(
             position=1,
             predecessor_hronir_uuid="any-pred-uuid",
-            forking_dir=forking_dir,
-            ratings_dir=ratings_dir,
         )
         assert duel_info is None
 
     def test_edge_case_one_hronir(self, tmp_path, mock_ratings_get_ranking):
         set_df_data = mock_ratings_get_ranking
         set_df_data([{"uuid": str(uuid.uuid4()), "elo": 1500, "total_duels": 0}])
-        forking_dir = tmp_path / "narrative_paths"
-        forking_dir.mkdir()
-        ratings_dir = tmp_path / "ratings"
-        ratings_dir.mkdir()
         duel_info = _call_determine_next_duel_entropy_with_setup(
             position=1,
             predecessor_hronir_uuid="any-pred-uuid",
-            forking_dir=forking_dir,
-            ratings_dir=ratings_dir,
         )
         assert duel_info is None
 
@@ -270,15 +224,9 @@ class TestDetermineNextDuelPurelyEntropic:
                 {"uuid": h2_new, "elo": 1500, "total_duels": 0},
             ]
         )
-        forking_dir = tmp_path / "narrative_paths"
-        forking_dir.mkdir()
-        ratings_dir = tmp_path / "ratings"
-        ratings_dir.mkdir()
         duel_info = _call_determine_next_duel_entropy_with_setup(
             position=1,
             predecessor_hronir_uuid="any-pred-uuid",
-            forking_dir=forking_dir,
-            ratings_dir=ratings_dir,
         )
 
         assert duel_info is not None
@@ -310,15 +258,9 @@ class TestDetermineNextDuelPurelyEntropic:
         )
         set_df_data(malformed_df_for_test.copy())
 
-        forking_dir = tmp_path / "narrative_paths"
-        forking_dir.mkdir()
-        ratings_dir = tmp_path / "ratings"
-        ratings_dir.mkdir()
         duel_info = _call_determine_next_duel_entropy_with_setup(
             position=1,
             predecessor_hronir_uuid="any-pred-uuid",
-            forking_dir=forking_dir,
-            ratings_dir=ratings_dir,
         )
         assert duel_info is not None
         assert duel_info["strategy"] == "max_shannon_entropy"
@@ -340,15 +282,9 @@ class TestDetermineNextDuelPurelyEntropic:
             ]
         )
 
-        forking_dir = tmp_path / "narrative_paths"
-        forking_dir.mkdir()
-        ratings_dir = tmp_path / "ratings"
-        ratings_dir.mkdir()
         duel_info = _call_determine_next_duel_entropy_with_setup(
             position=1,
             predecessor_hronir_uuid="any-pred-uuid",
-            forking_dir=forking_dir,
-            ratings_dir=ratings_dir,
         )
         assert duel_info is not None
         assert duel_info["strategy"] == "max_shannon_entropy"
@@ -365,15 +301,9 @@ class TestDetermineNextDuelPurelyEntropic:
             ]
         )
 
-        forking_dir = tmp_path / "narrative_paths"
-        forking_dir.mkdir()
-        ratings_dir = tmp_path / "ratings"
-        ratings_dir.mkdir()
         duel_info = _call_determine_next_duel_entropy_with_setup(
             position=1,
             predecessor_hronir_uuid="any-pred-uuid",
-            forking_dir=forking_dir,
-            ratings_dir=ratings_dir,
         )
         assert duel_info is not None
         assert duel_info["strategy"] == "max_shannon_entropy"

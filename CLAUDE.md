@@ -140,22 +140,20 @@ uv run hronir recover-canon
 
 ## Architecture
 
-### Streamlined Storage Architecture
+### Storage Architecture
 
-**CRITICAL PRINCIPLE**: The system uses a pure pandas + Pydantic approach for simplicity and transparency:
+**CORE PRINCIPLE**: The system uses DuckDB as its primary data store, with Pydantic for data validation.
 
-- **Runtime**: Pandas DataFrames for fast data operations and analysis
-- **Persistence**: CSV files as canonical storage for git transparency
-- **Validation**: Pydantic models ensure data integrity throughout
-- **Graph Operations**: NetworkX for narrative consistency validation
+- **Persistence**: A DuckDB database file (e.g., `data/encyclopedia.duckdb`) serves as the canonical storage. This file is version-controlled in Git.
+- **Runtime**: Data is queried from and written to DuckDB.
+- **Validation**: Pydantic models ensure data integrity before persistence and after retrieval.
+- **Graph Operations**: NetworkX can be used for narrative consistency validation on data retrieved from DuckDB.
 
 **Why this approach:**
 
-- CSV files remain human-readable and git-friendly
-- Pandas provides powerful data manipulation without ORM complexity
-- Direct CSV operations eliminate unnecessary database layers
-- Pydantic ensures type safety and validation
-- No database dependencies or integrity constraint errors
+- DuckDB provides ACID compliance, efficient querying, and a robust SQL interface for data operations.
+- Storing the database file in Git allows for versioning of the entire dataset state.
+- Pydantic ensures type safety and validation.
 
 ### Core System Flow
 
@@ -171,27 +169,32 @@ The system follows a Protocol v2 architecture with these key phases:
 #### `hronir_encyclopedia/` Package
 
 - **`cli.py`**: Main CLI interface with Typer commands for all user interactions
-- **`storage.py`**: Core data persistence, UUID management, and file validation using pandas
-- **`pandas_data_manager.py`**: Pure pandas-based data access layer for CSV operations
-- **`models.py`**: Pure Pydantic models for data validation and business logic
-- **`graph_logic.py`**: NetworkX-based narrative consistency validation
-- **`session_manager.py`**: Manages judgment sessions and dossier generation
-- **`transaction_manager.py`**: Immutable ledger for session commits and path promotions
-- **`ratings.py`**: Elo ranking system and duel determination logic
-- **`gemini_util.py`**: AI generation utilities using Google Gemini
-- **`database.py`**: SQLAlchemy database utilities (secondary to CSV storage)
+- **`storage.py`**: Core data persistence via `DataManager`, UUID management, and data validation. Uses `duckdb_storage.py`.
+- **`duckdb_storage.py`**: DuckDB-based data access layer.
+- **`models.py`**: Pure Pydantic models for data validation and business logic.
+- **`graph_logic.py`**: NetworkX-based narrative consistency validation (operates on data from DuckDB).
+- **`session_manager.py`**: Manages judgment sessions and dossier generation.
+- **`transaction_manager.py`**: Immutable ledger for session commits and path promotions (data stored in DuckDB).
+- **`ratings.py`**: Elo ranking system and duel determination logic (data stored in DuckDB).
+- **`gemini_util.py`**: AI generation utilities using Google Gemini.
 
 #### Data Structure
 
 ```
-the_library/           # Hrönirs (chapters) stored by UUID
 data/
-├── canonical_path.json    # Current canonical narrative path
-├── sessions/             # Active/completed judgment sessions
-└── transactions/         # Immutable ledger of all commits
-narrative_paths/         # Path definitions (CSV files)
-ratings/                 # Vote records and Elo calculations (CSV files)
+├── encyclopedia.duckdb    # Main DuckDB database file containing all persistent data (paths, votes, transactions, hrönirs, etc.)
+├── sessions/              # Active/completed judgment sessions (JSON files, might be moved to DB eventually)
+└── backup/                # Backups of previous data formats or DB states.
+# the_library/             # Hrönir Markdown files (Kept for now due to deletion issues, but canonical data is in DuckDB)
+# narrative_paths/         # (Legacy, data moved to DuckDB)
+# ratings/                 # (Legacy, data moved to DuckDB)
+# data/transactions/       # (Legacy, data moved to DuckDB)
+# data/canonical_path.json # (Legacy, data/logic moved to DuckDB or generated dynamically)
 ```
+
+Primary data (paths, votes, hrönir content, transactions) is stored in tables within the `data/encyclopedia.duckdb` file.
+The `data/sessions/` directory still holds JSON files for active sessions.
+The `the_library/` directory is currently left in the repository but its content is considered secondary to the `hronirs` table in DuckDB.
 
 ### Key Protocol Concepts
 
@@ -210,9 +213,9 @@ ratings/                 # Vote records and Elo calculations (CSV files)
 
 #### Temporal Cascade
 
-- Recalculates canonical path from oldest voted position forward
-- Ensures narrative consistency after judgment sessions
-- Updates `data/canonical_path.json`
+- Recalculates canonical path from oldest voted position forward (based on data in DuckDB).
+- Ensures narrative consistency after judgment sessions.
+- The canonical path is determined dynamically from DuckDB data or can be stored in a dedicated table/view within DuckDB if needed. The file `data/canonical_path.json` is no longer the primary source.
 
 ### UUID System
 
@@ -239,22 +242,24 @@ Tests focus on protocol dynamics:
 
 ### Data Persistence Guidelines
 
-**CRITICAL**: Always maintain CSV-first approach for repository transparency:
+**CORE**: The primary data store is a DuckDB database file (`data/encyclopedia.duckdb`).
 
-- **Read**: Load CSV data directly into pandas DataFrames
-- **Process**: Use pandas for data operations and Pydantic for validation
-- **Write**: Save all changes back to CSV files using pandas
-- **Validate**: Use NetworkX to check narrative consistency
-- **Never commit**: Database files (.db, .sqlite) to repository
+- **Interaction**: Use the `DataManager` (`hronir_encyclopedia.storage.data_manager`) for all data operations. It interfaces with `DuckDBDataManager`.
+- **Schema**: The DuckDB schema is defined and managed within `hronir_encyclopedia/duckdb_storage.py` and initialized by `scripts/migrate_to_duckdb.py`.
+- **Validation**: Pydantic models (`hronir_encyclopedia/models.py`) are used for data validation before writing to and after reading from DuckDB.
+- **Committing**: The `data/encyclopedia.duckdb` file **is version-controlled** in Git. Ensure it is staged and committed with your changes if data modifications are part of your work.
+- **Large Datasets**: For very large data changes, consider implications for repository size and Git performance.
+- **Data Integrity**: Use NetworkX for narrative consistency validation on data retrieved from DuckDB as needed.
 
 ### Core Principles
 
-- The system uses CSV files as canonical storage with pandas for runtime performance
-- All UUIDs are deterministic and content-addressed
-- The canonical path is emergent, not predetermined
-- Session commits are atomic and trigger cascading updates
-- Fork qualification uses Elo ratings with configurable thresholds
-- NetworkX ensures narrative graph remains acyclic (no time paradoxes)
+- The system uses DuckDB as its canonical storage for data, providing ACID transactions and SQL querying.
+- The `data/encyclopedia.duckdb` file is version-controlled.
+- All UUIDs are deterministic and content-addressed.
+- The canonical path is emergent, derived from data in DuckDB.
+- Session commits are atomic and trigger cascading updates, with transaction data stored in DuckDB.
+- Fork qualification uses Elo ratings with configurable thresholds (ratings stored in DuckDB).
+- NetworkX can be used to ensure narrative graph remains acyclic.
 
 ## Practical Testing Protocol
 

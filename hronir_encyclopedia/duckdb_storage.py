@@ -5,6 +5,9 @@ from pathlib import Path
 import duckdb
 from pydantic import ValidationError
 
+import datetime # Added for Optional[datetime] type hint
+from typing import Optional # Added for Optional type hint
+
 from .models import Path as PathModel
 from .models import Transaction, Vote
 from .sharding import ShardingManager, SnapshotManifest  # Added
@@ -71,6 +74,16 @@ class DuckDBDataManager:
             );
             """
         )
+        self.conn.execute( # Add hronirs table creation
+            """
+            CREATE TABLE IF NOT EXISTS hronirs (
+                uuid VARCHAR PRIMARY KEY,
+                content TEXT,
+                created_at TIMESTAMP,
+                metadata TEXT -- JSON string for other attributes
+            );
+            """
+        )
 
     def load_all_data(self) -> None:
         import pandas as pd
@@ -114,29 +127,9 @@ class DuckDBDataManager:
         self._initialized = True
 
     def save_all_data(self) -> None:
+        """Commits the current transaction to the DuckDB database."""
         self.conn.commit()
-
-        self.path_csv_dir.mkdir(exist_ok=True)
-        df_paths = self.conn.execute("SELECT * FROM paths").df()
-        if not df_paths.empty:
-            for position, group in df_paths.groupby("position"):
-                file_path = self.path_csv_dir / f"narrative_paths_position_{position}.csv"
-                group.to_csv(file_path, index=False)
-
-        self.ratings_csv_dir.mkdir(exist_ok=True)
-        df_votes = self.conn.execute("SELECT * FROM votes").df()
-        if not df_votes.empty:
-            (self.ratings_csv_dir / "votes.csv").write_text("")  # clear file
-            df_votes.to_csv(self.ratings_csv_dir / "votes.csv", index=False)
-
-        self.transactions_json_dir.mkdir(parents=True, exist_ok=True)
-        tx_rows = self.conn.execute("SELECT * FROM transactions").fetchall()
-        for tx_uuid, data in tx_rows:
-            try:
-                obj = json.loads(data)
-            except json.JSONDecodeError:
-                continue
-            (self.transactions_json_dir / f"{tx_uuid}.json").write_text(json.dumps(obj, indent=2))
+        # Removed logic that writes back to CSV/JSON files.
 
     # --- Path operations ---
     def get_all_paths(self) -> list[PathModel]:
@@ -325,6 +318,45 @@ class DuckDBDataManager:
             return Transaction(**json.loads(row[0]))
         except (json.JSONDecodeError, ValidationError):
             return None
+
+    # --- Hrönir operations ---
+    def add_hronir(
+        self,
+        hronir_uuid: str,
+        content: str,
+        created_at: Optional[datetime.datetime] = None,
+        metadata: Optional[dict] = None,
+    ) -> None:
+        """Adds a hrönir's content to the hronirs table."""
+        if created_at is None:
+            created_at = datetime.datetime.now(datetime.timezone.utc)
+        metadata_json = json.dumps(metadata) if metadata else "{}"
+
+        # Ensure the hronirs table exists (it should have been created by _create_tables via migration script)
+        # For robustness, we could add a check or ensure_table_exists call here if necessary.
+        # self._create_tables() # This would try to create all tables, maybe too broad.
+        # A more targeted "CREATE TABLE IF NOT EXISTS hronirs ..." could be used if this method
+        # could be called before the main initialization. Given current flow, it's likely fine.
+
+        self.conn.execute(
+            """
+            INSERT INTO hronirs (uuid, content, created_at, metadata)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(uuid) DO UPDATE SET
+                content = excluded.content,
+                created_at = excluded.created_at,
+                metadata = excluded.metadata;
+            """,
+            (hronir_uuid, content, created_at, metadata_json),
+        )
+
+    def get_hronir_content(self, hronir_uuid: str) -> str | None:
+        """Retrieves a hrönir's content from the hronirs table by its UUID."""
+        # Ensure the hronirs table exists.
+        result = self.conn.execute(
+            "SELECT content FROM hronirs WHERE uuid = ?", (hronir_uuid,)
+        ).fetchone()
+        return result[0] if result else None
 
     # --- Utility methods ---
     def initialize_if_needed(self) -> None:

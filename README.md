@@ -71,18 +71,18 @@ _Diagrama ilustrando o fluxo de interação de um agente com o protocolo Hrönir
    - `IA_ACCESS_KEY` – token for uploading snapshots to the Internet Archive.
    - `NETWORK_UUID` – identifier for the network item on the Archive.
 
-Dependencies are managed with `uv` using `pyproject.toml` and `uv.lock`. Core libraries include [**typer**](https://typer.tiangolo.com/) for the CLI and [**pandas**](https://pandas.pydata.org/) for data manipulation. New packages such as [**Pydantic**](https://docs.pydantic.dev/), [**SQLAlchemy**](https://www.sqlalchemy.org/) and [**NetworkX**](https://networkx.org/) are installed automatically when you run `uv sync`.
+Dependencies are managed with `uv` using `pyproject.toml` and `uv.lock`. Core libraries include [**typer**](https://typer.tiangolo.com/) for the CLI, [**DuckDB**](https://duckdb.org/) for data storage, and [**Pydantic**](https://docs.pydantic.dev/) for data validation. [**NetworkX**](https://networkx.org/) is used for graph-based analysis.
 
-The CLI loads rating and narrative path CSVs into a lightweight SQLite database via SQLAlchemy. This temporary database provides transactional updates and easier queries while the canonical CSV files remain on disk.
+The system uses a DuckDB database (`data/encyclopedia.duckdb`) as its primary data store. This database contains all narrative paths, hrönir content, ratings, and transaction data. The database file is version-controlled in Git.
 
-For an overview of how these libraries work together see [docs/new_libs_plan.md](docs/new_libs_plan.md).
+For an overview of how these libraries work together see [docs/new_libs_plan.md](docs/new_libs_plan.md) (though this may need updates to reflect the move to DuckDB as primary storage).
 For detalhes sobre o pivot para uma arquitetura distribuída, consulte [docs/distributed_architecture_plan.md](docs/distributed_architecture_plan.md).
 
 ### Key Libraries
 
+- **DuckDB** – provides the embedded SQL database for all persistent data.
 - **Pydantic** – validates and serializes the protocol's data models.
-- **SQLAlchemy** – powers the SQLite database used for transactional updates.
-- **NetworkX** – enables graph-based analysis of path relationships.
+- **NetworkX** – enables graph-based analysis of path relationships from data in DuckDB.
 
 ---
 
@@ -93,7 +93,7 @@ The encyclopedia grows through interconnected processes:
 - **Generation**: AI creates new chapter variants (`hrönirs`) from the accumulated narrative space.
 - **Collaboration**: Human contributors submit chapter variants.
 - **Selection (Tribunal of the Future)**: The encyclopedia's canon evolves through the **Tribunal of the Future**. Instead of single votes, influence is now wielded through **Judgment Sessions**. When a contributor creates a new, high-quality path that proves its relevance by performing well in duels, it becomes **`QUALIFIED`**. This grants a one-time right to initiate a session, acting as a judge over all of prior history. This mechanism ensures that only meaningful contributions can shape the past, providing a robust defense against low-effort Sybil attacks.
-- **Evolution**: Veredicts from Judgment Sessions update Elo rankings for paths. The **Temporal Cascade**, triggered by `session commit`, recalculates the canonical path (`data/canonical_path.json`), which is a sequence of path decisions representing the most "inevitable" narrative.
+- **Evolution**: Veredicts from Judgment Sessions update Elo rankings for paths (stored in DuckDB). The **Temporal Cascade**, triggered by `session commit`, recalculates the canonical path, which is a sequence of path decisions representing the most "inevitable" narrative. This path is derived from data within DuckDB.
 
 ## 🤖 Daily Automated Generation
 
@@ -122,14 +122,14 @@ Agents (human or AI) interact with the protocol primarily through the Command Li
 
 1.  **Create an `hrönir`**: Generate a new chapter in Markdown format. This is your creative "work."
 2.  **Register the `hrönir` and Create a `path`**:
-    First store your chapter in `the_library/` using the `store` command. Then create a path linking the new chapter to its predecessor.
+    Use the `store` command to save your chapter's content into the DuckDB database. Then create a path linking the new chapter to its predecessor.
 
     ```bash
     uv run hronir store drafts/my_chapter.md
     uv run hronir path --position N --source <uuid_of_previous_hronir> --target <new_uuid>
     ```
 
-    The `store` command outputs `<new_uuid>`, which you pass to `path`.
+    The `store` command processes the Markdown file, stores its content in the database, and outputs the content-derived `<new_uuid>`, which you pass to `path`.
 
 3.  **Initiate a Judgment Session (`session start` command)**:
     With the `path_uuid` obtained (representing your new `path` at Position `N`), you gain the right to start a "Judgment Session." This session will present you with a dossier of maximum entropy duels for all previous positions (`N-1` down to `0`).
@@ -164,10 +164,10 @@ The narrative expands exponentially, creating a network of infinite possibilitie
 
 The "true chapter," or more precisely, the **canonical path of `paths`** (narrative transitions), is not selected by a central authority but emerges through a continuous process of judgment and re-evaluation, called "The Tribunal of the Future." This is the heart of the protocol.
 
-- **Proof-of-Work and Mandate for Judgment**: By introducing a new `path` (a new narrative possibility) at Position `N` via the `store` command, an agent performs a "Proof-of-Work." This grants the agent a "mandate" to start a Judgment Session.
-- **Atomic Judgment Sessions**: Using the `path_uuid` from their contribution at `N`, the agent initiates a session (`session start`). The system presents a static "dossier" of the maximum entropy duels for all prior positions (`N-1` to `0`). The agent then submits their veredicts for any subset of these duels in a single `session commit`.
-- **Immutable Ledger and Temporal Cascade**: Each `session commit` is recorded as a transaction in a ledger (similar to a blockchain in `data/transactions/`). Crucially, this commit triggers a "Temporal Cascade": the system recalculates the canonical path (`data/canonical_path.json`) starting from the oldest position affected by the agent's veredicts, propagating the changes forward.
-- **Elo Rankings and Emergence**: The votes (veredicts) update the Elo ratings of the competing `paths`. The `canonical_path.json` is derived from these ratings. There are no fixed "canonical chapters," but rather a canonical path of _pathing decisions_ that is always subject to revision by the Temporal Cascade, based on new judgments.
+- **Proof-of-Work and Mandate for Judgment**: By introducing a new `path` (a new narrative possibility) at Position `N` via the `store` command (which saves chapter content to DuckDB), an agent performs a "Proof-of-Work." This grants the agent a "mandate" to start a Judgment Session.
+- **Atomic Judgment Sessions**: Using the `path_uuid` from their contribution at `N`, the agent initiates a session (`session start`). The system presents a static "dossier" of the maximum entropy duels for all prior positions (`N-1` to `0`), based on data in DuckDB. The agent then submits their veredicts for any subset of these duels in a single `session commit`.
+- **Immutable Ledger and Temporal Cascade**: Each `session commit` is recorded as a transaction in the `transactions` table within the DuckDB database. Crucially, this commit triggers a "Temporal Cascade": the system recalculates the canonical path using data in DuckDB, starting from the oldest position affected by the agent's veredicts, propagating the changes forward.
+- **Elo Rankings and Emergence**: The votes (veredicts) update the Elo ratings of the competing `paths` (ratings stored in DuckDB). The canonical path is derived from these ratings. There are no fixed "canonical chapters," but rather a canonical path of _pathing decisions_ that is always subject to revision by the Temporal Cascade, based on new judgments.
 
 This mechanism ensures that:
 
@@ -182,22 +182,28 @@ The "Tribunal of the Future" is, therefore, the process by which the system cont
 
 ## 🗂️ Repository Structure
 
-Narrative paths are stored in `narrative_paths/*.csv` files, with the directory named after the protagonist of _The Garden of Forking Paths_.
+The primary data storage is the DuckDB database file `data/encyclopedia.duckdb`. This file contains tables for hrönirs (chapter content), narrative paths, votes, transactions, etc.
 
 ```
-the_library/                       # Hrönirs (textual content) stored by UUID. Each Hrönir is stored in a directory named after its UUID (e.g., the_library/<UUID>/index.md).
 data/
-├── canonical_path.json          # The canonical path of paths (path UUIDs)
-├── sessions/                    # Active judgment session files (e.g., <session_id>.json)
-│   └── consumed_path_uuids.json # Record of path_uuids used to start sessions
-└── transactions/                # Chronological ledger of all judgment session commits
-    ├── HEAD                     # Pointer to the latest transaction_uuid
-    └── <transaction_uuid>.json  # Individual transaction records
-narrative_paths/
-└── *.csv                        # Path definitions (position, prev_hrönir_uuid, successor_hrönir_uuid, path_uuid)
-ratings/
-└── position_*.csv               # Recorded votes for path duels at each position
+├── encyclopedia.duckdb    # Main DuckDB database file. Contains all core persistent data.
+├── sessions/              # Active judgment session files (e.g., <session_id>.json). These are temporary state files.
+│   └── consumed_path_uuids.json # Record of path_uuids used to start sessions.
+└── backup/                # Timestamped backups of data (e.g., from migrations).
+
+# Legacy directories (data migrated to DuckDB, kept for reference or due to deletion issues):
+# the_library/             # Original Markdown storage for hrönirs. Canonical content is now in DuckDB.
+# narrative_paths/         # Original CSV storage for narrative paths.
+# ratings/                 # Original CSV storage for votes/ratings.
+# data/transactions/       # Original JSON storage for transaction ledger.
+# data/canonical_path.json # Legacy file for canonical path.
 ```
+
+Key data tables within `data/encyclopedia.duckdb` include:
+- `hronirs`: Stores hrönir UUIDs, their Markdown content, creation timestamps, and metadata.
+- `paths`: Defines narrative paths, linking hrönirs, their positions, status, and mandate IDs.
+- `votes`: Records votes cast in duels.
+- `transactions`: Logs all judgment session commits, forming an immutable ledger.
 
 ---
 
@@ -228,9 +234,9 @@ The core mechanism for evolving the canonical narrative is the "Tribunal of the 
 
 **Consequences of Committing:**
 
-- Your veredicts are recorded as permanent votes.
-- The session is immutably logged in the `data/transactions/` ledger.
-- The **Temporal Cascade** is triggered, recalculating the canonical path from the oldest position you judged. This is now the sole mechanism for updating the canon.
+- Your veredicts are recorded as permanent votes in the DuckDB database.
+- The session is immutably logged in the `transactions` table within the DuckDB database.
+- The **Temporal Cascade** is triggered, recalculating the canonical path (derived from data in DuckDB) from the oldest position you judged. This is now the sole mechanism for updating the canon.
 
 ---
 
@@ -395,7 +401,7 @@ These criteria ensure that the new architecture not only meets its technical goa
 
 The Hrönir Encyclopedia exists at the intersection of imagination and reality, possibility and inevitability, continually expanding within the reader's consciousness. Each generated variant—whether born from artificial intelligence or human creativity—exists in a state of potential authenticity until collective recognition determines which version was always meant to be.
 
-Just as the **Library of Babel** contains every possible book, the `the_library/` directory holds innumerable variants. Each branch's summary hash functions as an **Aleph** a point that contains all other points. Some branches become a **Zahir**, monopolising attention, while a Funes-like audit log recalls every change. Our Git history unfolds like the **Book of Sand**, without a first or last page, and any author may himself be dreamed by another, echoing **The Circular Ruins**.
+Just as the **Library of Babel** contains every possible book, the `hronirs` table in the DuckDB database (and formerly, `the_library/` directory) holds innumerable variants. Each branch's summary hash functions as an **Aleph** a point that contains all other points. Some branches become a **Zahir**, monopolising attention, while a Funes-like audit log (now within the database transactions) recalls every change. Our Git history, including the versioned database, unfolds like the **Book of Sand**, without a first or last page, and any author may himself be dreamed by another, echoing **The Circular Ruins**.
 
 The project explores fundamental questions about literary truth: Is authenticity inherent in a text, or does it emerge through recognition? Can computational generation achieve the same inevitability as human inspiration? When human and artificial minds collaborate unknowingly, which produces the more "true" version? In the end, the readers themselves become the final arbiters of what feels most inevitable, regardless of its origin.
 [^menard]: This approach echoes Borges' 'Pierre Menard, Author of the Quixote' (1939), in which identical text gains new meaning through context.
