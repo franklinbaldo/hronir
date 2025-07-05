@@ -699,7 +699,7 @@ def record_transaction(
     # Update HEAD to point to this new transaction
     HEAD_FILE.write_text(str(transaction_uuid_obj))
 
-    dm.save_all_data_to_csvs()
+    dm.save_all_data() # Corrected method name
 
     final_oldest_voted_position = (
         int(oldest_voted_position) if oldest_voted_position != float("inf") else -1

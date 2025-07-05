@@ -12,47 +12,42 @@ from hronir_encyclopedia.ratings import get_ranking
 def _uuid(name: str) -> str:
     return str(uuid.uuid5(uuid.NAMESPACE_DNS, name))
 
+# Removed temp_data_dir fixture as it's no longer needed for CSV creation.
+# from hronir_encyclopedia.models import Path as PathModel, Vote # Moved import lower for context if needed or keep here
 
-@pytest.fixture
-def temp_data_dir(tmp_path: Path) -> tuple[Path, Path]:
-    forking_dir = tmp_path / "narrative_paths"
-    ratings_dir = tmp_path / "ratings"
-    forking_dir.mkdir(exist_ok=True)
-    ratings_dir.mkdir(exist_ok=True)
-    return forking_dir, ratings_dir
+from hronir_encyclopedia.models import Path as PathModel, Vote # For direct data creation
 
-
-# Helper function to manage DataManager and call get_ranking
-def _call_get_ranking_with_setup(position, predecessor_hronir_uuid, forking_dir, ratings_dir):
-    original_fork_csv_dir = storage.data_manager.fork_csv_dir
-    original_ratings_csv_dir = storage.data_manager.ratings_csv_dir
-    original_initialized = storage.data_manager._initialized
-
-    db_cleared_by_this_run = False
-
+# Helper function to call get_ranking with a clean DataManager state
+def _call_get_ranking_with_setup(position, predecessor_hronir_uuid):
+    """
+    Calls ratings.get_ranking.
+    Assumes DataManager is already configured by conftest.py to use a test DuckDB.
+    This helper ensures data is cleared before the call (though tests should populate data).
+    """
     try:
-        storage.data_manager.fork_csv_dir = forking_dir
-        storage.data_manager.ratings_csv_dir = ratings_dir
+        # DataManager should be initialized by conftest. Ensure it's clean.
+        if not storage.data_manager._initialized:
+             storage.data_manager.initialize_and_load(clear_existing_data=True)
+        else:
+            # Data for get_ranking (paths, votes) should be set up by the calling test.
+            # This clear is more for safety between tests if test setup failed.
+            storage.data_manager.clear_in_memory_data()
+            storage.data_manager.save_all_data() # commit the clear
 
-        storage.data_manager._initialized = False
-        storage.data_manager.clear_in_memory_data()
-        db_cleared_by_this_run = True
+        # Ensure any data added by tests is committed before get_ranking is called
+        storage.data_manager.save_all_data()
 
-        storage.data_manager.initialize_and_load(clear_existing_data=False)
 
         df = get_ranking(
             position=position,
             predecessor_hronir_uuid=predecessor_hronir_uuid,
-            # session argument removed
         )
         return df
     finally:
-        storage.data_manager.fork_csv_dir = original_fork_csv_dir
-        storage.data_manager.ratings_csv_dir = original_ratings_csv_dir
-        storage.data_manager._initialized = original_initialized
-
-        if db_cleared_by_this_run and storage.data_manager._initialized:
+        # Clean up data from the test DB after the test
+        if storage.data_manager._initialized:
             storage.data_manager.clear_in_memory_data()
+            storage.data_manager.save_all_data() # commit the clear
 
 
 # Hrönirs
@@ -104,31 +99,37 @@ ratings_pos1_data = [
 ratings_pos0_data = []
 ratings_pos2_data = []
 
+# Removed create_csv function as data will be added directly to DB.
 
-def create_csv(data: list[dict], path: Path):
-    if data:
-        pd.DataFrame(data).to_csv(path, index=False)
-    else:
-        if data == [] and path.name.startswith("position_"):
-            pd.DataFrame(columns=["uuid", "voter", "winner", "loser"]).to_csv(path, index=False)
-        elif data == [] and path.name.startswith("forks_"):
-            pd.DataFrame(columns=["position", "prev_uuid", "uuid", "fork_uuid"]).to_csv(
-                path, index=False
-            )
-        else:
-            path.touch()
+def test_get_ranking_filters_by_canonical_predecessor(): # Removed temp_data_dir
+    # Setup data directly in DB
+    for fork_data_item in forks_main_data:
+        # fork_uuid from test data is actually path_uuid
+        path_model_data = {
+            "path_uuid": fork_data_item["fork_uuid"],
+            "position": fork_data_item["position"],
+            "prev_uuid": uuid.UUID(fork_data_item["prev_uuid"]) if fork_data_item["prev_uuid"] else None,
+            "uuid": uuid.UUID(fork_data_item["uuid"]),
+            "status": "PENDING" # Default status
+        }
+        storage.data_manager.add_path(PathModel(**path_model_data))
 
+    for rating_data_item in ratings_pos1_data:
+        vote_model_data = {
+            "uuid": rating_data_item["uuid"],
+            "position": 1, # Assuming all ratings_pos1_data are for pos 1
+            "voter": rating_data_item["voter"], # This was fork_uuid, now needs to be path_uuid of voter
+            "winner": rating_data_item["winner"], # This is hrönir_uuid
+            "loser": rating_data_item["loser"]   # This is hrönir_uuid
+        }
+        storage.data_manager.add_vote(Vote(**vote_model_data))
+    storage.data_manager.save_all_data()
 
-def test_get_ranking_filters_by_canonical_predecessor(temp_data_dir):
-    forking_dir, ratings_dir = temp_data_dir
-    create_csv(forks_main_data, forking_dir / "forks_main.csv")
-    create_csv(ratings_pos1_data, ratings_dir / "position_001.csv")
 
     ranking_df = _call_get_ranking_with_setup(
         position=1,
         predecessor_hronir_uuid=H0_ROOT,
-        forking_dir=forking_dir,
-        ratings_dir=ratings_dir,
+        # forking_dir and ratings_dir arguments removed
     )
 
     assert not ranking_df.empty
@@ -157,35 +158,55 @@ def test_get_ranking_filters_by_canonical_predecessor(temp_data_dir):
     assert ranking_df.iloc[2]["hrönir_uuid"] == H1B
 
 
-def test_get_ranking_no_heirs_for_predecessor(temp_data_dir):
-    forking_dir, ratings_dir = temp_data_dir
-    create_csv(forks_main_data, forking_dir / "forks_main.csv")
-    create_csv(ratings_pos1_data, ratings_dir / "position_001.csv")
+def test_get_ranking_no_heirs_for_predecessor(): # Removed temp_data_dir
+    # Setup data directly in DB (same as previous test for path data)
+    for fork_data_item in forks_main_data:
+        path_model_data = {
+            "path_uuid": fork_data_item["fork_uuid"],
+            "position": fork_data_item["position"],
+            "prev_uuid": uuid.UUID(fork_data_item["prev_uuid"]) if fork_data_item["prev_uuid"] else None,
+            "uuid": uuid.UUID(fork_data_item["uuid"]),
+            "status": "PENDING"
+        }
+        storage.data_manager.add_path(PathModel(**path_model_data))
+
+    for rating_data_item in ratings_pos1_data: # Votes might not be strictly necessary for this test if no paths are found
+        vote_model_data = {
+            "uuid": rating_data_item["uuid"], "position": 1, "voter": rating_data_item["voter"],
+            "winner": rating_data_item["winner"], "loser": rating_data_item["loser"]
+        }
+        storage.data_manager.add_vote(Vote(**vote_model_data))
+    storage.data_manager.save_all_data()
 
     NON_EXISTENT_PREDECESSOR = _uuid("non_existent_predecessor")
     ranking_df = _call_get_ranking_with_setup(
         position=1,
         predecessor_hronir_uuid=NON_EXISTENT_PREDECESSOR,
-        forking_dir=forking_dir,
-        ratings_dir=ratings_dir,
     )
     assert ranking_df.empty
 
 
-def test_get_ranking_no_votes_for_heirs(temp_data_dir):
-    forking_dir, ratings_dir = temp_data_dir
-    simple_forks = [
+def test_get_ranking_no_votes_for_heirs(): # Removed temp_data_dir
+    simple_forks_data = [
         {"position": 1, "prev_uuid": H0_ROOT, "uuid": H1A, "fork_uuid": _uuid("f1")},
         {"position": 1, "prev_uuid": H0_ROOT, "uuid": H1B, "fork_uuid": _uuid("f2")},
     ]
-    create_csv(simple_forks, forking_dir / "forks_simple.csv")
-    create_csv([], ratings_dir / "position_001.csv")
+    for fork_data_item in simple_forks_data:
+        path_model_data = {
+            "path_uuid": fork_data_item["fork_uuid"],
+            "position": fork_data_item["position"],
+            "prev_uuid": uuid.UUID(fork_data_item["prev_uuid"]) if fork_data_item["prev_uuid"] else None,
+            "uuid": uuid.UUID(fork_data_item["uuid"]),
+            "status": "PENDING"
+        }
+        storage.data_manager.add_path(PathModel(**path_model_data))
+    # No votes are added for this test case.
+    storage.data_manager.save_all_data()
+
 
     ranking_df = _call_get_ranking_with_setup(
         position=1,
         predecessor_hronir_uuid=H0_ROOT,
-        forking_dir=forking_dir,
-        ratings_dir=ratings_dir,
     )
 
     assert len(ranking_df) == 2
@@ -200,25 +221,32 @@ def test_get_ranking_no_votes_for_heirs(temp_data_dir):
         assert row["games_played"] == 0
 
 
-def test_get_ranking_for_position_0_no_predecessor(temp_data_dir):
-    forking_dir, ratings_dir = temp_data_dir
+def test_get_ranking_for_position_0_no_predecessor(): # Removed temp_data_dir
     H0_ALT = _uuid("hrönir_0_ALT_pos0")
-    forks_for_pos0 = forks_main_data + [
+    forks_for_pos0_data = forks_main_data + [
         {"position": 0, "prev_uuid": "", "uuid": H0_ALT, "fork_uuid": _uuid("fork_0_H0_ALT")}
     ]
-    create_csv(forks_for_pos0, forking_dir / "forks_pos0.csv")
+    for fork_data_item in forks_for_pos0_data:
+        path_model_data = {
+            "path_uuid": fork_data_item["fork_uuid"],
+            "position": fork_data_item["position"],
+            "prev_uuid": uuid.UUID(fork_data_item["prev_uuid"]) if fork_data_item["prev_uuid"] else None,
+            "uuid": uuid.UUID(fork_data_item["uuid"]),
+            "status": "PENDING"
+        }
+        storage.data_manager.add_path(PathModel(**path_model_data))
 
-    ratings_data_pos0_duels = [
-        {"uuid": _uuid("v_p0_1"), "voter": _uuid("v_p0_v1"), "winner": H0_ROOT, "loser": H0_ALT},
-        {"uuid": _uuid("v_p0_2"), "voter": _uuid("v_p0_v2"), "winner": H0_ROOT, "loser": H0_ALT},
+    ratings_data_pos0_duels_data = [
+        {"uuid": _uuid("v_p0_1"), "voter": _uuid("v_p0_v1"), "winner": H0_ROOT, "loser": H0_ALT, "position": 0},
+        {"uuid": _uuid("v_p0_2"), "voter": _uuid("v_p0_v2"), "winner": H0_ROOT, "loser": H0_ALT, "position": 0},
     ]
-    create_csv(ratings_data_pos0_duels, ratings_dir / "position_000.csv")
+    for rating_data_item in ratings_data_pos0_duels_data:
+        storage.data_manager.add_vote(Vote(**rating_data_item))
+    storage.data_manager.save_all_data()
 
     ranking_df = _call_get_ranking_with_setup(
         position=0,
         predecessor_hronir_uuid=None,
-        forking_dir=forking_dir,
-        ratings_dir=ratings_dir,
     )
 
     assert len(ranking_df) == 2
@@ -235,138 +263,99 @@ def test_get_ranking_for_position_0_no_predecessor(temp_data_dir):
     assert h0_alt_data["losses"] == 2
 
 
-def test_get_ranking_empty_narrative_paths_dir(temp_data_dir):
-    _, ratings_dir = temp_data_dir
-    forking_dir_empty = temp_data_dir[0]
-
-    create_csv(ratings_pos1_data, ratings_dir / "position_001.csv")
+def test_get_ranking_empty_paths_table(): # Renamed, removed temp_data_dir
+    # No paths added to DB.
+    # Add ratings, though they won't be used if no paths match.
+    for rating_data_item in ratings_pos1_data:
+        vote_model_data = {
+            "uuid": rating_data_item["uuid"], "position": 1, "voter": rating_data_item["voter"],
+            "winner": rating_data_item["winner"], "loser": rating_data_item["loser"]
+        }
+        storage.data_manager.add_vote(Vote(**vote_model_data))
+    storage.data_manager.save_all_data()
 
     ranking_df = _call_get_ranking_with_setup(
         position=1,
         predecessor_hronir_uuid=H0_ROOT,
-        forking_dir=forking_dir_empty,
-        ratings_dir=ratings_dir,
     )
     assert ranking_df.empty
 
 
-def test_get_ranking_empty_ratings_files(temp_data_dir):
-    forking_dir, ratings_dir = temp_data_dir
-    create_csv(forks_main_data, forking_dir / "forks_main.csv")
+def test_get_ranking_empty_votes_table(): # Renamed, removed temp_data_dir
+    # Add paths to DB
+    for fork_data_item in forks_main_data:
+        path_model_data = {
+            "path_uuid": fork_data_item["fork_uuid"],
+            "position": fork_data_item["position"],
+            "prev_uuid": uuid.UUID(fork_data_item["prev_uuid"]) if fork_data_item["prev_uuid"] else None,
+            "uuid": uuid.UUID(fork_data_item["uuid"]),
+            "status": "PENDING"
+        }
+        storage.data_manager.add_path(PathModel(**path_model_data))
+    # No votes added to DB.
+    storage.data_manager.save_all_data()
 
-    pd.DataFrame(columns=["uuid", "voter", "winner", "loser"]).to_csv(
-        ratings_dir / "position_001.csv", index=False
-    )
 
     ranking_df = _call_get_ranking_with_setup(
         position=1,
         predecessor_hronir_uuid=H0_ROOT,
-        forking_dir=forking_dir,
-        ratings_dir=ratings_dir,
     )
     assert len(ranking_df) == 3
     for _, row in ranking_df.iterrows():
         assert row["elo_rating"] == 1500
-
-    (ratings_dir / "position_001.csv").write_text("")
-    ranking_df_zero_bytes = _call_get_ranking_with_setup(
-        position=1,
-        predecessor_hronir_uuid=H0_ROOT,
-        forking_dir=forking_dir,
-        ratings_dir=ratings_dir,
-    )
-    assert len(ranking_df_zero_bytes) == 3
-    for _, row in ranking_df_zero_bytes.iterrows():
-        assert row["elo_rating"] == 1500
+    # Removed second part of the test that dealt with zero-byte CSV files as it's no longer applicable.
 
 
-def test_get_ranking_malformed_forking_csv(temp_data_dir):
-    forking_dir, ratings_dir = temp_data_dir
-
-    create_csv(
-        [{"position": 1, "prev_uuid": H0_ROOT, "uuid": H1A, "fork_uuid": _uuid("f1")}],
-        forking_dir / "good_forks.csv",
-    )
-    (forking_dir / "bad_forks.csv").write_text(
-        "position,prev_uuid\ninvalid,row,with,too,many,columns"
-    )
-
-    create_csv([], ratings_dir / "position_001.csv")
+def test_get_ranking_malformed_data_handling_equivalent(): # Renamed, removed temp_data_dir
+    # This test used to check malformed CSVs.
+    # With direct DB insertion, "malformed" data means data that Pydantic models reject
+    # or that violates DB constraints. DataManager/DuckDBDataManager should handle this.
+    # For get_ranking, if data is already in DB, it's assumed to be valid per models.
+    # We can test how get_ranking handles incomplete but structurally valid data if necessary,
+    # but the concept of "malformed CSV" doesn't directly translate.
+    # Here, we'll add valid minimal data and expect default Elo.
+    path_data = {
+        "path_uuid": _uuid("f1"), "position": 1, "prev_uuid": uuid.UUID(H0_ROOT),
+        "uuid": uuid.UUID(H1A), "status": "PENDING"
+    }
+    storage.data_manager.add_path(PathModel(**path_data))
+    storage.data_manager.save_all_data() # No votes
 
     ranking_df = _call_get_ranking_with_setup(
         position=1,
         predecessor_hronir_uuid=H0_ROOT,
-        forking_dir=forking_dir,
-        ratings_dir=ratings_dir,
     )
     assert len(ranking_df) == 1
     assert ranking_df.iloc[0]["hrönir_uuid"] == H1A
     assert ranking_df.iloc[0]["elo_rating"] == 1500
 
+# Removed test_get_ranking_malformed_ratings_csv as it's CSV specific.
 
-def test_get_ranking_malformed_ratings_csv(temp_data_dir):
-    forking_dir, ratings_dir = temp_data_dir
-    create_csv(
-        [{"position": 1, "prev_uuid": H0_ROOT, "uuid": H1A, "fork_uuid": _uuid("f1")}],
-        forking_dir / "forks.csv",
-    )
-    (ratings_dir / "position_001.csv").write_text("winner,loser\ninvalid,row")
-
-    ranking_df = _call_get_ranking_with_setup(
-        position=1,
-        predecessor_hronir_uuid=H0_ROOT,
-        forking_dir=forking_dir,
-        ratings_dir=ratings_dir,
-    )
-    assert len(ranking_df) == 1
-    assert ranking_df.iloc[0]["hrönir_uuid"] == H1A
-    assert ranking_df.iloc[0]["elo_rating"] == 1500
-    assert ranking_df.iloc[0]["wins"] == 0
-    assert ranking_df.iloc[0]["losses"] == 0
-
-
-def test_get_ranking_canonical_predecessor_none_not_pos_0(temp_data_dir):
-    forking_dir, ratings_dir = temp_data_dir
-    create_csv(forks_main_data, forking_dir / "forks_main.csv")
-    create_csv(ratings_pos1_data, ratings_dir / "position_001.csv")
+def test_get_ranking_canonical_predecessor_none_not_pos_0(): # Removed temp_data_dir
+    # Add main fork data
+    for fork_data_item in forks_main_data:
+        path_model_data = {
+            "path_uuid": fork_data_item["fork_uuid"],
+            "position": fork_data_item["position"],
+            "prev_uuid": uuid.UUID(fork_data_item["prev_uuid"]) if fork_data_item["prev_uuid"] else None,
+            "uuid": uuid.UUID(fork_data_item["uuid"]),
+            "status": "PENDING"
+        }
+        storage.data_manager.add_path(PathModel(**path_model_data))
+    # Add ratings data
+    for rating_data_item in ratings_pos1_data:
+        vote_model_data = {
+            "uuid": rating_data_item["uuid"], "position": 1, "voter": rating_data_item["voter"],
+            "winner": rating_data_item["winner"], "loser": rating_data_item["loser"]
+        }
+        storage.data_manager.add_vote(Vote(**vote_model_data))
+    storage.data_manager.save_all_data()
 
     ranking_df = _call_get_ranking_with_setup(
         position=1,
-        predecessor_hronir_uuid=None,
-        forking_dir=forking_dir,
-        ratings_dir=ratings_dir,
+        predecessor_hronir_uuid=None, # Key part of this test
     )
     assert ranking_df.empty
 
-
-def test_get_ranking_narrative_paths_missing_columns(temp_data_dir):
-    forking_dir, ratings_dir = temp_data_dir
-    (forking_dir / "missing_cols.csv").write_text("uuid,fork_uuid\nval1,val2")
-    create_csv(ratings_pos1_data, ratings_dir / "position_001.csv")
-
-    ranking_df = _call_get_ranking_with_setup(
-        position=1,
-        predecessor_hronir_uuid=H0_ROOT,
-        forking_dir=forking_dir,
-        ratings_dir=ratings_dir,
-    )
-    assert ranking_df.empty
-
-
-def test_get_ranking_ratings_path_missing_columns(temp_data_dir):
-    forking_dir, ratings_dir = temp_data_dir
-    create_csv(
-        [{"position": 1, "prev_uuid": H0_ROOT, "uuid": H1A, "fork_uuid": _uuid("f1")}],
-        forking_dir / "forks.csv",
-    )
-    (ratings_dir / "position_001.csv").write_text("voter_id,winning_id,losing_id\nv1,w1,l1")
-
-    ranking_df = _call_get_ranking_with_setup(
-        position=1,
-        predecessor_hronir_uuid=H0_ROOT,
-        forking_dir=forking_dir,
-        ratings_dir=ratings_dir,
-    )
-    assert len(ranking_df) == 1
-    assert ranking_df.iloc[0]["hrönir_uuid"] == H1A
-    assert ranking_df.iloc[0]["elo_rating"] == 1500
+# Removed test_get_ranking_narrative_paths_missing_columns (CSV specific)
+# Removed test_get_ranking_ratings_path_missing_columns (CSV specific)
