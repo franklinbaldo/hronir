@@ -29,16 +29,21 @@ def create_mock_hronir(
     # Let's use a temporary file to pass content to store_hrönir.
 
     import tempfile
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False, dir=library_path.parent) as tmp_file:
+
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".md", delete=False, dir=library_path.parent
+    ) as tmp_file:
         tmp_file.write(text_content)
         temp_file_path = Path(tmp_file.name)
 
     # storage.store_chapter_text will use DataManager.store_hrönir, which adds to DB.
     # It derives UUID from content.
-    content_derived_uuid = storage.store_chapter_text(text_content, base=library_path) # base is for temp file if store_chapter_text makes one
-                                                                                      # but store_hrönir (new) does not use base.
-                                                                                      # store_chapter_text was updated to use store_hrönir.
-                                                                                      # The `base` in store_chapter_text is unused by the new DataManager.
+    content_derived_uuid = storage.store_chapter_text(
+        text_content, base=library_path
+    )  # base is for temp file if store_chapter_text makes one
+    # but store_hrönir (new) does not use base.
+    # store_chapter_text was updated to use store_hrönir.
+    # The `base` in store_chapter_text is unused by the new DataManager.
 
     if uuid_override:
         # If an override is given, the test expects this UUID.
@@ -56,11 +61,11 @@ def create_mock_hronir(
             # and that UUID is not content-derived, the hronirs table would need direct insert,
             # bypassing store_hrönir's UUID generation.
             # Given the current structure, we'll assume uuid_override IS the content-derived one.
-            pass # Let it proceed, test will fail later if assertions depend on uuid_override being different from content hash
-        temp_file_path.unlink() # Clean up temp file
-        return uuid_override # Return the override, assuming test setup is consistent.
+            pass  # Let it proceed, test will fail later if assertions depend on uuid_override being different from content hash
+        temp_file_path.unlink()  # Clean up temp file
+        return uuid_override  # Return the override, assuming test setup is consistent.
 
-    temp_file_path.unlink() # Clean up temp file
+    temp_file_path.unlink()  # Clean up temp file
     return content_derived_uuid
 
 
@@ -154,22 +159,60 @@ def setup_test_environment(tmp_path: Path) -> dict[str, Path]:
 
     # Add paths to DataManager/DB
     forks_data_for_db = [
-        {"path_uuid": fork_A_uuid, "position": 0, "prev_uuid": None, "uuid": hronir_A_suc, "status": "PENDING"},
-        {"path_uuid": fork_B_uuid, "position": 0, "prev_uuid": None, "uuid": hronir_B_suc, "status": "PENDING"},
-        {"path_uuid": fork_C_uuid, "position": 1, "prev_uuid": hronir_A_suc, "uuid": hronir_C_suc, "status": "PENDING"},
-        {"path_uuid": fork_D_uuid, "position": 1, "prev_uuid": hronir_A_suc, "uuid": hronir_D_suc, "status": "PENDING"},
-        {"path_uuid": fork_E_uuid, "position": 1, "prev_uuid": hronir_B_suc, "uuid": hronir_E_suc, "status": "PENDING"},
-        {"path_uuid": fork_F_uuid, "position": 1, "prev_uuid": hronir_B_suc, "uuid": hronir_F_suc, "status": "PENDING"},
+        {
+            "path_uuid": fork_A_uuid,
+            "position": 0,
+            "prev_uuid": None,
+            "uuid": hronir_A_suc,
+            "status": "PENDING",
+        },
+        {
+            "path_uuid": fork_B_uuid,
+            "position": 0,
+            "prev_uuid": None,
+            "uuid": hronir_B_suc,
+            "status": "PENDING",
+        },
+        {
+            "path_uuid": fork_C_uuid,
+            "position": 1,
+            "prev_uuid": hronir_A_suc,
+            "uuid": hronir_C_suc,
+            "status": "PENDING",
+        },
+        {
+            "path_uuid": fork_D_uuid,
+            "position": 1,
+            "prev_uuid": hronir_A_suc,
+            "uuid": hronir_D_suc,
+            "status": "PENDING",
+        },
+        {
+            "path_uuid": fork_E_uuid,
+            "position": 1,
+            "prev_uuid": hronir_B_suc,
+            "uuid": hronir_E_suc,
+            "status": "PENDING",
+        },
+        {
+            "path_uuid": fork_F_uuid,
+            "position": 1,
+            "prev_uuid": hronir_B_suc,
+            "uuid": hronir_F_suc,
+            "status": "PENDING",
+        },
     ]
-    from hronir_encyclopedia.models import Path as PathModel # Local import for clarity
-    import uuid as uuid_module # Local import for clarity
+    import uuid as uuid_module  # Local import for clarity
+
+    from hronir_encyclopedia.models import Path as PathModel  # Local import for clarity
+
     for item in forks_data_for_db:
         path_model_data = {
             "path_uuid": uuid_module.UUID(item["path_uuid"]),
             "position": item["position"],
             "prev_uuid": uuid_module.UUID(item["prev_uuid"]) if item["prev_uuid"] else None,
             "uuid": uuid_module.UUID(item["uuid"]),
-            "status": item["status"]
+            "status": item["status"],
         }
         storage.data_manager.add_path(PathModel(**path_model_data))
 
@@ -204,24 +247,24 @@ def setup_test_environment(tmp_path: Path) -> dict[str, Path]:
         position=99, prev_uuid="", cur_uuid=dummy_voter_hronir_uuid
     )
     # Add this dummy fork to DataManager/DB
-    from hronir_encyclopedia.models import Vote # Local import for clarity
+    from hronir_encyclopedia.models import Vote  # Local import for clarity
+
     dummy_fork_model_data = {
         "path_uuid": uuid_module.UUID(voter_for_initial_ratings_fork_uuid),
         "position": 99,
         "prev_uuid": None,
         "uuid": uuid_module.UUID(dummy_voter_hronir_uuid),
-        "status": "PENDING"
+        "status": "PENDING",
     }
     storage.data_manager.add_path(PathModel(**dummy_fork_model_data))
-
 
     # Initial ratings for Position 0: Make Fork A slightly ahead or tied initially.
     ratings_pos0_data_for_db = [
         {
-            "uuid": str(uuid_module.uuid4()), # Vote needs a UUID
+            "uuid": str(uuid_module.uuid4()),  # Vote needs a UUID
             "position": 0,
-            "voter": voter_for_initial_ratings_fork_uuid, # This is a path_uuid
-            "winner": hronir_A_suc, # This is hrönir_uuid
+            "voter": voter_for_initial_ratings_fork_uuid,  # This is a path_uuid
+            "winner": hronir_A_suc,  # This is hrönir_uuid
             "loser": hronir_B_suc,  # This is hrönir_uuid
             # Elo columns are not part of Vote model, they are calculated.
         }
@@ -232,27 +275,29 @@ def setup_test_environment(tmp_path: Path) -> dict[str, Path]:
             "position": item["position"],
             "voter": str(item["voter"]),
             "winner": uuid_module.UUID(item["winner"]),
-            "loser": uuid_module.UUID(item["loser"])
+            "loser": uuid_module.UUID(item["loser"]),
         }
         storage.data_manager.add_vote(Vote(**vote_model_data))
-
 
     # Ratings for Position 1 (children of A) - to ensure C vs D is the duel if A remains canonical
     voter_pos1_A_children_fork_uuid = storage.compute_forking_uuid(
         position=98, prev_uuid="", cur_uuid=dummy_voter_hronir_uuid
     )
-    dummy_fork_model_data_2 = { # Add this dummy voter path to DB
+    dummy_fork_model_data_2 = {  # Add this dummy voter path to DB
         "path_uuid": uuid_module.UUID(voter_pos1_A_children_fork_uuid),
-        "position": 98, "prev_uuid": None, "uuid": uuid_module.UUID(dummy_voter_hronir_uuid), "status": "PENDING"
+        "position": 98,
+        "prev_uuid": None,
+        "uuid": uuid_module.UUID(dummy_voter_hronir_uuid),
+        "status": "PENDING",
     }
     storage.data_manager.add_path(PathModel(**dummy_fork_model_data_2))
 
     ratings_pos1_children_A_data_for_db = [
         {
-            "uuid": str(uuid_module.uuid4()), # Vote UUID
+            "uuid": str(uuid_module.uuid4()),  # Vote UUID
             "position": 1,
-            "voter": voter_pos1_A_children_fork_uuid, # path_uuid of voter
-            "winner": hronir_C_suc, # hrönir_uuid
+            "voter": voter_pos1_A_children_fork_uuid,  # path_uuid of voter
+            "winner": hronir_C_suc,  # hrönir_uuid
             "loser": hronir_D_suc,  # hrönir_uuid
         }
     ]
@@ -262,11 +307,11 @@ def setup_test_environment(tmp_path: Path) -> dict[str, Path]:
             "position": item["position"],
             "voter": str(item["voter"]),
             "winner": uuid_module.UUID(item["winner"]),
-            "loser": uuid_module.UUID(item["loser"])
+            "loser": uuid_module.UUID(item["loser"]),
         }
         storage.data_manager.add_vote(Vote(**vote_model_data))
 
-    storage.data_manager.save_all_data() # Commit all added paths and votes
+    storage.data_manager.save_all_data()  # Commit all added paths and votes
 
     # Ratings for Position 1 (children of B) - to ensure E vs F is the duel if B becomes canonical
     # Voter for these can be another dummy fork.
@@ -581,7 +626,9 @@ def test_merkle_tree_and_proof_dynamics(sample_transactions_data: list[str]):
         proof = generate_merkle_proof(sample_transactions_data, i)
         assert proof is not None, f"Proof should be generated for transaction at index {i}."
 
-        is_valid = verify_merkle_proof(tx_data, merkle_root, proof, i, len(sample_transactions_data))
+        is_valid = verify_merkle_proof(
+            tx_data, merkle_root, proof, i, len(sample_transactions_data)
+        )
         assert is_valid, f"Merkle proof verification should pass for transaction at index {i}."
 
     # 3. Test with a modified transaction (should fail verification)
@@ -594,12 +641,18 @@ def test_merkle_tree_and_proof_dynamics(sample_transactions_data: list[str]):
         assert proof_for_original is not None
 
         # Verification should fail if data is tampered with
-        is_valid_modified = verify_merkle_proof(modified_tx_data, merkle_root, proof_for_original, 0, len(sample_transactions_data))
+        is_valid_modified = verify_merkle_proof(
+            modified_tx_data, merkle_root, proof_for_original, 0, len(sample_transactions_data)
+        )
         assert not is_valid_modified, "Verification should fail for tampered transaction data."
 
         # Verification should fail if root is incorrect
         is_valid_wrong_root = verify_merkle_proof(
-            original_tx_data, "incorrect_merkle_root_value", proof_for_original, 0, len(sample_transactions_data)
+            original_tx_data,
+            "incorrect_merkle_root_value",
+            proof_for_original,
+            0,
+            len(sample_transactions_data),
         )
         assert not is_valid_wrong_root, "Verification should fail for incorrect Merkle root."
 

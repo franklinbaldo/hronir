@@ -124,7 +124,7 @@ def _get_session_file_data(session_id: str) -> dict | None:
 
 
 def _get_consumed_forks_data() -> dict:
-    consumed_file = SESSIONS_DIR_runtime / "consumed_path_uuids.json" # Corrected filename
+    consumed_file = SESSIONS_DIR_runtime / "consumed_path_uuids.json"  # Corrected filename
     if not consumed_file.exists():
         return {}
     return json.loads(consumed_file.read_text())

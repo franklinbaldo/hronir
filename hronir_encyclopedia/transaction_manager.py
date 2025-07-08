@@ -218,7 +218,7 @@ def _build_merkle_tree_level(current_hashes: list[str]) -> list[str]:
     # The loop in compute_merkle_root will stop when len is 1.
     # This function's job is to pair up and hash.
     if len(current_hashes) == 1:
-        return list(current_hashes) # Return a copy if it's already a single hash (root of subtree)
+        return list(current_hashes)  # Return a copy if it's already a single hash (root of subtree)
 
     hashes_to_process = list(current_hashes)  # Work on a copy
     if len(hashes_to_process) % 2 == 1:
@@ -294,7 +294,9 @@ def generate_merkle_proof(data_items: list[str], item_index: int) -> list[tuple[
     return proof
 
 
-def verify_merkle_proof(item_data: str, root: str, proof: list[tuple[str, str]], item_index: int, total_leaves: int) -> bool:
+def verify_merkle_proof(
+    item_data: str, root: str, proof: list[tuple[str, str]], item_index: int, total_leaves: int
+) -> bool:
     """
     Verifies a Merkle proof for a given item.
     item_data: The original data of the leaf node.
@@ -320,7 +322,9 @@ def verify_merkle_proof(item_data: str, root: str, proof: list[tuple[str, str]],
         if current_idx_in_level % 2 == 0:  # Current hash is a left node
             if current_idx_in_level + 1 < num_nodes_this_level:  # Has a right sibling
                 if proof_idx >= len(proof):
-                    logging.error("Proof is too short for verification path (missing right sibling).")
+                    logging.error(
+                        "Proof is too short for verification path (missing right sibling)."
+                    )
                     return False
                 sibling_hash, direction = proof[proof_idx]
                 if direction != "R":
@@ -699,7 +703,7 @@ def record_transaction(
     # Update HEAD to point to this new transaction
     HEAD_FILE.write_text(str(transaction_uuid_obj))
 
-    dm.save_all_data() # Corrected method name
+    dm.save_all_data()  # Corrected method name
 
     final_oldest_voted_position = (
         int(oldest_voted_position) if oldest_voted_position != float("inf") else -1

@@ -1,7 +1,5 @@
-import uuid # Added for uuid.uuid5
+import uuid  # Added for uuid.uuid5
 from pathlib import Path
-
-import pandas as pd
 
 from hronir_encyclopedia import (
     graph_logic,
@@ -18,9 +16,9 @@ def _setup_and_check_consistency(paths_data: list[PathModel]):
     try:
         # Ensure DataManager is initialized and its DB is clean for the test
         if not storage.data_manager._initialized:
-             storage.data_manager.initialize_and_load(clear_existing_data=True)
+            storage.data_manager.initialize_and_load(clear_existing_data=True)
         else:
-            storage.data_manager.clear_in_memory_data() # Clears tables in the test DB
+            storage.data_manager.clear_in_memory_data()  # Clears tables in the test DB
 
         # Add provided path data to the database
         for path_model_data in paths_data:
@@ -28,20 +26,19 @@ def _setup_and_check_consistency(paths_data: list[PathModel]):
             # Assuming paths_data will be list of PathModel instances or compatible dicts
             if isinstance(path_model_data, dict):
                 path_to_add = PathModel(**path_model_data)
-            else: # Assumes PathModel instance
+            else:  # Assumes PathModel instance
                 path_to_add = path_model_data
             storage.data_manager.add_path(path_to_add)
 
         # Commit data if add_path doesn't auto-commit (DuckDBDataManager.add_path does not auto-commit)
         storage.data_manager.save_all_data()
 
-
         return graph_logic.is_narrative_consistent()
     finally:
         # Clean up data from the test DB after the test
         if storage.data_manager._initialized:
             storage.data_manager.clear_in_memory_data()
-            storage.data_manager.save_all_data() # Commit the clear operation
+            storage.data_manager.save_all_data()  # Commit the clear operation
 
 
 def test_is_narrative_consistent(tmp_path: Path):
@@ -96,12 +93,12 @@ def test_is_narrative_consistent(tmp_path: Path):
     ]
     # df_consistent = pd.DataFrame(validated_consistent_data) # No longer creating CSV
     # df_consistent.to_csv(fork_dir / "path_consistent.csv", index=False)
-    assert _setup_and_check_consistency(validated_consistent_data) # Pass data directly
+    assert _setup_and_check_consistency(validated_consistent_data)  # Pass data directly
 
     # (fork_dir / "path_consistent.csv").unlink() # No longer creating CSV
 
     # Test 2: Graph with a cycle
-    df_cycle_nodes_data = [ # This is already a list of dicts compatible with PathModel
+    df_cycle_nodes_data = [  # This is already a list of dicts compatible with PathModel
         {
             "position": 0,
             "prev_uuid": None,
@@ -136,4 +133,4 @@ def test_is_narrative_consistent(tmp_path: Path):
     # ]
     # df_cycle_nodes = pd.DataFrame(validated_cycle_data) # No longer creating CSV
     # df_cycle_nodes.to_csv(fork_dir / "path_cycle.csv", index=False)
-    assert not _setup_and_check_consistency(df_cycle_nodes_data) # Pass data directly
+    assert not _setup_and_check_consistency(df_cycle_nodes_data)  # Pass data directly

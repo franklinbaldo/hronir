@@ -40,7 +40,7 @@ def temp_data_dirs(tmp_path: Path) -> dict[str, Path]:
     backup_dir = base_dir / "data" / "backup"
     # backup_dir.mkdir(parents=True) # Script will create this
     db_dir = base_dir / "data"
-    db_dir.mkdir(parents=True, exist_ok=True) # Corrected indentation
+    db_dir.mkdir(parents=True, exist_ok=True)  # Corrected indentation
 
     # Create dummy files
     # Paths
@@ -275,7 +275,8 @@ def test_enable_sharding_flag(temp_data_dirs: dict[str, Path], capsys):
     )
     assert res.returncode == 0, f"Script failed: {res.stderr}"
     assert (
-        "--enable-sharding is specified, but sharding logic is not fully implemented" in res.stderr  # Logging goes to stderr
+        "--enable-sharding is specified, but sharding logic is not fully implemented"
+        in res.stderr  # Logging goes to stderr
     )
 
 

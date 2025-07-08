@@ -1,5 +1,4 @@
 import uuid
-from pathlib import Path  # Import Path
 
 import pandas as pd
 import pytest
@@ -18,9 +17,9 @@ def _call_determine_next_duel_entropy_with_setup(position, predecessor_hronir_uu
         # Ensure DataManager is initialized and its DB is clean for the test
         # conftest.py should ensure storage.data_manager is a fresh instance pointing to a test DB
         if not storage.data_manager._initialized:
-             storage.data_manager.initialize_and_load(clear_existing_data=True)
+            storage.data_manager.initialize_and_load(clear_existing_data=True)
         else:
-            storage.data_manager.clear_in_memory_data() # Clears tables in the test DB
+            storage.data_manager.clear_in_memory_data()  # Clears tables in the test DB
 
         # The function being tested
         duel_info = ratings.determine_next_duel_entropy(

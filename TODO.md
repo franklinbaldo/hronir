@@ -83,14 +83,14 @@ Esta seção resume as tarefas de migração para o sistema distribuído propost
 
 ### Enhanced Data Models 🏗️
 
-- [ ] **Session models** (`Session`, `SessionDossier`, `SessionDuel`) for type-safe session management
-- [ ] **Hrönir content model** (`Hronir`) for story content with metadata and validation
-- [ ] **Canonical path models** (`CanonicalPath`, `CanonicalEntry`) for structured canonical state
-- [ ] **Enhanced transaction model** (`TransactionContent`, `SessionVerdict`) for structured transaction content
-- [ ] **Duel/ranking models** (`DuelResult`, `RankingEntry`) for Elo system type safety
-- [ ] **Mandate/qualification models** (`Mandate`, `QualificationCriteria`) for validation logic
-- [ ] **Configuration models** (`SystemConfig`, `StoragePaths`) for system administration
-- [ ] **Validation models** (`ValidationIssue`, `DataIntegrityReport`) for debugging and maintenance
+- [x] **Session models** (`Session`, `SessionDossier`, `SessionDuel`) for type-safe session management
+- [x] **Hrönir content model** (`Hronir`) for story content with metadata and validation
+- [x] **Canonical path models** (`CanonicalPath`, `CanonicalEntry`) for structured canonical state
+- [x] **Enhanced transaction model** (`TransactionContent`, `SessionVerdict`) for structured transaction content
+- [x] **Duel/ranking models** (`DuelResult`, `RankingEntry`) for Elo system type safety
+- [x] **Mandate/qualification models** (`Mandate`, `QualificationCriteria`) for validation logic
+- [x] **Configuration models** (`SystemConfig`, `StoragePaths`) for system administration
+- [x] **Validation models** (`ValidationIssue`, `DataIntegrityReport`) for debugging and maintenance
 
 ### Essential CLI Commands 📟
 

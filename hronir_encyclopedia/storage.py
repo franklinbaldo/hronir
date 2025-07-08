@@ -1,11 +1,11 @@
 import os
-import shutil
 import uuid
 from pathlib import Path
 
 from .duckdb_storage import DuckDBDataManager
 from .models import Path as PathModel
 from .models import Transaction, Vote
+
 # Removed PandasDataManager import
 from .sharding import SnapshotManifest  # Added
 
@@ -25,9 +25,9 @@ class DataManager:
 
     def __init__(
         self,
-        path_csv_dir="narrative_paths", # Still used by DuckDBDataManager for initial load
-        ratings_csv_dir="ratings", # Still used by DuckDBDataManager for initial load
-        transactions_json_dir="data/transactions", # Still used by DuckDBDataManager for initial load
+        path_csv_dir="narrative_paths",  # Still used by DuckDBDataManager for initial load
+        ratings_csv_dir="ratings",  # Still used by DuckDBDataManager for initial load
+        transactions_json_dir="data/transactions",  # Still used by DuckDBDataManager for initial load
     ):
         if hasattr(self, "_initialized") and self._initialized:
             return
@@ -36,18 +36,18 @@ class DataManager:
         db_path = os.getenv("HRONIR_DUCKDB_PATH", "data/encyclopedia.duckdb")
         self.backend = DuckDBDataManager(
             db_path=db_path,
-            path_csv_dir=path_csv_dir, # Pass through for initial loading if DB is empty
-            ratings_csv_dir=ratings_csv_dir, # Pass through for initial loading if DB is empty
-            transactions_json_dir=transactions_json_dir, # Pass through for initial loading if DB is empty
+            path_csv_dir=path_csv_dir,  # Pass through for initial loading if DB is empty
+            ratings_csv_dir=ratings_csv_dir,  # Pass through for initial loading if DB is empty
+            transactions_json_dir=transactions_json_dir,  # Pass through for initial loading if DB is empty
         )
 
         # Configurable library path - this will need to be re-evaluated
         # as hrönirs are now stored in DuckDB. For now, keep initialization
         # but operations like store_hrönir will change.
-        default_library_path = Path("the_library") # This directory will be deleted.
+        default_library_path = Path("the_library")  # This directory will be deleted.
         library_path_str = os.getenv("HRONIR_LIBRARY_DIR")
         self.library_path = Path(library_path_str) if library_path_str else default_library_path
-        self.library_path.mkdir(parents=True, exist_ok=True) # Ensure it exists
+        self.library_path.mkdir(parents=True, exist_ok=True)  # Ensure it exists
 
         self._initialized = False
 
@@ -215,7 +215,9 @@ class DataManager:
         """Returns None as hrönirs are stored in DB, not as files. Path is no longer relevant."""
         # This method might need to be deprecated or re-evaluated based on usage.
         # For now, it signals that paths are not how hrönirs are accessed.
-        print(f"Warning: get_hrönir_path for {content_uuid} called. Hrönirs are stored in DB, file paths are not directly applicable.")
+        print(
+            f"Warning: get_hrönir_path for {content_uuid} called. Hrönirs are stored in DB, file paths are not directly applicable."
+        )
         return None
 
     def hrönir_exists(self, content_uuid: str) -> bool:
@@ -310,7 +312,7 @@ def get_canonical_path_info(position: int, canonical_path_file: Path) -> dict[st
     """
     Retrieves path_uuid and hrönir_uuid for a given position from the canonical_path.json file.
     """
-    import json # Moved import here to be self-contained
+    import json  # Moved import here to be self-contained
     # import logging # Not using logging in this simple utility for now
 
     if not canonical_path_file.exists():
@@ -328,9 +330,10 @@ def get_canonical_path_info(position: int, canonical_path_file: Path) -> dict[st
             }
         # logging.debug(f"No canonical entry found for position {position} in {canonical_path_file}")
         return None
-    except (OSError, json.JSONDecodeError): #  Removed "as e" as e is not used
+    except (OSError, json.JSONDecodeError):  #  Removed "as e" as e is not used
         # logging.error(f"Error reading or parsing canonical path file {canonical_path_file}: {e}")
         return None
+
 
 def store_chapter_text(text: str, base: Path | str = "the_library") -> str:
     """Store chapter text - compatibility wrapper."""

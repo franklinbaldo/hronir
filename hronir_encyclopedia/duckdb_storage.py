@@ -1,12 +1,10 @@
+import datetime  # Added for Optional[datetime] type hint
 import json
 import logging  # Added to fix Ruff F821
 from pathlib import Path
 
 import duckdb
 from pydantic import ValidationError
-
-import datetime # Added for Optional[datetime] type hint
-from typing import Optional # Added for Optional type hint
 
 from .models import Path as PathModel
 from .models import Transaction, Vote
@@ -74,7 +72,7 @@ class DuckDBDataManager:
             );
             """
         )
-        self.conn.execute( # Add hronirs table creation
+        self.conn.execute(  # Add hronirs table creation
             """
             CREATE TABLE IF NOT EXISTS hronirs (
                 uuid VARCHAR PRIMARY KEY,
@@ -324,8 +322,8 @@ class DuckDBDataManager:
         self,
         hronir_uuid: str,
         content: str,
-        created_at: Optional[datetime.datetime] = None,
-        metadata: Optional[dict] = None,
+        created_at: datetime.datetime | None = None,
+        metadata: dict | None = None,
     ) -> None:
         """Adds a hrönir's content to the hronirs table."""
         if created_at is None:

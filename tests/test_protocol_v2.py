@@ -83,7 +83,9 @@ class TestProtocolV2(unittest.TestCase):
 
         self.original_dm_fork_csv_dir = storage.data_manager.fork_csv_dir
         self.original_dm_ratings_csv_dir = storage.data_manager.ratings_csv_dir
-        self.original_dm_transactions_json_dir = storage.data_manager.transactions_json_dir # Keep for restoration if needed by other modules
+        self.original_dm_transactions_json_dir = (
+            storage.data_manager.transactions_json_dir
+        )  # Keep for restoration if needed by other modules
 
         # DataManager will now use DuckDB by default, configured by conftest.py's HRONIR_DUCKDB_PATH.
         # The specific CSV dirs (fork_csv_dir, ratings_csv_dir) are less relevant for direct DataManager manipulation here,
@@ -92,9 +94,11 @@ class TestProtocolV2(unittest.TestCase):
         # Legacy HRONIR_LIBRARY_DIR might still be picked up by storage.py for the self.library_path if we don't clear it.
         # For these tests, we want store_hrönir to use the DB, so self.library_path in DataManager should ideally not be used for primary storage.
 
-        os.environ["HRONIR_LIBRARY_DIR"] = str(self.library_path) # store_chapter_text in _create_dummy_chapter uses this
-                                                                  # DataManager.store_hrönir uses self.library_path if saving MD files,
-                                                                  # but now it saves to DB. The physical library_path is for loading content.
+        os.environ["HRONIR_LIBRARY_DIR"] = str(
+            self.library_path
+        )  # store_chapter_text in _create_dummy_chapter uses this
+        # DataManager.store_hrönir uses self.library_path if saving MD files,
+        # but now it saves to DB. The physical library_path is for loading content.
 
         # Clear any specific CSV path settings on DataManager instance if they were set by old code or other tests.
         # Defaults will be used by DuckDBDataManager for initial load if its DB is empty.
@@ -109,7 +113,9 @@ class TestProtocolV2(unittest.TestCase):
 
         # transaction_manager and session_manager might still use file paths for now.
         # TODO: Update these managers to use DataManager for their persistence.
-        transaction_manager.TRANSACTIONS_DIR = self.transactions_dir # This will be unused if TM uses DB
+        transaction_manager.TRANSACTIONS_DIR = (
+            self.transactions_dir
+        )  # This will be unused if TM uses DB
         transaction_manager.HEAD_FILE = self.transactions_dir / "HEAD"
         session_manager.SESSIONS_DIR = self.sessions_dir
         session_manager.CONSUMED_PATHS_FILE = self.sessions_dir / "consumed_fork_uuids.json"
@@ -135,14 +141,16 @@ class TestProtocolV2(unittest.TestCase):
             os.environ["HRONIR_LIBRARY_DIR"] = self.original_env_library_dir
 
         if self.original_env_narrative_paths_dir is None:
-            if "HRONIR_NARRATIVE_PATHS_DIR" in os.environ: del os.environ["HRONIR_NARRATIVE_PATHS_DIR"]
+            if "HRONIR_NARRATIVE_PATHS_DIR" in os.environ:
+                del os.environ["HRONIR_NARRATIVE_PATHS_DIR"]
         else:
             os.environ["HRONIR_NARRATIVE_PATHS_DIR"] = self.original_env_narrative_paths_dir
 
         if self.original_env_ratings_dir is None:
-            if "HRONIR_RATINGS_DIR" in os.environ: del os.environ["HRONIR_RATINGS_DIR"] # Restored
+            if "HRONIR_RATINGS_DIR" in os.environ:
+                del os.environ["HRONIR_RATINGS_DIR"]  # Restored
         else:
-            os.environ["HRONIR_RATINGS_DIR"] = self.original_env_ratings_dir # Restored
+            os.environ["HRONIR_RATINGS_DIR"] = self.original_env_ratings_dir  # Restored
 
         # HRONIR_USE_DUCKDB is no longer used by DataManager directly.
         # The conftest.py fixture handles setting up DuckDB for tests.
@@ -154,7 +162,6 @@ class TestProtocolV2(unittest.TestCase):
         elif "HRONIR_USE_DUCKDB" in os.environ:
             del os.environ["HRONIR_USE_DUCKDB"]
 
-
         # DataManager's paths are now primarily controlled by its internal DuckDB path,
         # set by conftest.py. Resetting library_path from env is okay if some
         # legacy file operations in tests still depend on it.
@@ -164,7 +171,9 @@ class TestProtocolV2(unittest.TestCase):
         # and these are only for initial load from CSV.
         # storage.data_manager.fork_csv_dir = self.original_dm_fork_csv_dir
         # storage.data_manager.ratings_csv_dir = self.original_dm_ratings_csv_dir
-        storage.data_manager.transactions_json_dir = self.original_dm_transactions_json_dir # This might be read by other modules
+        storage.data_manager.transactions_json_dir = (
+            self.original_dm_transactions_json_dir
+        )  # This might be read by other modules
 
     def _create_fork_entry(
         self, position: int, prev_uuid_str: str | None, current_hrönir_uuid: str
@@ -186,7 +195,7 @@ class TestProtocolV2(unittest.TestCase):
             status="PENDING",
         )
         storage.data_manager.add_path(path_model)
-        storage.data_manager.save_all_data() # Ensure path is committed to DB
+        storage.data_manager.save_all_data()  # Ensure path is committed to DB
         return str(path_uuid_obj)
 
     def test_sybil_resistance(self):
@@ -238,13 +247,19 @@ class TestProtocolV2(unittest.TestCase):
             # We expect a non-zero exit code and the error message to be present in either stdout or stderr.
             error_message_found = False
             # Based on cli.py output: f"Error: Path '{path_uuid_str}' not QUALIFIED (status: '{path_data_obj.status}')"
-            expected_error_substring_status = "not QUALIFIED" # Adjusted to new wording
-            expected_error_substring_used = "already been used" # For other potential failures
+            expected_error_substring_status = "not QUALIFIED"  # Adjusted to new wording
+            expected_error_substring_used = "already been used"  # For other potential failures
 
-            if result.stdout and (expected_error_substring_status in result.stdout or expected_error_substring_used in result.stdout):
+            if result.stdout and (
+                expected_error_substring_status in result.stdout
+                or expected_error_substring_used in result.stdout
+            ):
                 error_message_found = True
 
-            if result.stderr and (expected_error_substring_status in result.stderr or expected_error_substring_used in result.stderr):
+            if result.stderr and (
+                expected_error_substring_status in result.stderr
+                or expected_error_substring_used in result.stderr
+            ):
                 error_message_found = True
 
             if not error_message_found:
@@ -352,7 +367,9 @@ class TestProtocolV2(unittest.TestCase):
             is_valid_uuid = True
         except ValueError:
             is_valid_uuid = False
-        self.assertTrue(is_valid_uuid, f"Generated mandate_id '{generated_mandate_id}' is not a valid UUID.")
+        self.assertTrue(
+            is_valid_uuid, f"Generated mandate_id '{generated_mandate_id}' is not a valid UUID."
+        )
 
         promotions = tx_result_data.get("promotions_granted", [])
         found_promotion_in_tx = False
@@ -420,7 +437,7 @@ class TestProtocolV2(unittest.TestCase):
         # _get_head_transaction_uuid will need to be updated if transactions are in DB
         # For now, assume transaction_manager still writes HEAD file, or this check is adapted/removed.
         # If transaction_manager is updated to use DataManager, this check changes.
-        if (self.transactions_dir / "HEAD").exists(): # Conditional check
+        if (self.transactions_dir / "HEAD").exists():  # Conditional check
             self.assertEqual(
                 _get_head_transaction_uuid(self.transactions_dir),
                 qualifying_tx_data["transaction_uuid"],
@@ -445,7 +462,7 @@ class TestProtocolV2(unittest.TestCase):
         )
         self._create_fork_entry(position=0, prev_uuid_str=None, current_hrönir_uuid=p0_duel_chB)
 
-        storage.data_manager.save_all_data_to_csvs()  # Save after creating duel options
+        storage.data_manager.save_all_data()  # Save after creating duel options
 
         self.canonical_path_file.write_text(
             json.dumps({"title": "Test Canonical Path", "path": {}})
@@ -481,7 +498,7 @@ class TestProtocolV2(unittest.TestCase):
         #     duel_at_0 = dossier_duels["0"]
         #     # Access attributes directly on the Pydantic model instance
         #     verdicts_for_commit["0"] = str(duel_at_0.path_A_uuid) if duel_at_0 else None
-        verdicts_for_commit_str = "{}" # Force empty verdicts to test that path
+        verdicts_for_commit_str = "{}"  # Force empty verdicts to test that path
 
         commit_result = self.runner.invoke(
             cli.app,
@@ -491,16 +508,18 @@ class TestProtocolV2(unittest.TestCase):
                 "--session-id",
                 session_id_spent,
                 "--verdicts",
-                verdicts_for_commit_str, # Pass empty JSON object
+                verdicts_for_commit_str,  # Pass empty JSON object
                 # --forking-path-dir and --ratings-dir are not params of session commit
                 "--canonical-path-file",
                 str(self.canonical_path_file),
             ],
         )
-        print(f"DEBUG STDOUT: {commit_result.stdout}") # Print stdout directly
-        print(f"DEBUG STDERR: {commit_result.stderr}") # Print stderr directly
+        print(f"DEBUG STDOUT: {commit_result.stdout}")  # Print stdout directly
+        print(f"DEBUG STDERR: {commit_result.stderr}")  # Print stderr directly
         self.assertEqual(
-            commit_result.exit_code, 0, f"Session commit failed: {commit_result.stdout}\nStderr: {commit_result.stderr}"
+            commit_result.exit_code,
+            0,
+            f"Session commit failed: {commit_result.stdout}\nStderr: {commit_result.stderr}",
         )
 
         # CLI's session commit interacts with DataManager (which uses DuckDB).
@@ -544,7 +563,7 @@ class TestProtocolV2(unittest.TestCase):
         # It might also be caught by "is_path_consumed" check if commit also marks consumed.
         self.assertTrue(
             "not QUALIFIED" in second_start_result.stdout  # Simpler check for the primary error
-            or "already been used" in second_start_result.stdout, # Check for consumption message
+            or "already been used" in second_start_result.stdout,  # Check for consumption message
             f"Second session start output unexpected: {second_start_result.stdout}",
         )
 
@@ -678,7 +697,9 @@ class TestProtocolV2(unittest.TestCase):
             ],
         )
         self.assertEqual(
-            commit_res.exit_code, 0, f"Session commit for cascade test failed: {commit_res.stdout}\nStderr: {commit_res.stderr}"
+            commit_res.exit_code,
+            0,
+            f"Session commit for cascade test failed: {commit_res.stdout}\nStderr: {commit_res.stderr}",
         )
 
         # CLI session commit updated data in DuckDB. DataManager instance is shared.
