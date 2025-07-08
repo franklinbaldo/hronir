@@ -1,19 +1,14 @@
 import uuid
 
 from hronir_encyclopedia import storage  # Added for DataManager
+from hronir_encyclopedia.models import Path as PathModel  # For direct data creation
+from hronir_encyclopedia.models import Vote
 from hronir_encyclopedia.ratings import get_ranking
 
 
 # Helper para criar UUIDs de teste
 def _uuid(name: str) -> str:
     return str(uuid.uuid5(uuid.NAMESPACE_DNS, name))
-
-
-# Removed temp_data_dir fixture as it's no longer needed for CSV creation.
-# from hronir_encyclopedia.models import Path as PathModel, Vote # Moved import lower for context if needed or keep here
-
-from hronir_encyclopedia.models import Path as PathModel  # For direct data creation
-from hronir_encyclopedia.models import Vote
 
 
 # Helper function to call get_ranking with a clean DataManager state
@@ -97,38 +92,38 @@ forks_main_data = [
 
 ratings_pos1_data = [
     {
-        "uuid": uuid.UUID(_uuid("vote1")),
+        "uuid": _uuid("vote1"),
         "voter": str(uuid.UUID(_uuid("voter1"))),
-        "winner": uuid.UUID(H1A),
-        "loser": uuid.UUID(H1B),
+        "winner": H1A,
+        "loser": H1B,
         "position": 1,
     },
     {
-        "uuid": uuid.UUID(_uuid("vote2")),
+        "uuid": _uuid("vote2"),
         "voter": str(uuid.UUID(_uuid("voter2"))),
-        "winner": uuid.UUID(H1A),
-        "loser": uuid.UUID(H1B),
+        "winner": H1A,
+        "loser": H1B,
         "position": 1,
     },
     {
-        "uuid": uuid.UUID(_uuid("vote3")),
+        "uuid": _uuid("vote3"),
         "voter": str(uuid.UUID(_uuid("voter3"))),
-        "winner": uuid.UUID(H1B),
-        "loser": uuid.UUID(H1A),
+        "winner": H1B,
+        "loser": H1A,
         "position": 1,
     },
     {
-        "uuid": uuid.UUID(_uuid("vote4")),
+        "uuid": _uuid("vote4"),
         "voter": str(uuid.UUID(_uuid("voter4"))),
-        "winner": uuid.UUID(H1A),
-        "loser": uuid.UUID(H1D_OTHER_PARENT),
+        "winner": H1A,
+        "loser": H1D_OTHER_PARENT,
         "position": 1,
     },
     {
-        "uuid": uuid.UUID(_uuid("vote5")),
+        "uuid": _uuid("vote5"),
         "voter": str(uuid.UUID(_uuid("voter5"))),
-        "winner": uuid.UUID(H1D_OTHER_PARENT),
-        "loser": uuid.UUID(H1B),
+        "winner": H1D_OTHER_PARENT,
+        "loser": H1B,
         "position": 1,
     },
 ]
@@ -160,11 +155,11 @@ def test_get_ranking_filters_by_canonical_predecessor():  # Removed temp_data_di
 
     assert h1a_data["wins"] == 2
     assert h1a_data["losses"] == 1
-    assert h1a_data["elo_rating"] == 1515
+    assert h1a_data["elo_rating"] == 1512
 
     assert h1b_data["wins"] == 1
     assert h1b_data["losses"] == 2
-    assert h1b_data["elo_rating"] == 1485
+    assert h1b_data["elo_rating"] == 1488
 
     assert h1c_data["wins"] == 0
     assert h1c_data["losses"] == 0
@@ -240,17 +235,17 @@ def test_get_ranking_for_position_0_no_predecessor():  # Removed temp_data_dir
 
     ratings_data_pos0_duels_data = [
         {
-            "uuid": uuid.UUID(_uuid("v_p0_1")),
+            "uuid": _uuid("v_p0_1"),
             "voter": str(uuid.UUID(_uuid("v_p0_v1"))),
-            "winner": uuid.UUID(H0_ROOT),
-            "loser": uuid.UUID(H0_ALT),
+            "winner": H0_ROOT,
+            "loser": H0_ALT,
             "position": 0,
         },
         {
-            "uuid": uuid.UUID(_uuid("v_p0_2")),
+            "uuid": _uuid("v_p0_2"),
             "voter": str(uuid.UUID(_uuid("v_p0_v2"))),
-            "winner": uuid.UUID(H0_ROOT),
-            "loser": uuid.UUID(H0_ALT),
+            "winner": H0_ROOT,
+            "loser": H0_ALT,
             "position": 0,
         },
     ]

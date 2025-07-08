@@ -101,9 +101,6 @@ def run_temporal_cascade(
                             f"Could not find path data for winning_path_uuid {winning_path_uuid} at pos {pos_str}."
                         )
 
-                sorted_voted_positions = sorted(
-                    [int(p) for p in committed_verdicts.keys()] + list(map(int, path_map.keys()))
-                )
                 min_affected_pos = 0
                 if committed_verdicts:
                     min_affected_pos = (
@@ -614,7 +611,7 @@ def session_commit(
         try:
             position_idx = int(pos_str)
             assert position_idx >= 0
-        except:
+        except (ValueError, AssertionError):
             typer.echo(f"Warning: Invalid pos key '{pos_str}'. Skipping.")
             continue
         duel_model_for_pos = dossier_duels_models.get(pos_str)

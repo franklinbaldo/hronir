@@ -331,7 +331,6 @@ class TestProtocolV2(unittest.TestCase):
                 }
             )
 
-        last_tx_hash_before_qualifying_tx = ""
 
         # Ensure all paths created by _create_fork_entry are saved before record_transaction
         storage.data_manager.save_all_data()
@@ -489,11 +488,6 @@ class TestProtocolV2(unittest.TestCase):
 
         session_data_for_commit = session_manager.get_session(session_id_spent)
         self.assertIsNotNone(session_data_for_commit, "Session data should not be None for commit.")
-        dossier_duels = {}
-        if session_data_for_commit and session_data_for_commit.dossier:
-            dossier_duels = session_data_for_commit.dossier.duels
-
-        verdicts_for_commit = {}
         # if "0" in dossier_duels:
         #     duel_at_0 = dossier_duels["0"]
         #     # Access attributes directly on the Pydantic model instance

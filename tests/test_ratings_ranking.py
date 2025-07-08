@@ -78,24 +78,24 @@ def test_get_ranking():  # Removed tmp_path
     # Vote data (voter is path_uuid of the voting path, winner/loser are hrönir_uuids)
     votes_data_list = [
         {
-            "uuid": uuid.uuid5(uuid.NAMESPACE_DNS, "vote1"),
+            "uuid": str(uuid.uuid5(uuid.NAMESPACE_DNS, "vote1")),
             "voter": str(uuid.uuid5(uuid.NAMESPACE_DNS, "voter-path-1")),
-            "winner": uuid.uuid5(uuid.NAMESPACE_DNS, UUID_A),
-            "loser": uuid.uuid5(uuid.NAMESPACE_DNS, UUID_B),
+            "winner": str(uuid.uuid5(uuid.NAMESPACE_DNS, UUID_A)),
+            "loser": str(uuid.uuid5(uuid.NAMESPACE_DNS, UUID_B)),
             "position": 1,
         },
         {
-            "uuid": uuid.uuid5(uuid.NAMESPACE_DNS, "vote2"),
+            "uuid": str(uuid.uuid5(uuid.NAMESPACE_DNS, "vote2")),
             "voter": str(uuid.uuid5(uuid.NAMESPACE_DNS, "voter-path-2")),
-            "winner": uuid.uuid5(uuid.NAMESPACE_DNS, UUID_A),
-            "loser": uuid.uuid5(uuid.NAMESPACE_DNS, UUID_C),
+            "winner": str(uuid.uuid5(uuid.NAMESPACE_DNS, UUID_A)),
+            "loser": str(uuid.uuid5(uuid.NAMESPACE_DNS, UUID_C)),
             "position": 1,
         },
         {
-            "uuid": uuid.uuid5(uuid.NAMESPACE_DNS, "vote3"),
+            "uuid": str(uuid.uuid5(uuid.NAMESPACE_DNS, "vote3")),
             "voter": str(uuid.uuid5(uuid.NAMESPACE_DNS, "voter-path-3")),
-            "winner": uuid.uuid5(uuid.NAMESPACE_DNS, UUID_B),
-            "loser": uuid.uuid5(uuid.NAMESPACE_DNS, UUID_A),
+            "winner": str(uuid.uuid5(uuid.NAMESPACE_DNS, UUID_B)),
+            "loser": str(uuid.uuid5(uuid.NAMESPACE_DNS, UUID_A)),
             "position": 1,
         },
     ]
