@@ -233,6 +233,13 @@ def test_environment(monkeypatch):
     original_tx_dir = storage.data_manager.transactions_json_dir
     original_initialized = storage.data_manager._initialized
 
+    # Set global paths for session_manager and transaction_manager
+    session_manager.SESSIONS_DIR = resolved_test_root / "data" / "sessions"
+    session_manager.CONSUMED_PATHS_FILE = session_manager.SESSIONS_DIR / "consumed_path_uuids.json"
+    transaction_manager.TRANSACTIONS_DIR = resolved_test_root / "data" / "transactions"
+    transaction_manager.HEAD_FILE = transaction_manager.TRANSACTIONS_DIR / "HEAD"
+
+
     storage.data_manager.fork_csv_dir = Path("narrative_paths")
     storage.data_manager.ratings_csv_dir = Path("ratings")
     storage.data_manager.transactions_json_dir = Path("data") / "transactions"
@@ -248,6 +255,13 @@ def test_environment(monkeypatch):
     storage.data_manager.ratings_csv_dir = original_ratings_dir
     storage.data_manager.transactions_json_dir = original_tx_dir
     storage.data_manager._initialized = original_initialized
+
+    # Restore global paths for session_manager and transaction_manager
+    session_manager.SESSIONS_DIR = SESSIONS_DIR_fixture_abs
+    session_manager.CONSUMED_PATHS_FILE = session_manager.SESSIONS_DIR / "consumed_path_uuids.json"
+    transaction_manager.TRANSACTIONS_DIR = TRANSACTIONS_DIR_fixture_abs
+    transaction_manager.HEAD_FILE = transaction_manager.TRANSACTIONS_DIR / "HEAD"
+
 
     if storage.data_manager._initialized:
         storage.data_manager.clear_in_memory_data()

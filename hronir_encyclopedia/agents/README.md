@@ -43,7 +43,7 @@ export GEMINI_API_KEY="your-api-key-here"
 # Check system status
 uv run hronir agent status
 
-# Generate a single chapter
+# Generate a single chapter (position >= 1)
 uv run hronir agent test-writer
 
 # Generate with specific theme
@@ -55,6 +55,10 @@ uv run hronir agent test-writer --position 1 --predecessor-uuid <uuid>
 # Run competitive session
 uv run hronir agent competitive-session --num-agents 3
 ```
+
+### Important Protocol Restriction
+
+**Position 0 is reserved for Tlön/Borges foundational content** and cannot be modified by AI agents. All AI-generated content must use position 1 or higher. This preserves the integrity of the original Borgesian foundation while allowing autonomous expansion.
 
 ## Agent Types
 

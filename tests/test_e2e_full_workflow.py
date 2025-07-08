@@ -80,7 +80,7 @@ def _qualify_path(path_to_qualify_uuid_str: str, hr_to_qualify_uuid_str: str, po
             }
         ]
         # Generate a dummy initiating path_uuid for the transaction
-        dummy_initiator_path_uuid = str(uuid.uuid4()) # Use v4 for simplicity here
+        dummy_initiator_path_uuid = _create_path_entry(0, None, _create_hronir(f"initiator_content_{i}_{path_to_qualify_uuid_str}"))
 
         tx_result = transaction_manager.record_transaction(
             session_id=str(uuid.uuid4()),

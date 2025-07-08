@@ -35,6 +35,14 @@ class ChapterWriterAgent(BaseHronirAgent):
         theme = task_data.get("theme", "continuation")
         target_audience = task_data.get("target_audience", "general")
         
+        # Protocol validation: Position 0 is reserved for Tlön/Borges foundational content
+        if position == 0:
+            raise ValueError(
+                "Position 0 is reserved for the foundational Tlön/Borges content. "
+                "AI agents cannot create content for position 0. "
+                "Please use position 1 or higher for new content generation."
+            )
+        
         # Get narrative context
         context = self.get_narrative_context(position, predecessor_uuid)
         

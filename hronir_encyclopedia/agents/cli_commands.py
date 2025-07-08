@@ -24,12 +24,19 @@ agent_app = typer.Typer(help="AI agent management commands")
 
 @agent_app.command("test-writer")
 def test_chapter_writer(
-    position: int = typer.Option(0, help="Position for the new chapter"),
+    position: int = typer.Option(1, help="Position for the new chapter (must be >= 1, position 0 reserved for Tlön)"),
     predecessor_uuid: Optional[str] = typer.Option(None, help="UUID of predecessor hrönir"),
     theme: str = typer.Option("continuation", help="Theme for the chapter"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output")
 ):
     """Test the Chapter Writer agent."""
+    
+    # Validate position
+    if position == 0:
+        console.print(f"[bold red]Error: Position 0 is reserved for Tlön/Borges foundational content[/bold red]")
+        console.print(f"[yellow]Position 0 contains the original Borges short story and cannot be modified by AI agents.[/yellow]")
+        console.print(f"[cyan]Please use position 1 or higher for new content generation.[/cyan]")
+        raise typer.Exit(1)
     
     console.print(f"[bold blue]Testing Chapter Writer Agent[/bold blue]")
     console.print(f"Position: {position}")
@@ -205,12 +212,19 @@ def test_crew_system(
 
 @agent_app.command("competitive-session")
 def run_competitive_session(
-    position: int = typer.Option(0, help="Position for the competitive session"),
+    position: int = typer.Option(1, help="Position for the competitive session (must be >= 1, position 0 reserved for Tlön)"),
     predecessor_uuid: Optional[str] = typer.Option(None, help="UUID of predecessor hrönir"),
     num_agents: int = typer.Option(3, help="Number of competing agents"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output")
 ):
     """Run a competitive session between multiple AI agents."""
+    
+    # Validate position
+    if position == 0:
+        console.print(f"[bold red]Error: Position 0 is reserved for Tlön/Borges foundational content[/bold red]")
+        console.print(f"[yellow]Competitive sessions cannot modify position 0 content.[/yellow]")
+        console.print(f"[cyan]Please use position 1 or higher for competitive sessions.[/cyan]")
+        raise typer.Exit(1)
     
     console.print(f"[bold blue]Running Competitive Session[/bold blue]")
     console.print(f"Position: {position}")
@@ -337,7 +351,11 @@ def agent_status():
         console.print(f"[yellow]⚠ CrewAI: Not installed[/yellow]")
     
     console.print(f"\n[bold]Available Commands:[/bold]")
-    console.print(f"• test-writer: Test chapter generation")
+    console.print(f"• test-writer: Test chapter generation (position >= 1)")
     console.print(f"• test-judge: Test judgment capabilities")
     console.print(f"• test-crew: Test CrewAI integration")
-    console.print(f"• competitive-session: Run agent competition")
+    console.print(f"• competitive-session: Run agent competition (position >= 1)")
+    
+    console.print(f"\n[bold yellow]Protocol Note:[/bold yellow]")
+    console.print(f"Position 0 is reserved for Tlön/Borges foundational content.")
+    console.print(f"AI agents can only create content for positions 1 and higher.")
