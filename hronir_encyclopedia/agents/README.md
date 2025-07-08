@@ -84,7 +84,7 @@ config = AgentConfig(
 
 agent = ChapterWriterAgent(config)
 result = agent.execute_task({
-    "position": 0,
+    "position": 1,  # Position >= 1 (position 0 reserved for Tlön)
     "theme": "infinite_library",
     "predecessor_uuid": None
 })
@@ -160,7 +160,7 @@ Run multiple agents in competition:
 
 ```python
 # Via CLI
-uv run hronir agent competitive-session --position 0 --num-agents 3
+uv run hronir agent competitive-session --position 1 --num-agents 3
 
 # Via Python
 from hronir_encyclopedia.agents import ChapterWriterAgent, AgentConfig
@@ -176,11 +176,11 @@ for i in range(3):
     )
     writers.append(ChapterWriterAgent(config))
 
-# Generate competing chapters
+# Generate competing chapters (position >= 1)
 chapters = []
 for writer in writers:
     result = writer.generate_competitive_chapter(
-        position=0,
+        position=1,  # Position >= 1 (position 0 reserved for Tlön)
         predecessor_uuid=None,
         opponent_strategy="unknown"
     )
@@ -193,9 +193,9 @@ Generate multiple chapters efficiently:
 
 ```python
 requests = [
-    {"position": 0, "theme": "foundation"},
-    {"position": 1, "theme": "expansion"},
-    {"position": 2, "theme": "culmination"}
+    {"position": 1, "theme": "foundation"},  # Position >= 1 (position 0 reserved)
+    {"position": 2, "theme": "expansion"},
+    {"position": 3, "theme": "culmination"}
 ]
 
 results = agent.batch_generate_chapters(requests)

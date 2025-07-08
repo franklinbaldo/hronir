@@ -133,13 +133,14 @@ class ChapterWriterAgent(BaseHronirAgent):
         # For now, return a strategic theme based on position
         
         strategic_themes = {
-            0: "foundational_mystery",
-            1: "philosophical_deepening", 
+            1: "philosophical_deepening",  # Position 0 reserved for Tlön
             2: "narrative_expansion",
-            3: "metaphysical_culmination"
+            3: "metaphysical_culmination",
+            4: "temporal_recursion"
         }
         
-        return strategic_themes.get(position % 4, "continuation")
+        # Use position-based theme, with fallback for higher positions
+        return strategic_themes.get(position, strategic_themes.get((position - 1) % 4 + 1, "continuation"))
         
     def batch_generate_chapters(self, requests: list[Dict[str, Any]]) -> list[Dict[str, Any]]:
         """Generate multiple chapters efficiently."""

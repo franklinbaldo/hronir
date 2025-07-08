@@ -150,12 +150,19 @@ def test_judge_agent(
 
 @agent_app.command("test-crew")
 def test_crew_system(
-    position: int = typer.Option(0, help="Position for the task"),
+    position: int = typer.Option(1, help="Position for the task (must be >= 1, position 0 reserved for Tlön)"),
     predecessor_uuid: Optional[str] = typer.Option(None, help="UUID of predecessor hrönir"),
     num_chapters: int = typer.Option(2, help="Number of chapters to generate"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output")
 ):
     """Test the CrewAI integration."""
+    
+    # Validate position
+    if position == 0:
+        console.print(f"[bold red]Error: Position 0 is reserved for Tlön/Borges foundational content[/bold red]")
+        console.print(f"[yellow]CrewAI testing cannot use position 0.[/yellow]")
+        console.print(f"[cyan]Please use position 1 or higher for crew testing.[/cyan]")
+        raise typer.Exit(1)
     
     console.print(f"[bold blue]Testing CrewAI Integration[/bold blue]")
     console.print(f"Position: {position}")
