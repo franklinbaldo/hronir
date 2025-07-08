@@ -35,6 +35,14 @@ app = typer.Typer(
 session_app = typer.Typer(help="Manage Hrönir judgment sessions.", no_args_is_help=True)
 app.add_typer(session_app, name="session")
 
+# Add AI agents commands
+try:
+    from .agents.cli_commands import agent_app
+    app.add_typer(agent_app, name="agent")
+except ImportError as e:
+    # Agents module not available
+    pass
+
 
 def run_temporal_cascade(
     canonical_path_file: Path,
@@ -374,15 +382,15 @@ def _validate_path_inputs_helper(
     if not target:
         secho("Error: Target hrönir UUID required.", fg=typer.colors.RED)
         raise typer.Exit(1)
-    if not (library_dir / f"{target}.md").exists():
-        secho(f"Error: Target hrönir '{target}' not in library.", fg=typer.colors.RED)
+    if not storage.DataManager().hrönir_exists(target):
+        secho(f"Error: Target hrönir '{target}' not found in the database.", fg=typer.colors.RED)
         raise typer.Exit(1)
     if position > 0:
         if not source:
             secho("Error: Source UUID required for position > 0.", fg=typer.colors.RED)
             raise typer.Exit(1)
-        if not (library_dir / f"{source}.md").exists():
-            secho(f"Error: Source hrönir '{source}' not in library.", fg=typer.colors.RED)
+        if not storage.DataManager().hrönir_exists(source):
+            secho(f"Error: Source hrönir '{source}' not found in the database.", fg=typer.colors.RED)
             raise typer.Exit(1)
         return source
     else:
@@ -414,7 +422,7 @@ def path(
             status="PENDING",
         )
     )
-    dm.save_all_data_to_csvs()
+    dm.save_all_data()
     typer.echo(
         f"Created path: {path_uuid_obj} (Pos: {position}, Src: {norm_source or 'None'}, Tgt: {target}, Status: PENDING)"
     )

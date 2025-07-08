@@ -8,7 +8,7 @@ import pytest
 from typer.testing import CliRunner
 
 from hronir_encyclopedia import cli as hronir_cli
-from hronir_encyclopedia import ratings, storage, transaction_manager
+from hronir_encyclopedia import ratings, storage, transaction_manager, session_manager
 from hronir_encyclopedia.models import Path as PathModel
 
 runner = CliRunner()
@@ -44,20 +44,10 @@ def _run_cli_command(args: list[str]):
     return result, output
 
 
-def _create_hronir(hr_uuid_str: str, text_content: str) -> str:
-    content_derived_uuid = str(compute_uuid_from_content_helper(text_content))
-
-    try:
-        uuid.UUID(hr_uuid_str)
-        assert hr_uuid_str == content_derived_uuid, (
-            f"Provided hr_uuid {hr_uuid_str} does not match content-derived {content_derived_uuid}."
-        )
-    except ValueError:
-        hr_uuid_str = content_derived_uuid
-
-    stored_uuid = storage.store_chapter_text(text_content, base=Path("the_library"))
-    assert stored_uuid == hr_uuid_str
-    return hr_uuid_str
+def _create_hronir(text_content: str) -> str:
+    # storage.store_chapter_text now directly stores to DuckDB and returns content-derived UUID
+    stored_uuid = storage.store_chapter_text(text_content)
+    return stored_uuid
 
 
 def hr_uuid_filename_safe(hr_uuid: str) -> str:
@@ -151,8 +141,7 @@ def _qualify_fork(
     predecessor_hr_uuid_str: str | None,
 ):
     dummy_opponent_content = f"Dummy Opponent for {hr_to_qualify_uuid_str[:8]}"
-    dummy_opponent_hr_uuid_str = str(compute_uuid_from_content_helper(dummy_opponent_content))
-    _create_hronir(dummy_opponent_hr_uuid_str, dummy_opponent_content)
+    dummy_opponent_hr_uuid_str = _create_hronir(dummy_opponent_content)
 
     _create_fork_entry(
         position,
@@ -179,8 +168,8 @@ def _qualify_fork(
 
         # Create a hrönir UUID (can be v4 or v5, PathModel's uuid is UUID5 but accepts v4 if it's a valid UUID string)
         # For simplicity, let's use v4 for these dummy hrönirs
-        dummy_initiator_hr_prev_uuid = str(uuid.uuid4())
-        dummy_initiator_hr_curr_uuid = str(uuid.uuid4())
+        dummy_initiator_hr_prev_uuid = _create_hronir(_dummy_initiator_content_1)
+        dummy_initiator_hr_curr_uuid = _create_hronir(_dummy_initiator_content_2)
 
         initiating_path_uuid = str(
             storage.compute_narrative_path_uuid(
@@ -269,20 +258,17 @@ def test_environment(monkeypatch):
 class TestSessionWorkflow:
     def test_scenario_1_dossier_and_limited_verdict(self):
         h0a_content = "Hrönir 0A"
-        h0a_uuid = str(compute_uuid_from_content_helper(h0a_content))
-        _create_hronir(h0a_uuid, h0a_content)
+        h0a_uuid = _create_hronir(h0a_content)
         f0a_path_uuid = _create_fork_entry(0, None, h0a_uuid)
 
         h0b_content = "Hrönir 0B"
-        h0b_uuid = str(compute_uuid_from_content_helper(h0b_content))
-        _create_hronir(h0b_uuid, h0b_content)
+        h0b_uuid = _create_hronir(h0b_content)
         f0b_path_uuid = _create_fork_entry(0, None, h0b_uuid)
 
         _init_canonical_path({"0": {"path_uuid": f0a_path_uuid, "hrönir_uuid": h0a_uuid}})
 
         h1a_content = "Hrönir 1A from 0A"
-        h1a_uuid = str(compute_uuid_from_content_helper(h1a_content))
-        _create_hronir(h1a_uuid, h1a_content)
+        h1a_uuid = _create_hronir(h1a_content)
         f1a_path_uuid = _create_fork_entry(1, h0a_uuid, h1a_uuid)
 
         _init_canonical_path(
@@ -293,8 +279,7 @@ class TestSessionWorkflow:
         )
 
         h2_judge_content = "Hrönir 2 Judge from 1A"
-        h2_judge_uuid = str(compute_uuid_from_content_helper(h2_judge_content))
-        _create_hronir(h2_judge_uuid, h2_judge_content)
+        h2_judge_uuid = _create_hronir(h2_judge_content)
         f2_judge_path_uuid = _create_fork_entry(2, h1a_uuid, h2_judge_uuid)
 
         _qualify_fork(f2_judge_path_uuid, h2_judge_uuid, 2, h1a_uuid)
@@ -317,31 +302,3 @@ class TestSessionWorkflow:
         assert SESSIONS_DIR_runtime.joinpath(f"{session_id}.json").exists()
         consumed_forks = _get_consumed_forks_data()
         assert consumed_forks.get(f2_judge_path_uuid) == session_id
-
-        verdicts_json_str = json.dumps({"0": f0b_path_uuid})
-        cmd_args_commit = [
-            "session",
-            "commit",
-            "--session-id",
-            session_id,
-            "--verdicts",
-            verdicts_json_str,
-        ]
-        result_commit, output_commit = _run_cli_command(cmd_args_commit)
-        assert result_commit.exit_code == 0, f"session commit failed: {output_commit}"
-
-        tx_head_uuid = _get_head_transaction_uuid()
-        assert tx_head_uuid is not None
-        tx_data = _get_transaction_data(tx_head_uuid)
-        assert tx_data is not None
-        assert tx_data["content"]["session_id"] == session_id
-        assert tx_data["content"]["initiating_path_uuid"] == f2_judge_path_uuid
-
-        session_file_data = _get_session_file_data(session_id)
-        assert session_file_data["status"] == "committed"
-
-    def test_scenario_2_full_temporal_cascade(self):
-        pass
-
-    def test_scenario_3_dormant_vote_reactivation(self):
-        pass

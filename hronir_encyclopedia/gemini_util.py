@@ -2,9 +2,6 @@ import os
 
 import google.generativeai as genai
 
-# import pandas as pd # No longer needed here
-from google.generativeai import types
-
 # from sqlalchemy.engine import Engine # No longer needed here
 from . import (
     ratings,
@@ -22,20 +19,19 @@ def _gemini_request(prompt: str) -> str:
     if not key:
         raise RuntimeError("GEMINI_API_KEY not set")
 
-    client = genai.Client(api_key=key)
-    contents = [types.Content(role="user", parts=[types.Part.from_text(text=prompt)])]
-    cfg = types.GenerateContentConfig(
-        safety_settings=[
-            types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"),
-            types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
-            types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_NONE"),
-            types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
-        ],
-        response_mime_type="text/plain",
-    )
-
-    chunks = client.models.generate_content_stream(model=MODEL_NAME, contents=contents, config=cfg)
-    return "".join(chunk.text for chunk in chunks)
+    genai.configure(api_key=key)
+    model = genai.GenerativeModel(MODEL_NAME)
+    
+    # Configure safety settings
+    safety_settings = [
+        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+    ]
+    
+    response = model.generate_content(prompt, safety_settings=safety_settings)
+    return response.text
 
 
 def generate_chapter(prompt: str, prev_uuid: str | None = None) -> str:
