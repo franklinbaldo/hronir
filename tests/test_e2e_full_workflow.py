@@ -24,8 +24,8 @@ def _create_hronir_and_store(content: str) -> str:
     temp_file_path = TEST_ROOT_E2E / f"temp_hronir_{uuid.uuid4()}.md"
     temp_file_path.write_text(content)
 
-    result, output = _run_cli_command(["store", str(temp_file_path)])
-    assert result.exit_code == 0, f"CLI store failed: {output}"
+    result, output = _run_cli_command(["store", "store", str(temp_file_path)]) # Corrected command
+    assert result.exit_code == 0, f"CLI store store failed: {output}" # Updated assertion message
     # The store command prints the UUID of the stored chapter
     stored_uuid = output.strip()
     temp_file_path.unlink() # Clean up temp file
@@ -34,7 +34,7 @@ def _create_hronir_and_store(content: str) -> str:
 def _create_path_entry(position: int, prev_hr_uuid_str: str | None, current_hr_uuid_str: str) -> str:
     """Creates a path entry via the CLI and returns its path_uuid."""
     args = [
-        "path",
+            "path", "path", # Corrected: "hronir path path ..."
         "--position", str(position),
         "--target", current_hr_uuid_str,
     ]
@@ -78,7 +78,7 @@ def _qualify_path(path_to_qualify_uuid_str: str, hr_to_qualify_uuid_str: str, po
             }
         ]
         # Generate a dummy initiating path_uuid for the transaction
-        dummy_initiator_path_uuid = _create_path_entry(0, None, _create_hronir(f"initiator_content_{i}_{path_to_qualify_uuid_str}"))
+        dummy_initiator_path_uuid = _create_path_entry(0, None, _create_hronir_and_store(f"initiator_content_{i}_{path_to_qualify_uuid_str}")) # Corrected Indentation
 
         tx_result = transaction_manager.record_transaction(
             session_id=str(uuid.uuid4()),
