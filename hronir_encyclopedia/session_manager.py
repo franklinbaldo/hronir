@@ -5,10 +5,8 @@ from pathlib import Path
 
 from pydantic import ValidationError  # For parsing errors
 
-from . import ratings, storage
-
-# Import the new Pydantic models
-from .models import Session, SessionDossier, SessionDuel
+from . import ratings, storage, canon # Added canon
+from .models import Session, SessionDossier, SessionDuel # Import the new Pydantic models
 
 SESSIONS_DIR = Path("data/sessions")
 # CONSUMED_PATHS_FILE instead of CONSUMED_FORKS_FILE for clarity
@@ -53,7 +51,8 @@ def create_session(
     path_n_uuid_str: str,
     position_n: int,
     mandate_id_str: str,
-    canonical_path_file: Path,
+    # canonical_path_file: Path, # To be removed, use DB-derived canonical info
+    dm: storage.DataManager, # Pass DataManager
 ) -> Session:
     """
     Creates a new session, generates a dossier using Pydantic models,
@@ -77,21 +76,21 @@ def create_session(
     for p_idx in range(position_n - 1, -1, -1):
         predecessor_hronir_uuid_for_duel_str: str | None = None
         if p_idx > 0:
-            canonical_info_for_predecessor = storage.get_canonical_path_info(
-                p_idx - 1, canonical_path_file
+            # Use the new canon module function to get predecessor from DB
+            # dm is already passed into create_session
+            predecessor_hronir_uuid_for_duel_str = canon.get_canonical_hronir_uuid_for_position(
+                dm, p_idx - 1
             )
-            if (
-                not canonical_info_for_predecessor
-                or "hrönir_uuid" not in canonical_info_for_predecessor
-            ):
-                print(
-                    f"Warning: SessionManager: Cannot find canonical hrönir at position {p_idx - 1} to serve as predecessor for duels at {p_idx}. Skipping duels for {p_idx}."
-                )
+            if not predecessor_hronir_uuid_for_duel_str:
+                # print( # Removed print to avoid interfering with JSON output in CLI tests
+                #     f"Warning: SessionManager: Cannot find canonical hrönir (via DB) at position {p_idx - 1} to serve as predecessor for duels at {p_idx}. Skipping duels for {p_idx}."
+                # )
                 continue
-            predecessor_hronir_uuid_for_duel_str = canonical_info_for_predecessor["hrönir_uuid"]
+        # else: predecessor_hronir_uuid_for_duel_str remains None for p_idx == 0
 
         # ratings.determine_next_duel_entropy currently instantiates its own DataManager,
-        # which handles its own database connections if using DuckDB.
+        # which handles its own database connections if using DuckDB. This should be refactored later
+        # to accept a DataManager instance (Action 1.3). For now, the call remains.
         # Therefore, we don't need to pass a session/connection object here.
         duel_info_dict = ratings.determine_next_duel_entropy(
             position=p_idx,

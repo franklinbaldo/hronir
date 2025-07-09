@@ -2,11 +2,19 @@ import datetime
 import pathlib
 import uuid
 from typing import Any
+from enum import Enum # Added Enum
 
 from pydantic import UUID5, BaseModel, Field, field_validator
 
 # --- Type Aliases ---
 MandateID = uuid.UUID
+
+# --- Enums ---
+class PathStatus(str, Enum):
+    PENDING = "PENDING"
+    QUALIFIED = "QUALIFIED"
+    SPENT = "SPENT"
+    INVALID = "INVALID" # Added for completeness, though not used everywhere yet
 
 # --- Base Models ---
 
@@ -24,7 +32,7 @@ class Path(BaseModel):
     position: int
     prev_uuid: UUID5 | None = None
     uuid: UUID5
-    status: str = "PENDING"
+    status: PathStatus = PathStatus.PENDING # Changed to PathStatus Enum
     mandate_id: MandateID | None = None
 
 

@@ -7,7 +7,7 @@ from typing import Annotated
 import pandas as pd
 import typer
 
-from .. import cli_utils # Relative import for validate_path_inputs_helper
+from .. import utils # Changed from cli_utils
 from .. import storage # Relative import
 from ..models import Path as PathModel # Relative import
 
@@ -22,10 +22,16 @@ def path(
     target: Annotated[str, typer.Option()],
     source: Annotated[str, typer.Option()] = "",
 ):
-    # norm_source = cli_utils._validate_path_inputs_helper(position, source, target, typer.secho, typer.echo) - Directly use from cli_utils
-    norm_source = cli_utils.validate_path_inputs_helper(position, source, target, typer.secho, typer.echo)
+    try:
+        norm_source = utils.validate_path_inputs_helper_v2(position, source, target)
+    except utils.PathInputError as e:
+        typer.secho(str(e), fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
     path_uuid_obj = storage.compute_narrative_path_uuid(position, norm_source, target)
     dm = storage.DataManager()
+    if not dm._initialized: # Ensure DM is loaded
+        dm.initialize_and_load()
     if any(p.path_uuid == path_uuid_obj for p in dm.get_paths_by_position(position)):
         typer.echo(f"Path already exists: {path_uuid_obj}")
         return

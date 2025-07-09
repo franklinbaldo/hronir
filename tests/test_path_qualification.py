@@ -213,9 +213,9 @@ class TestPathQualification(unittest.TestCase):
             current_hrönir_uuid=dummy_initiator_curr_hr_uuid
         )
 
-
+        from hronir_encyclopedia import ratings as ratings_module # Import ratings
         votes_to_qualify_fgood = []
-        num_wins_for_elo_qualification = transaction_manager.ELO_WINS_FOR_QUALIFICATION # Use configured value
+        num_wins_for_elo_qualification = ratings_module.TEST_WINS_FOR_QUALIFICATION
 
         for i in range(num_wins_for_elo_qualification):
             dummy_loser_hrönir = _create_dummy_chapter(self.library_path, f"dummy_loser_promo_pq_{i}")

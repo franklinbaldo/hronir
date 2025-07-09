@@ -7,8 +7,9 @@ from typing import Annotated, Any
 
 import typer
 
-from .. import cli_utils # Relative import
-from .. import session_manager, storage, transaction_manager # Relative imports
+from .. import utils, canon, storage as storage_module # Relative import, aliased storage
+from .. import session_manager, transaction_manager # Relative imports
+from ..models import PathStatus # Import PathStatus
 
 logger = logging.getLogger(__name__)
 
@@ -106,8 +107,8 @@ def session_commit(
             path_a_uuid_obj if winning_path_uuid_verdict_obj == path_b_uuid_obj else path_b_uuid_obj
         )
         winner_hronir, loser_hronir = (
-            cli_utils.get_successor_hronir_for_path(str(winning_path_uuid_verdict_obj)),
-            cli_utils.get_successor_hronir_for_path(str(loser_path_uuid_obj)),
+            utils.get_successor_hronir_for_path(str(winning_path_uuid_verdict_obj)),
+            utils.get_successor_hronir_for_path(str(loser_path_uuid_obj)),
         )
         if not winner_hronir or not loser_hronir:
             typer.secho(
@@ -115,7 +116,7 @@ def session_commit(
                 fg=typer.colors.RED,
             )
             raise typer.Exit(code=1)
-        path_data_winner = storage.DataManager().get_path_by_uuid(
+        path_data_winner = storage_module.DataManager().get_path_by_uuid( # Changed to storage_module
             str(winning_path_uuid_verdict_obj)
         )
         if not path_data_winner:
@@ -177,13 +178,16 @@ def session_commit(
 
     try:
         mandate_id_for_update = str(session_model.mandate_id) if session_model.mandate_id else None
-        storage.DataManager().update_path_status(
+        dm_instance = storage_module.DataManager() # Changed to storage_module
+        if not dm_instance._initialized: # Ensure initialized
+            dm_instance.initialize_and_load()
+        dm_instance.update_path_status(
             path_uuid=initiating_path_uuid_str,
-            status="SPENT",
+            status=PathStatus.SPENT.value, # Use Enum
             mandate_id=mandate_id_for_update, # Use the stored mandate_id from the session
             set_mandate_explicitly=True, # Ensure mandate is set/updated
         )
-        storage.DataManager().save_all_data() # Persist path status change
+        dm_instance.save_all_data() # Persist path status change
         typer.echo(f"Path {initiating_path_uuid_str} status updated to SPENT.")
     except Exception as e:
         logger.warning(
@@ -206,9 +210,14 @@ def session_commit(
         )
         try:
             # Pass the actual committed verdicts to the cascade function
-            cli_utils.run_temporal_cascade(
+            dm = storage_module.DataManager() # Get DataManager instance
+            if not dm._initialized:
+                dm.initialize_and_load()
+
+            canon.run_temporal_cascade(
+                dm=dm,
                 committed_verdicts=session_model.committed_verdicts, # These are UUID objects
-                canonical_path_file=canonical_path_file,
+                canonical_path_json_file_for_tests=canonical_path_file, # Pass the json file path
                 typer_echo=typer.echo,
                 start_position=int(effective_oldest_voted_pos), # Ensure it's int
                 max_positions_to_consolidate=max_cascade_positions,
@@ -256,11 +265,13 @@ def session_start(
         "data/canonical_path.json" # TODO: Consider making this configurable
     ),
 ):
-    path_data_obj = storage.DataManager().get_path_by_uuid(path_uuid_str)
+    path_data_obj = storage_module.DataManager().get_path_by_uuid(path_uuid_str) # Corrected indentation
     if not path_data_obj:
         typer.secho(f"Error: Path UUID '{path_uuid_str}' not found.", fg=typer.colors.RED)
         raise typer.Exit(code=1)
-    if path_data_obj.status != "QUALIFIED":
+    # This 'if' was incorrectly indented due to the above line in the previous read.
+    # It should be at the same level as the 'if not path_data_obj:'
+    if path_data_obj.status != PathStatus.QUALIFIED: # Use Enum
         typer.secho(
             f"Error: Path '{path_uuid_str}' not QUALIFIED (status: '{path_data_obj.status}').",
             fg=typer.colors.RED,
@@ -281,11 +292,15 @@ def session_start(
         raise typer.Exit(code=1)
 
     try:
+        dm = storage_module.DataManager() # Get DataManager instance
+        if not dm._initialized:
+            dm.initialize_and_load()
         session_model = session_manager.create_session(
             path_n_uuid_str=path_uuid_str,
             position_n=path_data_obj.position,
             mandate_id_str=str(path_data_obj.mandate_id), # Ensure mandate_id is string
-            canonical_path_file=canonical_path_file,
+            # canonical_path_file=canonical_path_file, # Removed
+            dm=dm, # Pass DataManager
         )
         # Prepare dossier for output, ensuring UUIDs are strings
         dossier_out = {
