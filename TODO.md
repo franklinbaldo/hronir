@@ -1,323 +1,123 @@
-# TODO.md · Development Roadmap — **Hrönir Encyclopedia**
+# HRONIR TODO - CRITICAL COMPLEXITY ISSUES 🚨
 
-This document outlines the development roadmap for the **Hrönir Encyclopedia** project. The core **Protocol v2** architecture is implemented with pandas-based data management and narrative path lifecycle management.
+## 🔥 IMMEDIATE ACTION REQUIRED - OVERENGINEERED SYSTEM
 
----
+HRONIR is the **WORST COMPLEXITY OFFENDER** in the entire workspace! This literary protocol has become more complex than most enterprise systems.
 
-## ❗ P0 – Pivot Plan v2.0
+### 🚨 CRITICAL FILES NEEDING IMMEDIATE ATTENTION
 
-Esta seção resume as tarefas de migração para o sistema distribuído proposto em [pivot_plan_v2.md](docs/pivot_plan_v2.md).
+#### Priority 1: Delete Legacy Code (Save 1,009 lines immediately)
+- [ ] **DELETE**: `hronir_encyclopedia/storage_old.py` - **1,009 lines of legacy code**
+  - This is dead code that should be removed immediately
+  - No functionality depends on this file
+  - **Action**: `rm hronir_encyclopedia/storage_old.py`
 
-### 1. Para Decisão
+#### Priority 2: Massive God-Objects (Save 2,000+ lines)
+- [ ] **SPLIT**: `hronir_encyclopedia/cli.py` - **914 lines!**
+  - Split into command modules: `commands/store.py`, `commands/session.py`, `commands/path.py`
+  - Extract common utilities to `cli_utils.py`
+  - Target: 100-150 lines per command module
 
-- [x] **Revisão técnica do plano v2.0** — avaliar a viabilidade de DuckDB + P2P e registrar parecer em `docs/decisions/`.
-- [x] **Aprovação de 3 semanas extras** — ajustar cronograma no `README.md`.
-- [x] **Security audit de Merkle + PGP** — revisar `transaction_manager.py` e `duckdb_storage.py`.
-- [x] **Definir critérios de sucesso** — documentar métricas de aceitação no `README.md`.
+- [ ] **SPLIT**: `tests/test_system_dynamics.py` - **777 lines!**
+  - Test file is larger than many applications!
+  - Split by functionality: `test_ratings.py`, `test_sessions.py`, `test_transactions.py`
+  - Target: 200-300 lines per test file
 
-### 2. Cronograma de Execução
+- [ ] **SPLIT**: `tests/test_protocol_v2.py` - **713 lines!**
+  - Another massive test file
+  - Split by protocol phases: `test_path_creation.py`, `test_qualification.py`, `test_sessions.py`
 
-#### Semanas 1-2 – Base + Sharding
+#### Priority 3: Overengineered Architecture (Simplify massively)
+- [ ] **SIMPLIFY**: `hronir_encyclopedia/transaction_manager.py` - **720 lines!**
+  - **Issues found**: PGP signing, Merkle trees, sharding, conflict detection, optimistic locking
+  - **Reality check**: This is a LITERARY PROTOCOL, not a blockchain!
+  - **Recommendation**: Replace with simple file-based storage (100-200 lines max)
+  - **Remove**: PGP signatures, Merkle trees, complex sharding, IA upload automation
 
-- [x] Instalar `duckdb`, `internetarchive` e `zstd` no `pyproject.toml`.
-- [x] Criar script `migrate_to_duckdb.py --backup --enable-sharding`.
-- [x] Implementar `hronir_encyclopedia/sharding.py` com `ShardingManager`.
-- [x] Refatorar `storage.py` para usar `DuckDBDataManager` e sharding.
-- [x] Salvar backup dos CSVs em `data/backup/`.
-- [x] Cobrir migração com testes em `tests/`.
+### 🎯 ARCHITECTURAL SIMPLIFICATION TARGETS
 
-#### Semanas 3-4 – Conflicts + Security
+#### Current Overengineered Features:
+1. **Blockchain-level complexity** for storing literary content
+2. **PGP signing** for creative writing (unnecessary)
+3. **Merkle trees** for narrative consistency (overkill)
+4. **Optimistic locking** with conflict detection (over-engineered)
+5. **Complex sharding** for Internet Archive uploads (premature optimization)
+6. **Multiple abstraction layers** for simple database operations
 
-- [x] Implementar locking por sequence number em `transaction_manager.py`.
-- [x] Adicionar comando `hronir sync --retry` no `cli.py`.
-- [x] Criar comando `hronir push` com verificação de conflitos.
-- [x] Exigir assinatura PGP nas operações (scripts e CLI).
-- [x] Melhorar discovery com retry em `duckdb_storage.py`. # Corrected from transaction_manager.py based on my previous work.
-- [x] Documentar testes manuais de conflito em `docs/manual_testing.md`.
+#### Recommended Simplified Architecture:
+```
+Simple File-Based System:
+├── content/          # Just store markdown files
+├── ratings/          # Simple JSON files for ratings  
+├── sessions/         # Simple session data
+└── database.duckdb   # All structured data in one DB
+```
 
-#### Semanas 5-6 – Trust Protocol
+### 🔢 COMPLEXITY ANALYSIS
 
-- [x] Implementar Merkle tree em `transaction_manager.py`.
-- [x] Verificar provas de Merkle.
-- [x] Realizar trust check com amostragem criptográfica.
-- [x] Criar discovery anti-Sybil em `session_manager.py`.
-- [x] Executar testes de integração em `tests/test_system_dynamics.py`.
+#### Current File Sizes (EXCESSIVE):
+- `storage_old.py`: 1,009 lines (DELETE)
+- `cli.py`: 914 lines (SPLIT into 6-8 modules)
+- `test_system_dynamics.py`: 777 lines (SPLIT into 3-4 files)
+- `test_protocol_v2.py`: 713 lines (SPLIT into 3-4 files)
+- `transaction_manager.py`: 720 lines (SIMPLIFY to ~100 lines)
 
-#### Semanas 7-9 – Automação + Testing
+#### Target After Simplification:
+- **Total reduction**: ~4,000+ lines
+- **File count increase**: Split large files into focused modules
+- **Complexity reduction**: 80%+ simpler architecture
 
-- [x] Configurar GitHub Action com PGP e sequence check.
-- [x] Definir secrets `IA_ACCESS_KEY`, `PGP_PRIVATE_KEY` e `NETWORK_UUID`.
-- [x] Automatizar detecção de mudanças e publicação.
-- [x] Atualizar `README.md` com nova arquitetura.
-- [x] Testes end-to-end em múltiplas redes.
-- [x] Benchmarks comparando DuckDB x CSV.
-- [x] Registrar resultado da security audit em `docs/security_audit.md`.
+### 🛠️ SPECIFIC REFACTORING TASKS
 
-### 3. Critérios de Sucesso
+#### Phase 1: Immediate Cleanup (30 minutes)
+- [ ] Delete `storage_old.py` 
+- [ ] Remove unused imports
+- [ ] Identify dead code in other files
 
-- [ ] Zero perda de dados em conflitos.
-- [ ] Resistência a Sybil acima de 95%.
-- [ ] Sharding transparente para o usuário.
-- [ ] Consultas abaixo de 5s em média.
-- [ ] Auditoria externa aprovada.
-- [ ] CI/CD com taxa >95%.
-- [ ] Distribuição P2P via torrents.
+#### Phase 2: CLI Restructuring (2-3 hours)
+- [ ] Create `commands/` directory
+- [ ] Extract `store` command to `commands/store.py`
+- [ ] Extract `session` commands to `commands/session.py`
+- [ ] Extract `path` commands to `commands/path.py`
+- [ ] Create `cli_utils.py` for shared utilities
 
-### 4. Stakeholder Sign-off
+#### Phase 3: Test File Splitting (1-2 hours)
+- [ ] Split `test_system_dynamics.py` by functionality
+- [ ] Split `test_protocol_v2.py` by protocol phase
+- [ ] Ensure all tests still pass after splitting
 
-- [ ] Aprovação arquitetural pelo Tech Lead.
-- [ ] Auditoria de algoritmos pelo Security Lead.
-- [ ] Alinhamento de roadmap pelo Product.
-- [ ] Validação de CI/CD e deployment pelo DevOps.
-- [ ] Registrar decisão final em `docs/decisions/`.
+#### Phase 4: Architecture Simplification (4-6 hours)
+- [ ] Identify essential vs. over-engineered features in `transaction_manager.py`
+- [ ] Remove PGP signing complexity
+- [ ] Simplify or remove Merkle tree implementation
+- [ ] Replace complex sharding with simple file operations
+- [ ] Keep only essential transaction logging
 
-## P0 - Post-Pivot Cleanup & Refinement
+### ⚠️ RISKS & CONSIDERATIONS
 
-### Critical Bug Fixes & Stability 🐛
+1. **Breaking changes**: This is a major architectural simplification
+2. **Feature loss**: Some over-engineered features will be removed
+3. **Testing**: Extensive testing needed after refactoring
+4. **Documentation**: Update docs to reflect simplified architecture
 
-- [~] **Stabilize existing test suite (Pytest)** - Significant progress. `test_protocol_v2.py` and `test_sessions_and_cascade.py` are now passing after fixing argument errors, mandate ID logic, CLI option issues, DataManager path synchronization, and temporal cascade basic implementation. Failures in other test files like `test_ranking_filtering.py` (mentioned in "NEW HIGH PRIORITY TASKS") still need addressing.
-- [~] **Path→hrönir mapping issues** in session commit workflow - Largely addressed. `session commit` logic, including hrönir mapping via `_get_successor_hronir_for_path` and cascade, was fixed, and related tests are passing.
-- [~] **Automatic qualification** based on Elo ratings not working - Likely improved. `test_legitimate_promotion_and_mandate_issuance` (which involves qualification) now passes. The `transaction_manager.record_transaction` handles qualification status updates. Further specific tests for Elo edge cases might be needed if problems persist elsewhere.
-- [~] **Integrity validation** for path→hrönir relationships - Improved. Fixes to `_get_successor_hronir_for_path` and ensuring correct data handling in `session_commit` and `run_temporal_cascade` contribute to this.
-- [ ] **Error messages** need more context about predecessors
+### 🎉 EXPECTED BENEFITS
 
-### Enhanced Data Models 🏗️
-
-- [x] **Session models** (`Session`, `SessionDossier`, `SessionDuel`) for type-safe session management
-- [x] **Hrönir content model** (`Hronir`) for story content with metadata and validation
-- [x] **Canonical path models** (`CanonicalPath`, `CanonicalEntry`) for structured canonical state
-- [x] **Enhanced transaction model** (`TransactionContent`, `SessionVerdict`) for structured transaction content
-- [x] **Duel/ranking models** (`DuelResult`, `RankingEntry`) for Elo system type safety
-- [x] **Mandate/qualification models** (`Mandate`, `QualificationCriteria`) for validation logic
-- [x] **Configuration models** (`SystemConfig`, `StoragePaths`) for system administration
-- [x] **Validation models** (`ValidationIssue`, `DataIntegrityReport`) for debugging and maintenance
-
-### Essential CLI Commands 📟
-
-- [ ] **`hronir validate-paths`** command for debugging path integrity
-- [ ] **`hronir tutorial`** command that executes complete workflow demonstration
-- [ ] **`hronir dev-qualify PATH_UUID`** for testing purposes
-
-### System Robustness
-
-- [ ] Add comprehensive **automated testing** for full workflow
-- [ ] Implement **detailed logging** for system debugging
-- [ ] Create **debug mode** that shows internal mappings
-- [ ] Add **path tree visualization** functionality
-
-### Documentation & UX
-
-- [ ] Improve **README with practical examples**
-- [ ] Update **CLAUDE.md** with current architecture (Note: AGENTS.md redirects here, so this is important)
-- [ ] Create **complete workflow guide** (store → path → session → vote)
-- [ ] Fix **CLI parameter documentation** inconsistencies
-
-### Performance & Quality
-
-- [ ] **Pre-commit hooks** resolution for clean development setup
-- [ ] **Error handling** improvements for file operations
-- [ ] **Code refactoring** to simplify complex functions in `cli.py`
-- [ ] **Type annotation** coverage completion
-
-### Phase 1: Enhanced CLI Experience (from PLANNED FEATURES)
-
-- [ ] **Interactive tutorial mode** with step-by-step guidance
-- [ ] **Rich output formatting** with better visualization
-- [ ] **Progress indicators** for long-running operations
-- [ ] **Configuration management** for user preferences
+1. **90% easier to understand** - Remove blockchain complexity
+2. **Faster development** - Less abstraction overhead
+3. **Better maintainability** - Focused, smaller files
+4. **Easier testing** - Split test files are more manageable
+5. **Reduced bugs** - Less complex code = fewer edge cases
 
 ---
 
-## P1 – Immediate Priorities
+## 📊 PROGRESS TRACKING
 
-(This section is now superseded by "P0 - Post-Pivot Cleanup & Refinement". Items moved.)
+- [ ] Phase 1: Immediate cleanup (DELETE storage_old.py)
+- [ ] Phase 2: CLI restructuring  
+- [ ] Phase 3: Test file splitting
+- [ ] Phase 4: Architecture simplification
 
-### Terminology Cleanup 🔥
+**Target completion**: Reduce HRONIR complexity by 80%+
+**Estimated time savings**: 2-3x faster development after refactoring
 
-- [x] **Complete fork→path terminology replacement** using regex `\Wfork\W` patterns throughout codebase
-- [x] **Update all documentation** to use path terminology consistently
-- [x] **Fix CLI command references** in help text and examples
-
----
-
-## 📋 **HIGH PRIORITY TASKS**
-
-(This section is now superseded by "P0 - Post-Pivot Cleanup & Refinement". Items moved.)
-
----
-
-## 🎯 **PLANNED FEATURES**
-
-### Phase 2: Web Interface
-
-- [ ] **Dashboard** for real-time protocol state visualization
-- [ ] **Interactive reader** to navigate canonical and alternative paths
-- [ ] **Session interface** for web-based judgment participation
-- [ ] **Analytics dashboard** for path performance metrics
-
-### Phase 3: Export & Distribution
-
-- [ ] **EPUB generation** with interactive path selection
-- [ ] **HTML export** for static site generation
-- [ ] **REST API** endpoints for external integrations
-- [ ] **Mobile-responsive** reading interfaces
-
-### Phase 4: Advanced AI Systems
-
-- [ ] **Multi-agent protocols** for coordinated AI interactions
-- [ ] **Specialized agents** for different genres or styles
-- [ ] **Learning systems** that adapt based on success rates
-- [ ] **Human-AI collaboration** in judgment sessions
-
-### Phase 5: Scalability
-
-- [ ] **Optional PostgreSQL backend** for large datasets
-- [ ] **Distributed processing** capabilities
-- [ ] **Caching systems** for performance optimization
-- [ ] **Archive management** strategies
-
----
-
-## 🔬 **RESEARCH & EXPERIMENTAL**
-
-### Narrative Science
-
-- [ ] **Emergence metrics** to measure narrative coherence
-- [ ] **Reader psychology** analysis of preference patterns
-- [ ] **Collaborative dynamics** study of human-AI interaction
-- [ ] **Temporal analysis** of canonical path evolution
-
-### Protocol Extensions
-
-- [ ] **Multi-narrative support** for parallel encyclopedia instances
-- [ ] **Cross-pollination** mechanisms for chapter sharing
-- [ ] **Versioning systems** for protocol upgrades
-- [ ] **Governance models** for community-driven evolution
-
----
-
-## ✅ **COMPLETED ACHIEVEMENTS**
-
-### Core Architecture ✅
-
-- [x] **Protocol v2** fully implemented with pandas data management
-- [x] **UUID-based storage** system with deterministic chapter storage
-- [x] **Path management** with position-based narrative connections
-- [x] **Elo ranking system** with sophisticated duel mechanics
-- [x] **Session management** with static dossiers and temporal cascades
-- [x] **Transaction ledger** with immutable blockchain-like recording
-
-### Fork → Path Migration ✅
-
-- [x] **Pydantic models** updated from Fork to Path
-- [x] **Data manager** refactored for path terminology
-- [x] **Storage layer** updated with new function signatures
-- [x] **Ratings system** migrated to path-based calculations
-- [x] **CLI commands** renamed (fork → path, list-forks → list-paths)
-- [x] **Directory structure** renamed (the_garden → narrative_paths)
-- [x] **CSV headers** updated (fork_uuid → path_uuid)
-- [x] **Documentation** comprehensively updated
-
-### Development Infrastructure ✅
-
-- [x] **Repository structure** with proper Python package
-- [x] **Development environment** with uv package manager
-- [x] **Code quality** with ruff linting and formatting
-- [x] **Testing framework** with comprehensive protocol validation
-- [x] **AI integration** with Gemini-based content generation
-
-### CLI Interface ✅
-
-- [x] **Core commands** implemented (`store`, `ranking`, `audit`, `clean`)
-- [x] **Session commands** implemented (`session start`, `session commit`)
-- [x] **Path management** commands (`path`, `list-paths`, `path-status`)
-- [x] **Advanced features** (`recover-canon`, `synthesize`, `metrics`)
-- [x] **Validation systems** for comprehensive content checking
-
----
-
-## 📊 **SUCCESS METRICS**
-
-- **Protocol Stability**: Zero data corruption incidents
-- **Code Quality**: All ruff checks pass, comprehensive type coverage
-- **Generation Quality**: AI-generated content passes validation >95%
-- **Session Efficiency**: Judgment sessions complete without errors
-- **Canonical Coherence**: Temporal cascades maintain narrative consistency
-- **Developer Experience**: New contributors can onboard within 1 hour
-- **Documentation Accuracy**: All CLI examples work as documented
-
----
-
-## 🗓️ **CURRENT STATUS**
-
-**Phase**: Post-Pivot Cleanup & Refinement
-**Priority**: P0 - Post-Pivot Cleanup & Refinement
-**Next Milestone**: Complete P0 tasks.
-
-**Architecture**: ✅ Pandas-based data management with CSV storage. (P2P/DuckDB implementation from Pivot Plan v2.0 is complete).
-**Terminology**: ✅ Major migration complete.
-**CLI Interface**: ✅ Functional with path-based commands.
-**Documentation**: 🚧 Updated for new terminology, refinement needed. (See P0 section)
-**Testing**: 🚧 Core functionality validated, test suite stabilization ongoing. (See P0 section)
-**Quality**: 🚧 Ruff checks pass (after recent fixes), type coverage improving. (See P0 section)
-
-**Ready for**: Focusing on "P0 - Post-Pivot Cleanup & Refinement" tasks.
-
----
-
-## 🔥 NEW HIGH PRIORITY TASKS (Identified 2024-06-30) - RESOLVED
-
-The following tasks have been identified as high priority based on recent test suite results and code review. They address critical failures and inconsistencies in core protocol functionality.
-
-- [x] **Fix `determine_next_duel_entropy` Argument Error in Session Start**
-  - **Context**: Multiple tests in `test_protocol_v2.py` (e.g., `test_mandate_double_spend_prevention`, `test_temporal_cascade_trigger`) and `test_sessions_and_cascade.py` (e.g., `test_scenario_1_dossier_and_limited_verdict`) are failing with a `TypeError: determine_next_duel_entropy() got an unexpected keyword argument 'session'`. This error occurs during the `hronir session start` CLI command execution within these tests.
-  - **Problem**: The `determine_next_duel_entropy` function, likely called by `session_manager.create_session_dossier` or a related function, is being invoked with an incorrect set of arguments. The `session` argument seems to be unexpected.
-  - **Impact**: This is a critical failure blocking the session start mechanism, which is fundamental for users/agents to participate in judgment sessions and influence the narrative.
-  - **Action**:
-    1. Investigated the call stack leading to `determine_next_duel_entropy` within the `session start` workflow.
-    2. Identified that the function definition in `ratings.py` did not expect a `session` argument.
-    3. Corrected the function call in `session_manager.py` by removing the `session` argument.
-    4. Verified the fix by ensuring the aforementioned tests pass this specific error.
-
-- [x] **Correct Mandate ID Generation and Verification**
-  - **Context**: The test `test_legitimate_promotion_and_mandate_issuance` in `test_protocol_v2.py` fails due to a mismatch between the generated `mandate_id` for a qualified path and the expected `mandate_id`. The test expects a Blake3 hash of `path_uuid + last_tx_hash_before_qualifying_tx`, but the actual `mandate_id` stored on the `PathModel` is a UUID (e.g., `e9e37a68-e268-4e1c-9375-8e7a800c8655`).
-  - **Problem**: There's a discrepancy in the logic for generating/assigning `mandate_id` in `transaction_manager.record_transaction` (which updates path status to QUALIFIED) and the test's expectation. The `PathModel.mandate_id` is typed as `Optional[uuid.UUID]`, but the test expects a Blake3-derived string.
-  - **Impact**: Incorrect mandate ID generation or validation could compromise the integrity of the "Tribunal of the Future" mechanism, potentially allowing unauthorized sessions or issues with tracking mandate usage.
-  - **Action**:
-    1. Confirmed the intended algorithm for `mandate_id` is UUID, based on `PathModel` and `transaction_manager.py` implementation.
-    2. Updated the test expectation in `test_legitimate_promotion_and_mandate_issuance` to check for a valid UUID, not a specific Blake3 hash.
-    3. Ensured consistency. Test now passes.
-
-- [ ] **Resolve Failures in Ranking and Filtering Logic**
-  - **Context**: Numerous tests in `test_ranking_filtering.py` (7 failures, e.g., `test_get_ranking_filters_by_canonical_predecessor`, `test_get_ranking_no_votes_for_heirs`) and `test_ratings_ranking.py` (`test_get_ranking`) are failing. These tests generally expect non-empty DataFrames with specific path rankings, but are receiving empty DataFrames.
-  - **Problem**: This indicates a systemic issue in `ratings.get_ranking` or the underlying data loading/filtering within the `DataManager` (Pandas or DuckDB backend). Paths might not be loaded correctly, votes might not be applied, or filtering logic (e.g., by predecessor hrönir) might be malfunctioning.
-  - **Impact**: The ranking system is fundamental to determining path quality, duel selection, and ultimately the canonical path. Failures here mean the core selection mechanism is broken.
-  - **Action**:
-    1. Debug `ratings.get_ranking` and its interaction with `DataManager` (specifically how paths and votes are loaded and provided for ranking calculations).
-    2. Verify that CSV/data file parsing in `PandasDataManager` (and `DuckDBDataManager` if active) correctly loads all necessary data for the test scenarios.
-    3. Check filtering logic within `get_ranking` or its helper functions, especially filtering by `predecessor_hrönir_uuid` and handling of position 0.
-    4. Ensure Elo calculations are performed correctly and that paths with and without votes are handled as expected by the tests.
-  - **Note**: Some `TypeError` issues related to `ratings.get_ranking` were fixed during the resolution of other high-priority tasks (e.g., `predecessor_hrönir_uuid` keyword). Further investigation needed if ranking tests still fail.
-
-- [ ] **Fix Narrative Consistency Check for Cyclic Graphs**
-  - **Context**: The test `test_is_narrative_consistent` in `test_graph_logic.py` fails with `AssertionError: assert not True` when checking a graph known to contain a cycle. The function `graph_logic.is_narrative_consistent()` is expected to return `False` for a cyclic graph.
-  - **Problem**: The current implementation of `is_narrative_consistent` (or its underlying cycle detection, likely using NetworkX) is incorrectly identifying the test's cyclic graph as non-cyclic (consistent).
-  - **Impact**: If cycles are not correctly detected, the system might allow impossible narrative loops, compromising logical coherence.
-  - **Action**:
-    1. Review the graph construction logic within `is_narrative_consistent` to ensure nodes and edges correctly represent path dependencies.
-    2. Verify that the NetworkX function used for cycle detection (e.g., `nx.is_directed_acyclic_graph` or `nx.simple_cycles`) is appropriate and correctly interpreted.
-    3. Debug with the specific cyclic data from `test_is_narrative_consistent` to pinpoint why the cycle is not being detected.
-
-- [ ] **Implement Functional PGP Signing for Snapshots**
-  - **Context**: The "Security audit de Merkle + PGP" task was marked as complete in the Pivot Plan v2.0. However, the actual PGP signing mechanism in `transaction_manager.py` (`sign_manifest_pgp`) is a placeholder that returns a dummy signature and logs a warning.
-  - **Problem**: If PGP signatures are a required security feature for snapshot authenticity and integrity (as implied by including it in the audit and manifest structure), the current placeholder is insufficient.
-  - **Impact**: Snapshots lack a verifiable cryptographic signature, potentially undermining trust in the distributed P2P data sharing model.
-  - **Action**:
-    1. Integrate a Python PGP library (e.g., `python-gnupg` or `pgpy`).
-    2. Implement the `sign_manifest_pgp` function to use the chosen library to sign manifest data using a configured PGP private key.
-    3. Implement a corresponding verification function (e.g., `verify_manifest_pgp_signature`) that can be used by clients or other nodes to verify snapshot integrity.
-    4. Address PGP key management: How will the PGP private key be provided to the system (e.g., env variable, file, HSM)? This needs to be documented and securely handled.
-    5. Add tests for successful PGP signing and verification, and for failure modes (e.g., bad signature, wrong key).
-    6. Update GitHub Actions that might publish snapshots to include PGP key configuration and signing steps.
-
-[end of TODO.md]
+*This literary protocol should be elegant and simple, not a distributed systems nightmare!*
