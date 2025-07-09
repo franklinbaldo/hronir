@@ -3,34 +3,44 @@ import uuid
 import pandas as pd
 import pytest
 
-from hronir_encyclopedia import ratings, storage  # ratings.py and storage for DataManager
+from hronir_encyclopedia import ratings # Removed storage import
+from hronir_encyclopedia.storage import DataManager # Import DataManager for type hint
 
 
 # Helper function to call determine_next_duel_entropy with a clean DataManager state
-def _call_determine_next_duel_entropy_with_setup(position, predecessor_hronir_uuid):
+def _call_determine_next_duel_entropy_with_setup(
+    dm: DataManager, position, predecessor_hronir_uuid
+):
     """
     Calls ratings.determine_next_duel_entropy.
-    It assumes DataManager is already configured by conftest.py to use a test DuckDB.
-    This helper ensures data is cleared before the call.
+    It uses the provided DataManager instance (dm), assumed to be configured for tests (e.g., by conftest.py enable_duckdb fixture).
+    This helper ensures data is cleared before the call using the provided dm.
     """
     try:
-        # Ensure DataManager is initialized and its DB is clean for the test
-        # conftest.py should ensure storage.data_manager is a fresh instance pointing to a test DB
-        if not storage.data_manager._initialized:
-            storage.data_manager.initialize_and_load(clear_existing_data=True)
+        # dm is provided by the test fixture (enable_duckdb) which already initializes and clears data.
+        # So, direct initialization or clearing here might be redundant if fixture does it.
+        # However, to be absolutely sure for this specific call context if tests manipulate dm:
+        if not dm._initialized: # Should already be true from fixture
+            dm.initialize_and_load(clear_existing_data=True)
         else:
-            storage.data_manager.clear_in_memory_data()  # Clears tables in the test DB
+            dm.clear_in_memory_data() # Clears tables in the test DB via the passed dm
+        dm.save_all_data() # Commit the clear
 
         # The function being tested
+        # ratings.determine_next_duel_entropy might instantiate its own DM if not passed one.
+        # For this test to be fully isolated regarding DM, determine_next_duel_entropy should accept a DM.
+        # Assuming for now it uses a global one or its own, this test primarily checks logic based on get_ranking mock.
         duel_info = ratings.determine_next_duel_entropy(
             position=position,
             predecessor_hronir_uuid=predecessor_hronir_uuid,
+            # data_manager_instance=dm # Ideal, if determine_next_duel_entropy supports it
         )
         return duel_info
     finally:
-        # Clean up data from the test DB after the test
-        if storage.data_manager._initialized:
-            storage.data_manager.clear_in_memory_data()
+        # Clean up data from the test DB after the test using the passed dm
+        if dm._initialized:
+            dm.clear_in_memory_data()
+            dm.save_all_data() # Commit the clear
 
 
 # Helper function to generate ranking DataFrame as get_ranking would
@@ -125,11 +135,12 @@ def mock_ratings_get_ranking(monkeypatch):
     return set_df_data
 
 
-class TestDetermineNextDuelPurelyEntropic:
-    def test_max_entropy_duel_no_new_hronirs(self, tmp_path, mock_ratings_get_ranking):
+class TestDetermineNextDuelPurelyEntropic: # Added enable_duckdb fixture to test methods
+    def test_max_entropy_duel_no_new_hronirs(self, tmp_path, mock_ratings_get_ranking, enable_duckdb: DataManager):
         """
         Test: Should pick duel with max entropy (closest Elos for neighbors),
         regardless of 'new' status.
+        enable_duckdb is the DataManager instance from conftest.
         """
         set_df_data = mock_ratings_get_ranking
         h1, h2, h3, h4 = str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4())
@@ -150,8 +161,9 @@ class TestDetermineNextDuelPurelyEntropic:
             ]
         )
 
-        # Call the helper, no need for forking_dir or ratings_dir setup
+        # Call the helper, passing the DataManager instance
         duel_info = _call_determine_next_duel_entropy_with_setup(
+            enable_duckdb, # Pass the DM instance from the fixture
             position=1,
             predecessor_hronir_uuid="any-pred-uuid",
         )
@@ -162,8 +174,8 @@ class TestDetermineNextDuelPurelyEntropic:
         assert duel_info["position"] == 1
         assert duel_info["entropy"] == pytest.approx(0.9994027, abs=1e-5)
 
-    def test_max_entropy_duel_chooses_highest_among_equal_elo_diffs(
-        self, tmp_path, mock_ratings_get_ranking
+    def test_max_entropy_duel_chooses_highest_among_equal_elo_diffs( # Added enable_duckdb
+        self, tmp_path, mock_ratings_get_ranking, enable_duckdb: DataManager
     ):
         set_df_data = mock_ratings_get_ranking
         h1, h2, h3, h4, h5, h6 = (
@@ -186,34 +198,31 @@ class TestDetermineNextDuelPurelyEntropic:
         )
 
         duel_info = _call_determine_next_duel_entropy_with_setup(
-            position=1,
-            predecessor_hronir_uuid="any-pred-uuid",
+            enable_duckdb, position=1, predecessor_hronir_uuid="any-pred-uuid"
         )
 
         assert duel_info is not None
         assert duel_info["strategy"] == "max_shannon_entropy"
         assert set(duel_info["duel_pair"].values()) == set([h1, h2])
 
-    def test_edge_case_no_hronirs(self, tmp_path, mock_ratings_get_ranking):
+    def test_edge_case_no_hronirs(self, tmp_path, mock_ratings_get_ranking, enable_duckdb: DataManager): # Added enable_duckdb
         set_df_data = mock_ratings_get_ranking
         set_df_data([])
         duel_info = _call_determine_next_duel_entropy_with_setup(
-            position=1,
-            predecessor_hronir_uuid="any-pred-uuid",
+            enable_duckdb, position=1, predecessor_hronir_uuid="any-pred-uuid"
         )
         assert duel_info is None
 
-    def test_edge_case_one_hronir(self, tmp_path, mock_ratings_get_ranking):
+    def test_edge_case_one_hronir(self, tmp_path, mock_ratings_get_ranking, enable_duckdb: DataManager): # Added enable_duckdb
         set_df_data = mock_ratings_get_ranking
         set_df_data([{"uuid": str(uuid.uuid4()), "elo": 1500, "total_duels": 0}])
         duel_info = _call_determine_next_duel_entropy_with_setup(
-            position=1,
-            predecessor_hronir_uuid="any-pred-uuid",
+            enable_duckdb, position=1, predecessor_hronir_uuid="any-pred-uuid"
         )
         assert duel_info is None
 
-    def test_edge_case_two_hronirs_both_new_is_max_entropy(
-        self, tmp_path, mock_ratings_get_ranking
+    def test_edge_case_two_hronirs_both_new_is_max_entropy( # Added enable_duckdb
+        self, tmp_path, mock_ratings_get_ranking, enable_duckdb: DataManager
     ):
         set_df_data = mock_ratings_get_ranking
         h1_new, h2_new = str(uuid.uuid4()), str(uuid.uuid4())
@@ -224,8 +233,7 @@ class TestDetermineNextDuelPurelyEntropic:
             ]
         )
         duel_info = _call_determine_next_duel_entropy_with_setup(
-            position=1,
-            predecessor_hronir_uuid="any-pred-uuid",
+            enable_duckdb, position=1, predecessor_hronir_uuid="any-pred-uuid"
         )
 
         assert duel_info is not None
@@ -233,7 +241,7 @@ class TestDetermineNextDuelPurelyEntropic:
         assert set(duel_info["duel_pair"].values()) == set([h1_new, h2_new])
         assert duel_info["entropy"] == pytest.approx(0.9994027, abs=1e-5)
 
-    def test_no_total_duels_column_handled_by_keyerror(self, tmp_path, mock_ratings_get_ranking):
+    def test_no_total_duels_column_handled_by_keyerror(self, tmp_path, mock_ratings_get_ranking, enable_duckdb: DataManager): # Added enable_duckdb
         set_df_data = mock_ratings_get_ranking
         h1_uuid, h2_uuid = str(uuid.uuid4()), str(uuid.uuid4())
 
@@ -258,15 +266,14 @@ class TestDetermineNextDuelPurelyEntropic:
         set_df_data(malformed_df_for_test.copy())
 
         duel_info = _call_determine_next_duel_entropy_with_setup(
-            position=1,
-            predecessor_hronir_uuid="any-pred-uuid",
+            enable_duckdb, position=1, predecessor_hronir_uuid="any-pred-uuid"
         )
         assert duel_info is not None
         assert duel_info["strategy"] == "max_shannon_entropy"
         assert set(duel_info["duel_pair"].values()) == set([h1_uuid, h2_uuid])
 
-    def test_entropy_calculation_is_correct_for_known_pair(
-        self, tmp_path, mock_ratings_get_ranking
+    def test_entropy_calculation_is_correct_for_known_pair( # Added enable_duckdb
+        self, tmp_path, mock_ratings_get_ranking, enable_duckdb: DataManager
     ):
         set_df_data = mock_ratings_get_ranking
         h1, h2 = str(uuid.uuid4()), str(uuid.uuid4())
@@ -282,15 +289,14 @@ class TestDetermineNextDuelPurelyEntropic:
         )
 
         duel_info = _call_determine_next_duel_entropy_with_setup(
-            position=1,
-            predecessor_hronir_uuid="any-pred-uuid",
+            enable_duckdb, position=1, predecessor_hronir_uuid="any-pred-uuid"
         )
         assert duel_info is not None
         assert duel_info["strategy"] == "max_shannon_entropy"
         assert set(duel_info["duel_pair"].values()) == set([h1, h2])
         assert duel_info["entropy"] == pytest.approx(0.9426, abs=1e-4)
 
-    def test_entropy_low_for_very_different_elos(self, tmp_path, mock_ratings_get_ranking):
+    def test_entropy_low_for_very_different_elos(self, tmp_path, mock_ratings_get_ranking, enable_duckdb: DataManager): # Added enable_duckdb
         set_df_data = mock_ratings_get_ranking
         h1, h2 = str(uuid.uuid4()), str(uuid.uuid4())
         set_df_data(
@@ -301,8 +307,7 @@ class TestDetermineNextDuelPurelyEntropic:
         )
 
         duel_info = _call_determine_next_duel_entropy_with_setup(
-            position=1,
-            predecessor_hronir_uuid="any-pred-uuid",
+            enable_duckdb, position=1, predecessor_hronir_uuid="any-pred-uuid"
         )
         assert duel_info is not None
         assert duel_info["strategy"] == "max_shannon_entropy"

@@ -7,6 +7,7 @@ import duckdb
 from pydantic import ValidationError
 
 from .models import Path as PathModel
+from .models import Session as SessionModel  # Added
 from .models import Transaction, Vote
 from .sharding import ShardingManager, SnapshotManifest  # Added
 
@@ -49,7 +50,8 @@ class DuckDBDataManager:
                 prev_uuid TEXT,
                 uuid TEXT,
                 status TEXT,
-                mandate_id TEXT
+                mandate_id TEXT,
+                consumed_in_session_id TEXT NULLABLE
             );
             """
         )
@@ -79,6 +81,21 @@ class DuckDBDataManager:
                 content TEXT,
                 created_at TIMESTAMP,
                 metadata TEXT -- JSON string for other attributes
+            );
+            """
+        )
+        self.conn.execute(  # Add sessions table
+            """
+            CREATE TABLE IF NOT EXISTS sessions (
+                session_id TEXT PRIMARY KEY,
+                initiating_path_uuid TEXT,
+                mandate_id TEXT,
+                position_n INTEGER,
+                dossier TEXT, -- JSON string for SessionDossier
+                status TEXT,
+                committed_verdicts TEXT, -- JSON string for dict[str, UUID5] or null
+                created_at TIMESTAMP,
+                updated_at TIMESTAMP
             );
             """
         )
@@ -142,9 +159,17 @@ class DuckDBDataManager:
                     "uuid": row[3],
                     "status": row[4],
                     "mandate_id": row[5] if row[5] else None,
+                    "consumed_in_session_id": row[6] if row[6] else None,
                 }
+                # Ensure prev_uuid and mandate_id are correctly typed for Pydantic
+                if data["prev_uuid"] == "":
+                    data["prev_uuid"] = None
+                if data["mandate_id"] == "":
+                    data["mandate_id"] = None
+
                 paths.append(PathModel(**data))
-            except ValidationError:
+            except ValidationError as e:
+                logging.warning(f"Validation error loading path from DB: {data}, error: {e}")
                 continue
         return paths
 
@@ -163,9 +188,15 @@ class DuckDBDataManager:
                     "uuid": row[3],
                     "status": row[4],
                     "mandate_id": row[5] if row[5] else None,
+                    "consumed_in_session_id": row[6] if row[6] else None,
                 }
+                if data["prev_uuid"] == "":
+                    data["prev_uuid"] = None
+                if data["mandate_id"] == "":
+                    data["mandate_id"] = None
                 paths.append(PathModel(**data))
-            except ValidationError:
+            except ValidationError as e:
+                logging.warning(f"Validation error loading path by position from DB: {data}, error: {e}")
                 continue
         return paths
 
@@ -173,19 +204,49 @@ class DuckDBDataManager:
         data = path.model_dump()
         self.conn.execute(
             """
-            INSERT INTO paths(path_uuid, position, prev_uuid, uuid, status, mandate_id)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(path_uuid) DO NOTHING
-            """,
+            INSERT INTO paths(path_uuid, position, prev_uuid, uuid, status, mandate_id, consumed_in_session_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(path_uuid) DO UPDATE SET
+                position = excluded.position,
+                prev_uuid = excluded.prev_uuid,
+                uuid = excluded.uuid,
+                status = excluded.status,
+                mandate_id = excluded.mandate_id,
+                consumed_in_session_id = excluded.consumed_in_session_id
+            """,  # Using DO UPDATE to allow upsert logic if needed, though path_uuid is primary key
             (
                 str(data["path_uuid"]),
                 data["position"],
-                str(data["prev_uuid"] or ""),
+                str(data.get("prev_uuid")) if data.get("prev_uuid") else None,
                 str(data["uuid"]),
                 data.get("status", "PENDING"),
-                str(data["mandate_id"] or ""),
+                str(data.get("mandate_id")) if data.get("mandate_id") else None,
+                str(data.get("consumed_in_session_id")) if data.get("consumed_in_session_id") else None,
             ),
         )
+
+    def update_path_fields(self, path_uuid: str, fields_to_update: dict) -> None:
+        """Dynamically update specified fields for a path."""
+        if not fields_to_update:
+            return
+
+        set_clauses = []
+        params = []
+        for key, value in fields_to_update.items():
+            # Ensure column names are valid to prevent injection; ideally, use a whitelist
+            if key not in ["status", "mandate_id", "consumed_in_session_id"]: # Add other valid fields if necessary
+                logging.warning(f"Attempted to update invalid or protected field: {key}")
+                continue
+            set_clauses.append(f"{key} = ?")
+            params.append(str(value) if value is not None else None)
+
+        if not set_clauses:
+            return
+
+        sql = f"UPDATE paths SET {', '.join(set_clauses)} WHERE path_uuid = ?"
+        params.append(path_uuid)
+        self.conn.execute(sql, tuple(params))
+
 
     def update_path_status(
         self,
@@ -194,16 +255,19 @@ class DuckDBDataManager:
         mandate_id: str | None = None,
         set_mandate_explicitly: bool = False,
     ) -> None:
+        fields = {"status": status}
         if set_mandate_explicitly:
-            self.conn.execute(
-                "UPDATE paths SET status=?, mandate_id=? WHERE path_uuid=?",
-                (status, mandate_id, path_uuid),
-            )
-        else:
-            self.conn.execute(
-                "UPDATE paths SET status=? WHERE path_uuid=?",
-                (status, path_uuid),
-            )
+            fields["mandate_id"] = mandate_id
+        self.update_path_fields(path_uuid, fields)
+
+    def mark_path_consumed(self, path_uuid: str, session_id: str) -> None:
+        """Marks a path as consumed by a specific session."""
+        self.update_path_fields(path_uuid, {"consumed_in_session_id": session_id})
+
+    def get_path_consumed_session_id(self, path_uuid: str) -> str | None:
+        """Retrieves the session_id that consumed the path, if any."""
+        path = self.get_path_by_uuid(path_uuid)
+        return str(path.consumed_in_session_id) if path and path.consumed_in_session_id else None
 
     def get_path_by_uuid(self, path_uuid: str) -> PathModel | None:
         row = self.conn.execute(
@@ -215,14 +279,20 @@ class DuckDBDataManager:
         data = {
             "path_uuid": row[0],
             "position": row[1],
-            "prev_uuid": row[2] if row[2] else None,
+            "prev_uuid": row[2] if row[2] else None, # Handle empty string from DB
             "uuid": row[3],
             "status": row[4],
-            "mandate_id": row[5] if row[5] else None,
+            "mandate_id": row[5] if row[5] else None, # Handle empty string from DB
+            "consumed_in_session_id": row[6] if row[6] else None,
         }
+        if data["prev_uuid"] == "":
+            data["prev_uuid"] = None
+        if data["mandate_id"] == "":
+            data["mandate_id"] = None
         try:
             return PathModel(**data)
-        except ValidationError:
+        except ValidationError as e:
+            logging.warning(f"Validation error loading path by UUID from DB: {data}, error: {e}")
             return None
 
     # --- Vote operations ---
@@ -356,6 +426,101 @@ class DuckDBDataManager:
         ).fetchone()
         return result[0] if result else None
 
+    # --- Session operations ---
+    def add_session(self, session: SessionModel) -> None:
+        """Adds a new session to the sessions table."""
+        session_data = session.model_dump()
+        dossier_json = json.dumps(session_data["dossier"])
+        committed_verdicts_json = json.dumps(session_data["committed_verdicts"]) if session_data["committed_verdicts"] is not None else None
+
+        self.conn.execute(
+            """
+            INSERT INTO sessions (session_id, initiating_path_uuid, mandate_id, position_n, dossier, status, committed_verdicts, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(session_id) DO UPDATE SET
+                initiating_path_uuid = excluded.initiating_path_uuid,
+                mandate_id = excluded.mandate_id,
+                position_n = excluded.position_n,
+                dossier = excluded.dossier,
+                status = excluded.status,
+                committed_verdicts = excluded.committed_verdicts,
+                created_at = excluded.created_at, -- Should not change on conflict if session_id is unique
+                updated_at = excluded.updated_at
+            """,
+            (
+                str(session_data["session_id"]),
+                str(session_data["initiating_path_uuid"]),
+                str(session_data["mandate_id"]),
+                session_data["position_n"],
+                dossier_json,
+                session_data["status"],
+                committed_verdicts_json,
+                session_data["created_at"],
+                session_data["updated_at"],
+            ),
+        )
+
+    def get_session(self, session_id: str) -> SessionModel | None:
+        """Retrieves a session by its ID from the sessions table."""
+        row = self.conn.execute(
+            "SELECT session_id, initiating_path_uuid, mandate_id, position_n, dossier, status, committed_verdicts, created_at, updated_at FROM sessions WHERE session_id = ?",
+            (session_id,),
+        ).fetchone()
+
+        if not row:
+            return None
+
+        try:
+            dossier_data = json.loads(row[4]) if row[4] else None
+            committed_verdicts_data = json.loads(row[6]) if row[6] else None
+            session_data = {
+                "session_id": row[0],
+                "initiating_path_uuid": row[1],
+                "mandate_id": row[2],
+                "position_n": row[3],
+                "dossier": dossier_data,
+                "status": row[5],
+                "committed_verdicts": committed_verdicts_data,
+                "created_at": row[7],
+                "updated_at": row[8],
+            }
+            return SessionModel(**session_data)
+        except (json.JSONDecodeError, ValidationError) as e:
+            logging.error(f"Error decoding/validating session {session_id} from DB: {e}")
+            return None
+
+    def update_session(self, session: SessionModel) -> None:
+        """Updates an existing session in the sessions table."""
+        session_data = session.model_dump()
+        dossier_json = json.dumps(session_data["dossier"])
+        committed_verdicts_json = json.dumps(session_data["committed_verdicts"]) if session_data["committed_verdicts"] is not None else None
+
+        self.conn.execute(
+            """
+            UPDATE sessions SET
+                initiating_path_uuid = ?,
+                mandate_id = ?,
+                position_n = ?,
+                dossier = ?,
+                status = ?,
+                committed_verdicts = ?,
+                created_at = ?,
+                updated_at = ?
+            WHERE session_id = ?
+            """,
+            (
+                str(session_data["initiating_path_uuid"]),
+                str(session_data["mandate_id"]),
+                session_data["position_n"],
+                dossier_json,
+                session_data["status"],
+                committed_verdicts_json,
+                session_data["created_at"],
+                session_data["updated_at"],
+                str(session_data["session_id"]),
+            ),
+        )
+
     # --- Utility methods ---
     def initialize_if_needed(self) -> None:
         if not self._initialized:
@@ -365,6 +530,8 @@ class DuckDBDataManager:
         self.conn.execute("DELETE FROM paths")
         self.conn.execute("DELETE FROM votes")
         self.conn.execute("DELETE FROM transactions")
+        self.conn.execute("DELETE FROM hronirs")
+        self.conn.execute("DELETE FROM sessions")
         self.conn.commit()
 
     def __enter__(self) -> "DuckDBDataManager":

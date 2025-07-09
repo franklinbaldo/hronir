@@ -182,9 +182,9 @@ The system follows a Protocol v2 architecture with these key phases:
 
 ```
 data/
-├── encyclopedia.duckdb    # Main DuckDB database file containing all persistent data (paths, votes, transactions, hrönirs, etc.)
-├── sessions/              # Active/completed judgment sessions (JSON files, might be moved to DB eventually)
+├── encyclopedia.duckdb    # Main DuckDB database file containing all persistent data (paths, votes, transactions, hrönirs, sessions, etc.)
 └── backup/                # Backups of previous data formats or DB states.
+# sessions/                # (Legacy, session data now in DuckDB)
 # the_library/             # Hrönir Markdown files (Kept for now due to deletion issues, but canonical data is in DuckDB)
 # narrative_paths/         # (Legacy, data moved to DuckDB)
 # ratings/                 # (Legacy, data moved to DuckDB)
@@ -192,8 +192,8 @@ data/
 # data/canonical_path.json # (Legacy, data/logic moved to DuckDB or generated dynamically)
 ```
 
-Primary data (paths, votes, hrönir content, transactions) is stored in tables within the `data/encyclopedia.duckdb` file.
-The `data/sessions/` directory still holds JSON files for active sessions.
+Primary data (paths, votes, hrönir content, transactions, **sessions**) is stored in tables within the `data/encyclopedia.duckdb` file.
+The `data/sessions/` directory is now legacy and its contents should be migrated to DuckDB using `scripts/migrate_sessions_to_duckdb.py`.
 The `the_library/` directory is currently left in the repository but its content is considered secondary to the `hronirs` table in DuckDB.
 
 ### Key Protocol Concepts
@@ -244,7 +244,7 @@ Tests focus on protocol dynamics:
 
 **CORE**: The primary data store is a DuckDB database file (`data/encyclopedia.duckdb`).
 
-- **Interaction**: Use the `DataManager` (`hronir_encyclopedia.storage.data_manager`) for all data operations. It interfaces with `DuckDBDataManager`.
+- **Interaction**: Instantiate `hronir_encyclopedia.storage.DataManager` for all data operations. It interfaces with `DuckDBDataManager`. Avoid using any global/singleton instance.
 - **Schema**: The DuckDB schema is defined and managed within `hronir_encyclopedia/duckdb_storage.py` and initialized by `scripts/migrate_to_duckdb.py`.
 - **Validation**: Pydantic models (`hronir_encyclopedia/models.py`) are used for data validation before writing to and after reading from DuckDB.
 - **Committing**: The `data/encyclopedia.duckdb` file **is version-controlled** in Git. Ensure it is staged and committed with your changes if data modifications are part of your work.

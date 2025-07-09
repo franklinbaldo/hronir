@@ -14,42 +14,46 @@ UUID_NAMESPACE = uuid.NAMESPACE_URL
 
 # --- Global Data Manager ---
 class DataManager:
-    """DataManager that delegates to pandas or DuckDB backends."""
-
-    _instance = None
-
-    def __new__(cls, *args, **kwargs):
-        if not cls._instance:
-            cls._instance = super().__new__(cls)
-        return cls._instance
+    """
+    DataManager that provides a high-level interface to the data storage backend.
+    Currently, it exclusively uses DuckDBDataManager.
+    """
 
     def __init__(
         self,
-        path_csv_dir="narrative_paths",  # Still used by DuckDBDataManager for initial load
-        ratings_csv_dir="ratings",  # Still used by DuckDBDataManager for initial load
-        transactions_json_dir="data/transactions",  # Still used by DuckDBDataManager for initial load
+        db_path: str | None = None,
+        path_csv_dir: str | Path = "narrative_paths",
+        ratings_csv_dir: str | Path = "ratings",
+        transactions_json_dir: str | Path = "data/transactions",
+        library_dir: str | Path = "the_library", # Will be removed in a later step
     ):
-        if hasattr(self, "_initialized") and self._initialized:
-            return
+        """
+        Initializes the DataManager.
 
-        # Always use DuckDBDataManager
-        db_path = os.getenv("HRONIR_DUCKDB_PATH", "data/encyclopedia.duckdb")
+        Args:
+            db_path: Path to the DuckDB database file. Defaults to env var or "data/encyclopedia.duckdb".
+            path_csv_dir: Directory for legacy path CSV files (for initial load).
+            ratings_csv_dir: Directory for legacy ratings CSV files (for initial load).
+            transactions_json_dir: Directory for legacy transaction JSON files (for initial load).
+            library_dir: Path to the hrönir library (will be deprecated).
+        """
+        actual_db_path = db_path or os.getenv("HRONIR_DUCKDB_PATH", "data/encyclopedia.duckdb")
         self.backend = DuckDBDataManager(
-            db_path=db_path,
-            path_csv_dir=path_csv_dir,  # Pass through for initial loading if DB is empty
-            ratings_csv_dir=ratings_csv_dir,  # Pass through for initial loading if DB is empty
-            transactions_json_dir=transactions_json_dir,  # Pass through for initial loading if DB is empty
+            db_path=actual_db_path,
+            path_csv_dir=path_csv_dir,
+            ratings_csv_dir=ratings_csv_dir,
+            transactions_json_dir=transactions_json_dir,
         )
 
-        # Configurable library path - this will need to be re-evaluated
-        # as hrönirs are now stored in DuckDB. For now, keep initialization
-        # but operations like store_hrönir will change.
-        default_library_path = Path("the_library")  # This directory will be deleted.
+        # This library_path logic will be removed in step 1.5
+        default_library_path = Path(library_dir)
         library_path_str = os.getenv("HRONIR_LIBRARY_DIR")
         self.library_path = Path(library_path_str) if library_path_str else default_library_path
-        self.library_path.mkdir(parents=True, exist_ok=True)  # Ensure it exists
+        if not Path(actual_db_path).parent.exists(): # Ensure parent of DB exists
+             Path(actual_db_path).parent.mkdir(parents=True, exist_ok=True)
+        # self.library_path.mkdir(parents=True, exist_ok=True) # This specific line will be removed later
 
-        self._initialized = False
+        self._initialized = False # Tracks if load_all_data has been called
 
     @property
     def fork_csv_dir(self):
@@ -300,72 +304,6 @@ class DataManager:
         """Context manager exit - save data."""
         self.save_all_data()
 
-
-# Legacy compatibility functions for CLI
-def store_chapter(chapter_file: Path, base: Path | str = "the_library") -> str:
-    """Store a chapter file - compatibility wrapper."""
-    data_manager = DataManager()
-    return data_manager.store_hrönir(chapter_file)
-
-
-def get_canonical_path_info(position: int, canonical_path_file: Path) -> dict[str, str] | None:
-    """
-    Retrieves path_uuid and hrönir_uuid for a given position from the canonical_path.json file.
-    """
-    import json  # Moved import here to be self-contained
-    # import logging # Not using logging in this simple utility for now
-
-    if not canonical_path_file.exists():
-        # logging.warning(f"Canonical path file not found: {canonical_path_file}")
-        return None
-    try:
-        with open(canonical_path_file) as f:
-            data = json.load(f)
-
-        path_entry = data.get("path", {}).get(str(position))
-        if path_entry and "path_uuid" in path_entry and "hrönir_uuid" in path_entry:
-            return {
-                "path_uuid": path_entry["path_uuid"],
-                "hrönir_uuid": path_entry["hrönir_uuid"],
-            }
-        # logging.debug(f"No canonical entry found for position {position} in {canonical_path_file}")
-        return None
-    except (OSError, json.JSONDecodeError):  #  Removed "as e" as e is not used
-        # logging.error(f"Error reading or parsing canonical path file {canonical_path_file}: {e}")
-        return None
-
-
-def store_chapter_text(text: str, base: Path | str = "the_library") -> str:
-    """Store chapter text - compatibility wrapper."""
-    import tempfile
-
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
-        f.write(text)
-        temp_path = Path(f.name)
-
-    try:
-        data_manager = DataManager()
-        return data_manager.store_hrönir(temp_path)
-    finally:
-        temp_path.unlink()  # Clean up temp file
-
-
-def compute_narrative_path_uuid(
-    position: int, prev_hronir_uuid: str, current_hronir_uuid: str
-) -> uuid.UUID:
-    """
-    Computes a deterministic UUID for a narrative path (edge).
-    Path UUIDs are UUIDv5 based on the concatenated string of:
-    position, predecessor hrönir UUID, and current hrönir UUID.
-    """
-    # Ensure consistent string representation for None or empty prev_uuid, especially for position 0
-    # The CLI 'path' command uses "" for source at position 0.
-    # The PathModel uses None for prev_uuid at position 0.
-    # Let's standardize on using an empty string for hashing if prev_hronir_uuid is None or empty.
-    prev_uuid_str = prev_hronir_uuid if prev_hronir_uuid else ""
-
-    path_key = f"{position}:{prev_uuid_str}:{current_hronir_uuid}"
-    return uuid.uuid5(UUID_NAMESPACE, path_key)
-
-
-data_manager = DataManager()
+# Global data_manager instance removed.
+# Utility functions (store_chapter, get_canonical_path_info, store_chapter_text, compute_narrative_path_uuid)
+# have been moved to hronir_encyclopedia/utils.py
