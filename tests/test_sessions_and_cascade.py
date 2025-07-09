@@ -8,7 +8,7 @@ import pytest
 from typer.testing import CliRunner
 
 from hronir_encyclopedia import cli as hronir_cli
-from hronir_encyclopedia import ratings, storage, transaction_manager, session_manager
+from hronir_encyclopedia import ratings, session_manager, storage, transaction_manager
 from hronir_encyclopedia.models import Path as PathModel
 
 runner = CliRunner()

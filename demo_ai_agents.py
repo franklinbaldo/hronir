@@ -3,20 +3,20 @@
 Demo script showing Hronir AI agent capabilities.
 """
 
-import asyncio
 import os
+import time
+
 from rich.console import Console
 from rich.panel import Panel
-from rich.text import Text
 from rich.progress import track
-import time
+from rich.text import Text
 
 console = Console()
 
 def show_intro():
     """Show introduction to the demo."""
     title = Text("🎭 Hronir Encyclopedia AI Agent Demo", style="bold blue")
-    
+
     intro_text = """
 Welcome to the Hronir Encyclopedia AI Agent System!
 
@@ -29,13 +29,13 @@ This demonstration showcases autonomous AI agents that can:
 The agents use Google Gemini for content generation and follow the 
 philosophical and competitive principles of the Hronir Encyclopedia.
 """
-    
+
     console.print(Panel(intro_text, title="🎭 Hronir AI Agents", border_style="blue"))
     console.print()
 
 def show_agent_capabilities():
     """Show what the agents can do."""
-    
+
     capabilities = [
         "🖋️  **Chapter Writer Agent**: Creates new hrönir chapters in Borgesian style",
         "⚖️  **Judge Agent**: Evaluates competing narratives and makes decisions",
@@ -44,13 +44,13 @@ def show_agent_capabilities():
         "📊 **Quality Metrics**: Evaluate narrative consistency and literary merit",
         "🧠 **Strategic Thinking**: Adapt writing style based on competitive context"
     ]
-    
+
     console.print(Panel("\n".join(capabilities), title="🚀 Agent Capabilities", border_style="green"))
     console.print()
 
 def show_working_commands():
     """Show the working CLI commands."""
-    
+
     working_commands = [
         "✅ `uv run hronir agent status` - Check system status",
         "✅ `uv run hronir agent test-writer` - Test chapter generation",
@@ -59,13 +59,13 @@ def show_working_commands():
         "🔧 `uv run hronir agent competitive-session` - Multi-agent competition (in development)",
         "🔧 `uv run hronir agent test-crew` - CrewAI integration (in development)"
     ]
-    
+
     console.print(Panel("\n".join(working_commands), title="🎮 Available Commands", border_style="yellow"))
     console.print()
 
 def show_example_output():
     """Show example of generated content."""
-    
+
     example_content = """
 **Do Limiar Inominável**
 
@@ -85,13 +85,13 @@ UUID: 9f3d7886-30ac-5cdd-8763-8282b6bce754
 Consistency Score: 0.80
 Length: 2,314 characters
 """
-    
+
     console.print(Panel(example_content, title="📖 Example Generated Content", border_style="magenta"))
     console.print()
 
 def show_technical_details():
     """Show technical implementation details."""
-    
+
     tech_details = """
 🔧 **Technical Architecture**:
 • Google Gemini API for content generation
@@ -112,13 +112,13 @@ def show_technical_details():
 • Temporal cascade for canonical path updates
 • Game-theoretic agent interactions
 """
-    
+
     console.print(Panel(tech_details, title="⚙️ Technical Implementation", border_style="cyan"))
     console.print()
 
 def show_next_steps():
     """Show what to do next."""
-    
+
     next_steps = """
 🚀 **Try the System**:
 1. Run `uv run hronir agent status` to check system readiness
@@ -137,16 +137,16 @@ def show_next_steps():
 • Check the Protocol v2 documentation
 • Explore the existing test suite for usage patterns
 """
-    
+
     console.print(Panel(next_steps, title="🎯 Next Steps", border_style="bright_green"))
     console.print()
 
 def simulate_agent_interaction():
     """Simulate an agent interaction for demo purposes."""
-    
+
     console.print("🎬 [bold]Simulating Agent Interaction[/bold]")
     console.print()
-    
+
     # Simulate agent thinking
     steps = [
         "🧠 Agent analyzing narrative context...",
@@ -155,16 +155,16 @@ def simulate_agent_interaction():
         "⚖️ Evaluating narrative consistency...",
         "✨ Finalizing hrönir chapter..."
     ]
-    
+
     for step in track(steps, description="Agent Processing"):
         time.sleep(0.5)  # Simulate processing time
-    
+
     console.print("✅ [bold green]Agent task completed successfully![/bold green]")
     console.print()
 
 def main():
     """Main demo function."""
-    
+
     # Check if API key is set
     if not os.getenv("GEMINI_API_KEY"):
         console.print(Panel(
@@ -174,7 +174,7 @@ def main():
             border_style="yellow"
         ))
         console.print()
-    
+
     show_intro()
     show_agent_capabilities()
     show_working_commands()
@@ -182,7 +182,7 @@ def main():
     show_technical_details()
     simulate_agent_interaction()
     show_next_steps()
-    
+
     console.print("🎉 [bold]Demo completed![/bold] The Hronir AI Agent System is ready for experimentation.")
     console.print()
 

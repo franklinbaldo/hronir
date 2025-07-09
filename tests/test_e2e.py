@@ -1,6 +1,7 @@
 import subprocess
 import sys
 
+
 def test_main_script_output():
     """
     Tests that running main.py produces the expected output.

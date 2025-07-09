@@ -39,7 +39,7 @@ app.add_typer(session_app, name="session")
 try:
     from .agents.cli_commands import agent_app
     app.add_typer(agent_app, name="agent")
-except ImportError as e:
+except ImportError:
     # Agents module not available
     pass
 

@@ -21,7 +21,7 @@ def _gemini_request(prompt: str) -> str:
 
     genai.configure(api_key=key)
     model = genai.GenerativeModel(MODEL_NAME)
-    
+
     # Configure safety settings
     safety_settings = [
         {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
@@ -29,7 +29,7 @@ def _gemini_request(prompt: str) -> str:
         {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
         {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
     ]
-    
+
     response = model.generate_content(prompt, safety_settings=safety_settings)
     return response.text
 

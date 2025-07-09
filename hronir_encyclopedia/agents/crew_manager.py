@@ -4,12 +4,12 @@ CrewAI Integration for Hronir Encyclopedia
 Manages crews of AI agents for collaborative hrönir generation and judgment.
 """
 
-from typing import Dict, Any, List, Optional
-from dataclasses import dataclass
 import asyncio
+from dataclasses import dataclass
+from typing import Any
 
 try:
-    from crewai import Agent, Task, Crew, Process
+    from crewai import Agent, Crew, Process, Task
     from crewai.llm import LLM
     CREWAI_AVAILABLE = True
 except ImportError:
@@ -26,9 +26,6 @@ except ImportError:
     class LLM:
         pass
 
-from .chapter_writer import ChapterWriterAgent
-from .judge import JudgeAgent
-from .base import AgentConfig
 from .. import storage
 
 
@@ -36,7 +33,7 @@ from .. import storage
 class CrewConfig:
     """Configuration for a Hronir crew."""
     name: str
-    agents: List[str]  # Agent types to include
+    agents: list[str]  # Agent types to include
     process: str = "sequential"  # or "hierarchical"
     verbose: bool = False
     max_execution_time: int = 300  # seconds
@@ -44,19 +41,19 @@ class CrewConfig:
 
 class HronirCrew:
     """Manages a crew of AI agents for collaborative Hronir tasks."""
-    
+
     def __init__(self, config: CrewConfig):
         if not CREWAI_AVAILABLE:
             raise ImportError("CrewAI is not installed. Install with: pip install crewai")
-            
+
         self.config = config
         self.agents = {}
         self.crew = None
         self.data_manager = storage.DataManager()
-        
+
         # Initialize agents
         self._initialize_agents()
-        
+
     def _initialize_agents(self):
         """Initialize the specified agents."""
         for agent_type in self.config.agents:
@@ -66,14 +63,14 @@ class HronirCrew:
                 self.agents[agent_type] = self._create_judge_crew_agent()
             else:
                 raise ValueError(f"Unknown agent type: {agent_type}")
-                
+
     def _create_gemini_llm(self) -> LLM:
         """Create a Gemini LLM instance for CrewAI."""
         return LLM(
             model="gemini/gemini-2.0-flash-experimental",
             api_key="GEMINI_API_KEY"  # Will be read from environment
         )
-        
+
     def _create_chapter_writer_crew_agent(self) -> Agent:
         """Create a CrewAI agent for chapter writing."""
         return Agent(
@@ -87,7 +84,7 @@ class HronirCrew:
             allow_delegation=False,
             max_iter=3
         )
-        
+
     def _create_judge_crew_agent(self) -> Agent:
         """Create a CrewAI agent for judgment tasks."""
         return Agent(
@@ -101,12 +98,12 @@ class HronirCrew:
             allow_delegation=False,
             max_iter=2
         )
-        
-    def create_writing_crew(self, task_data: Dict[str, Any]) -> Crew:
+
+    def create_writing_crew(self, task_data: dict[str, Any]) -> Crew:
         """Create a crew for collaborative writing tasks."""
         if "chapter_writer" not in self.agents:
             raise ValueError("Chapter writer agent not available")
-            
+
         # Create writing task
         writing_task = Task(
             description=f"""
@@ -125,19 +122,19 @@ class HronirCrew:
             expected_output="A complete hrönir chapter in Markdown format",
             agent=self.agents["chapter_writer"]
         )
-        
+
         return Crew(
             agents=[self.agents["chapter_writer"]],
             tasks=[writing_task],
             process=Process.sequential,
             verbose=self.config.verbose
         )
-        
-    def create_judgment_crew(self, task_data: Dict[str, Any]) -> Crew:
+
+    def create_judgment_crew(self, task_data: dict[str, Any]) -> Crew:
         """Create a crew for judgment tasks."""
         if "judge" not in self.agents:
             raise ValueError("Judge agent not available")
-            
+
         # Create judgment task
         judgment_task = Task(
             description=f"""
@@ -164,25 +161,25 @@ class HronirCrew:
             expected_output="A structured judgment with winner, confidence, and reasoning",
             agent=self.agents["judge"]
         )
-        
+
         return Crew(
             agents=[self.agents["judge"]],
             tasks=[judgment_task],
             process=Process.sequential,
             verbose=self.config.verbose
         )
-        
-    async def execute_writing_task(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def execute_writing_task(self, task_data: dict[str, Any]) -> dict[str, Any]:
         """Execute a collaborative writing task."""
         crew = self.create_writing_crew(task_data)
-        
+
         try:
             result = crew.kickoff()
-            
+
             # Store the generated content
             content = result if isinstance(result, str) else str(result)
             chapter_uuid = storage.store_chapter_text(content)
-            
+
             return {
                 "uuid": chapter_uuid,
                 "content": content,
@@ -190,45 +187,45 @@ class HronirCrew:
                 "crew": self.config.name,
                 "success": True
             }
-            
+
         except Exception as e:
             return {
                 "error": str(e),
                 "crew": self.config.name,
                 "success": False
             }
-            
-    async def execute_judgment_task(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def execute_judgment_task(self, task_data: dict[str, Any]) -> dict[str, Any]:
         """Execute a judgment task."""
         crew = self.create_judgment_crew(task_data)
-        
+
         try:
             result = crew.kickoff()
-            
+
             # Parse the judgment result
             judgment = self._parse_crew_judgment(str(result))
-            
+
             return {
                 "judgment": judgment,
                 "crew": self.config.name,
                 "success": True
             }
-            
+
         except Exception as e:
             return {
                 "error": str(e),
                 "crew": self.config.name,
                 "success": False
             }
-            
-    def _parse_crew_judgment(self, result: str) -> Dict[str, Any]:
+
+    def _parse_crew_judgment(self, result: str) -> dict[str, Any]:
         """Parse judgment result from CrewAI output."""
         lines = result.strip().split('\n')
-        
+
         winner = None
         confidence = 0.5
         reasoning = ""
-        
+
         for line in lines:
             line = line.strip()
             if line.startswith("WINNER:"):
@@ -240,25 +237,25 @@ class HronirCrew:
                     confidence = 0.5
             elif line.startswith("REASONING:"):
                 reasoning = line.split(":", 1)[1].strip()
-                
+
         return {
             "winner": winner,
             "confidence": confidence,
             "reasoning": reasoning
         }
-        
-    async def run_competitive_writing_session(self, position: int, 
-                                            predecessor_uuid: Optional[str] = None,
-                                            num_chapters: int = 3) -> List[Dict[str, Any]]:
+
+    async def run_competitive_writing_session(self, position: int,
+                                            predecessor_uuid: str | None = None,
+                                            num_chapters: int = 3) -> list[dict[str, Any]]:
         """Run a competitive writing session with multiple chapters."""
-        
+
         # Get context
         context = ""
         if predecessor_uuid:
             hrönir_data = self.data_manager.get_hrönir_by_uuid(predecessor_uuid)
             if hrönir_data:
                 context = hrönir_data.text_content[:500]
-                
+
         # Generate multiple chapters
         tasks = []
         for i in range(num_chapters):
@@ -270,13 +267,13 @@ class HronirCrew:
                 "iteration": i+1
             }
             tasks.append(self.execute_writing_task(task_data))
-            
+
         # Execute all tasks
         results = await asyncio.gather(*tasks)
-        
+
         return results
-        
-    def get_crew_statistics(self) -> Dict[str, Any]:
+
+    def get_crew_statistics(self) -> dict[str, Any]:
         """Get statistics about crew performance."""
         return {
             "name": self.config.name,

@@ -1,5 +1,4 @@
 import json
-import os
 import shutil
 import uuid
 from pathlib import Path
@@ -8,8 +7,7 @@ import pytest
 from typer.testing import CliRunner
 
 from hronir_encyclopedia import cli as hronir_cli
-from hronir_encyclopedia import ratings, storage, transaction_manager, session_manager
-from hronir_encyclopedia.models import Path as PathModel
+from hronir_encyclopedia import session_manager, storage, transaction_manager
 
 runner = CliRunner()
 

@@ -11,7 +11,7 @@ from .judge import JudgeAgent
 
 __all__ = [
     "BaseHronirAgent",
-    "ChapterWriterAgent", 
+    "ChapterWriterAgent",
     "JudgeAgent",
 ]
 
