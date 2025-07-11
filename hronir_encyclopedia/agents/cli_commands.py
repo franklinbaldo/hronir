@@ -24,17 +24,23 @@ agent_app = typer.Typer(help="AI agent management commands")
 
 @agent_app.command("test-writer")
 def test_chapter_writer(
-    position: int = typer.Option(1, help="Position for the new chapter (must be >= 1, position 0 reserved for Tlön)"),
+    position: int = typer.Option(
+        1, help="Position for the new chapter (must be >= 1, position 0 reserved for Tlön)"
+    ),
     predecessor_uuid: str | None = typer.Option(None, help="UUID of predecessor hrönir"),
     theme: str = typer.Option("continuation", help="Theme for the chapter"),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output")
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
 ):
     """Test the Chapter Writer agent."""
 
     # Validate position
     if position == 0:
-        console.print("[bold red]Error: Position 0 is reserved for Tlön/Borges foundational content[/bold red]")
-        console.print("[yellow]Position 0 contains the original Borges short story and cannot be modified by AI agents.[/yellow]")
+        console.print(
+            "[bold red]Error: Position 0 is reserved for Tlön/Borges foundational content[/bold red]"
+        )
+        console.print(
+            "[yellow]Position 0 contains the original Borges short story and cannot be modified by AI agents.[/yellow]"
+        )
         console.print("[cyan]Please use position 1 or higher for new content generation.[/cyan]")
         raise typer.Exit(1)
 
@@ -50,7 +56,7 @@ def test_chapter_writer(
             role="Literary Creator",
             goal="Create test hrönir chapter",
             backstory="Test agent for demonstration",
-            verbose=verbose
+            verbose=verbose,
         )
 
         agent = ChapterWriterAgent(config)
@@ -59,11 +65,9 @@ def test_chapter_writer(
         with Progress() as progress:
             task = progress.add_task("[green]Generating chapter...", total=1)
 
-            result = agent.execute_task({
-                "position": position,
-                "predecessor_uuid": predecessor_uuid,
-                "theme": theme
-            })
+            result = agent.execute_task(
+                {"position": position, "predecessor_uuid": predecessor_uuid, "theme": theme}
+            )
 
             progress.update(task, advance=1)
 
@@ -74,7 +78,7 @@ def test_chapter_writer(
         console.print(f"Consistency Score: {result['consistency_score']:.2f}")
 
         # Show content preview
-        content = result['content']
+        content = result["content"]
         preview = content[:200] + "..." if len(content) > 200 else content
         console.print("\n[bold]Content Preview:[/bold]")
         console.print(f"[italic]{preview}[/italic]")
@@ -87,7 +91,7 @@ def test_chapter_writer(
 @agent_app.command("test-judge")
 def test_judge_agent(
     position: int = typer.Option(0, help="Position to judge"),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output")
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
 ):
     """Test the Judge agent with mock data."""
 
@@ -101,21 +105,21 @@ def test_judge_agent(
             role="Literary Critic",
             goal="Evaluate test hrönir chapters",
             backstory="Test judge for demonstration",
-            verbose=verbose
+            verbose=verbose,
         )
 
         agent = JudgeAgent(config)
 
         # Mock content for testing
         content_a = """
-        In the labyrinthine corridors of memory, where time folds upon itself like 
-        parchment in an ancient library, I encountered a curious manuscript. The text 
+        In the labyrinthine corridors of memory, where time folds upon itself like
+        parchment in an ancient library, I encountered a curious manuscript. The text
         spoke of infinite realities, each word a doorway to possibility.
         """
 
         content_b = """
-        The garden of forking paths stretched before me, each route a different destiny. 
-        In one direction lay the certainty of knowledge; in another, the sweet 
+        The garden of forking paths stretched before me, each route a different destiny.
+        In one direction lay the certainty of knowledge; in another, the sweet
         uncertainty of mystery. I chose the path that led to both.
         """
 
@@ -125,14 +129,16 @@ def test_judge_agent(
 
             judgment = agent._parse_judgment(
                 agent.generate_with_gemini(
-                    agent.get_agent_prompt({
-                        "content_a": content_a,
-                        "content_b": content_b,
-                        "position": position,
-                        "context": "Test context"
-                    })
+                    agent.get_agent_prompt(
+                        {
+                            "content_a": content_a,
+                            "content_b": content_b,
+                            "position": position,
+                            "context": "Test context",
+                        }
+                    )
                 ),
-                None  # Mock duel
+                None,  # Mock duel
             )
 
             progress.update(task, advance=1)
@@ -150,16 +156,20 @@ def test_judge_agent(
 
 @agent_app.command("test-crew")
 def test_crew_system(
-    position: int = typer.Option(1, help="Position for the task (must be >= 1, position 0 reserved for Tlön)"),
+    position: int = typer.Option(
+        1, help="Position for the task (must be >= 1, position 0 reserved for Tlön)"
+    ),
     predecessor_uuid: str | None = typer.Option(None, help="UUID of predecessor hrönir"),
     num_chapters: int = typer.Option(2, help="Number of chapters to generate"),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output")
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
 ):
     """Test the CrewAI integration."""
 
     # Validate position
     if position == 0:
-        console.print("[bold red]Error: Position 0 is reserved for Tlön/Borges foundational content[/bold red]")
+        console.print(
+            "[bold red]Error: Position 0 is reserved for Tlön/Borges foundational content[/bold red]"
+        )
         console.print("[yellow]CrewAI testing cannot use position 0.[/yellow]")
         console.print("[cyan]Please use position 1 or higher for crew testing.[/cyan]")
         raise typer.Exit(1)
@@ -170,20 +180,14 @@ def test_crew_system(
 
     try:
         # Create crew config
-        config = CrewConfig(
-            name="Test Crew",
-            agents=["chapter_writer"],
-            verbose=verbose
-        )
+        config = CrewConfig(name="Test Crew", agents=["chapter_writer"], verbose=verbose)
 
         crew = HronirCrew(config)
 
         # Run competitive writing session
         async def run_test():
             return await crew.run_competitive_writing_session(
-                position=position,
-                predecessor_uuid=predecessor_uuid,
-                num_chapters=num_chapters
+                position=position, predecessor_uuid=predecessor_uuid, num_chapters=num_chapters
             )
 
         with Progress() as progress:
@@ -203,12 +207,16 @@ def test_crew_system(
         table.add_column("Preview", style="yellow")
 
         for result in results:
-            if result.get('success'):
-                uuid = result['uuid']
-                preview = result['content'][:50] + "..." if len(result['content']) > 50 else result['content']
+            if result.get("success"):
+                uuid = result["uuid"]
+                preview = (
+                    result["content"][:50] + "..."
+                    if len(result["content"]) > 50
+                    else result["content"]
+                )
                 table.add_row(uuid, "✓", preview)
             else:
-                table.add_row("ERROR", "✗", result.get('error', 'Unknown error'))
+                table.add_row("ERROR", "✗", result.get("error", "Unknown error"))
 
         console.print(table)
 
@@ -219,16 +227,20 @@ def test_crew_system(
 
 @agent_app.command("competitive-session")
 def run_competitive_session(
-    position: int = typer.Option(1, help="Position for the competitive session (must be >= 1, position 0 reserved for Tlön)"),
+    position: int = typer.Option(
+        1, help="Position for the competitive session (must be >= 1, position 0 reserved for Tlön)"
+    ),
     predecessor_uuid: str | None = typer.Option(None, help="UUID of predecessor hrönir"),
     num_agents: int = typer.Option(3, help="Number of competing agents"),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output")
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
 ):
     """Run a competitive session between multiple AI agents."""
 
     # Validate position
     if position == 0:
-        console.print("[bold red]Error: Position 0 is reserved for Tlön/Borges foundational content[/bold red]")
+        console.print(
+            "[bold red]Error: Position 0 is reserved for Tlön/Borges foundational content[/bold red]"
+        )
         console.print("[yellow]Competitive sessions cannot modify position 0 content.[/yellow]")
         console.print("[cyan]Please use position 1 or higher for competitive sessions.[/cyan]")
         raise typer.Exit(1)
@@ -242,12 +254,12 @@ def run_competitive_session(
         writers = []
         for i in range(num_agents):
             config = AgentConfig(
-                name=f"Competitive Writer {i+1}",
+                name=f"Competitive Writer {i + 1}",
                 role="Literary Competitor",
-                goal=f"Create winning hrönir chapter (Agent {i+1})",
-                backstory=f"Competitive agent {i+1} focused on literary excellence",
+                goal=f"Create winning hrönir chapter (Agent {i + 1})",
+                backstory=f"Competitive agent {i + 1} focused on literary excellence",
                 verbose=verbose,
-                temperature=0.7 + (i * 0.1)  # Vary creativity
+                temperature=0.7 + (i * 0.1),  # Vary creativity
             )
             writers.append(ChapterWriterAgent(config))
 
@@ -260,7 +272,7 @@ def run_competitive_session(
                 result = writer.generate_competitive_chapter(
                     position=position,
                     predecessor_uuid=predecessor_uuid,
-                    opponent_strategy=f"strategy_{i}"
+                    opponent_strategy=f"strategy_{i}",
                 )
                 chapters.append(result)
                 progress.update(task, advance=1)
@@ -271,7 +283,7 @@ def run_competitive_session(
             role="Literary Judge",
             goal="Evaluate competitive chapters",
             backstory="Expert judge for competitive evaluation",
-            verbose=verbose
+            verbose=verbose,
         )
         judge = JudgeAgent(judge_config)
 
@@ -282,14 +294,16 @@ def run_competitive_session(
 
                 judgment = judge._parse_judgment(
                     judge.generate_with_gemini(
-                        judge.get_agent_prompt({
-                            "content_a": chapters[0]['content'],
-                            "content_b": chapters[1]['content'],
-                            "position": position,
-                            "context": judge.get_narrative_context(position, predecessor_uuid)
-                        })
+                        judge.get_agent_prompt(
+                            {
+                                "content_a": chapters[0]["content"],
+                                "content_b": chapters[1]["content"],
+                                "position": position,
+                                "context": judge.get_narrative_context(position, predecessor_uuid),
+                            }
+                        )
                     ),
-                    None  # Mock duel
+                    None,  # Mock duel
                 )
 
                 progress.update(task, advance=1)
@@ -306,10 +320,10 @@ def run_competitive_session(
 
         for i, chapter in enumerate(chapters):
             table.add_row(
-                f"Agent {i+1}",
-                chapter['uuid'],
+                f"Agent {i + 1}",
+                chapter["uuid"],
                 f"{chapter['consistency_score']:.2f}",
-                chapter['content'][:40] + "..."
+                chapter["content"][:40] + "...",
             )
 
         console.print(table)
@@ -333,7 +347,8 @@ def agent_status():
 
     # Check database
     try:
-        data_manager = storage.DataManager()
+        # data_manager = storage.DataManager() # F841 Unused
+        storage.DataManager()  # Call to check connection
         console.print("[green]✓ Database connection: OK[/green]")
 
         # Get some stats
@@ -345,6 +360,7 @@ def agent_status():
 
     # Check API keys
     import os
+
     if os.getenv("GEMINI_API_KEY"):
         console.print("[green]✓ Gemini API key: Configured[/green]")
     else:
@@ -353,6 +369,7 @@ def agent_status():
     # Check CrewAI
     try:
         import crewai
+
         console.print(f"[green]✓ CrewAI: Available (v{crewai.__version__})[/green]")
     except ImportError:
         console.print("[yellow]⚠ CrewAI: Not installed[/yellow]")

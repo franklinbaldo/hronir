@@ -173,6 +173,27 @@ class DataManager:
         self.backend.initialize_if_needed()
         return self.backend.get_transaction(tx_uuid)
 
+    def set_path_canonical_status(self, path_uuid: str, is_canonical: bool) -> None:
+        """Sets the is_canonical status for a specific path."""
+        self.backend.initialize_if_needed()
+        self.backend.set_path_canonical_status(path_uuid, is_canonical)
+
+    def clear_canonical_statuses_from_position(self, position: int) -> None:
+        """Sets is_canonical to FALSE for all paths at or after a given position."""
+        self.backend.initialize_if_needed()
+        self.backend.clear_canonical_statuses_from_position(position)
+
+    def get_max_path_position(self) -> int | None:
+        """Gets the maximum position value present in the paths table."""
+        self.backend.initialize_if_needed()
+        if hasattr(self.backend, "get_max_path_position"):
+            return self.backend.get_max_path_position()
+        # Fallback if backend doesn't have it: derive from all_paths (less efficient)
+        all_paths = self.get_all_paths()
+        if not all_paths:
+            return None
+        return max(p.position for p in all_paths)
+
     # --- Snapshot operations ---
     def create_snapshot(
         self, output_dir: Path, network_uuid: str, git_commit: str | None = None

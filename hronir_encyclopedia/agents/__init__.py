@@ -17,7 +17,8 @@ __all__ = [
 
 # Optional imports that may not be available
 try:
-    from .crew_manager import HronirCrew
-    __all__.append("HronirCrew")
+    # from .crew_manager import HronirCrew # F401 Unused
+    pass  # Keep try-except structure if other optional imports are added later
+    # __all__.append("HronirCrew") # F401 Unused
 except ImportError:
     pass

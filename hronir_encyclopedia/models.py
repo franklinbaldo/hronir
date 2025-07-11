@@ -1,20 +1,22 @@
 import datetime
 import pathlib
 import uuid
+from enum import Enum  # Added Enum
 from typing import Any
-from enum import Enum # Added Enum
 
 from pydantic import UUID5, BaseModel, Field, field_validator
 
 # --- Type Aliases ---
 MandateID = uuid.UUID
 
+
 # --- Enums ---
 class PathStatus(str, Enum):
     PENDING = "PENDING"
     QUALIFIED = "QUALIFIED"
     SPENT = "SPENT"
-    INVALID = "INVALID" # Added for completeness, though not used everywhere yet
+    INVALID = "INVALID"  # Added for completeness, though not used everywhere yet
+
 
 # --- Base Models ---
 
@@ -32,8 +34,9 @@ class Path(BaseModel):
     position: int
     prev_uuid: UUID5 | None = None
     uuid: UUID5
-    status: PathStatus = PathStatus.PENDING # Changed to PathStatus Enum
+    status: PathStatus = PathStatus.PENDING  # Changed to PathStatus Enum
     mandate_id: MandateID | None = None
+    is_canonical: bool = False  # Added for marking canonical paths
 
 
 # --- Session Models ---
@@ -123,11 +126,13 @@ class SessionVerdict(BaseModel):
 
 
 class TransactionContent(BaseModel):
-    """The content of a transaction, detailing session results."""
+    """The content of a transaction, detailing voting results and their impact."""
 
-    session_id: uuid.UUID
-    initiating_path_uuid: UUID5
-    verdicts_processed: list[SessionVerdict] = Field(default_factory=list)
+    # session_id: uuid.UUID # Removed
+    initiating_path_uuid: UUID5  # This is the path that provided the mandate for these votes
+    votes_processed: list[SessionVerdict] = Field(
+        default_factory=list
+    )  # Renamed from verdicts_processed
     promotions_granted: list[UUID5] = Field(default_factory=list)
 
 

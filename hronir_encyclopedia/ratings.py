@@ -10,6 +10,7 @@ from .models import Vote
 # Constant for testing qualification scenarios
 TEST_WINS_FOR_QUALIFICATION = 5
 
+
 def _calculate_elo_probability(elo_a: float, elo_b: float) -> float:
     """Calculate the probability of A winning against B."""
     return 1 / (1 + 10 ** ((elo_b - elo_a) / 400))

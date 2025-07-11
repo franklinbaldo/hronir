@@ -1,14 +1,16 @@
 import datetime  # Added for Optional[datetime] type hint
 import json
-import logging  # Added to fix Ruff F821
+import logging
 from pathlib import Path
 
 import duckdb
-from pydantic import ValidationError
+from pydantic import ValidationError  # Moved up
 
 from .models import Path as PathModel
-from .models import Transaction, Vote
+from .models import PathStatus, Transaction, TransactionContent, Vote  # Added PathStatus
 from .sharding import ShardingManager, SnapshotManifest  # Added
+
+logger = logging.getLogger(__name__)  # Ensure logger is defined here
 
 
 class DuckDBDataManager:
@@ -49,7 +51,8 @@ class DuckDBDataManager:
                 prev_uuid TEXT,
                 uuid TEXT,
                 status TEXT,
-                mandate_id TEXT
+                mandate_id TEXT,
+                is_canonical BOOLEAN DEFAULT FALSE
             );
             """
         )
@@ -68,7 +71,11 @@ class DuckDBDataManager:
             """
             CREATE TABLE IF NOT EXISTS transactions(
                 uuid TEXT PRIMARY KEY,
-                data TEXT
+                timestamp TIMESTAMPTZ,
+                prev_transaction_uuid TEXT,
+                initiating_path_uuid TEXT,
+                votes_processed JSON,
+                promotions_granted JSON
             );
             """
         )
@@ -113,14 +120,14 @@ class DuckDBDataManager:
                     except ValidationError:
                         continue
 
-        tx_empty = self.conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0] == 0
-        if tx_empty and self.transactions_json_dir.exists():
-            for jf in self.transactions_json_dir.glob("*.json"):
-                try:
-                    data = json.loads(jf.read_text())
-                    self.add_transaction(Transaction(**data))
-                except (json.JSONDecodeError, ValidationError):
-                    continue
+        # tx_empty = self.conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0] == 0 # Legacy load from JSON removed
+        # if tx_empty and self.transactions_json_dir.exists():
+        #     for jf in self.transactions_json_dir.glob("*.json"):
+        #         try:
+        #             data = json.loads(jf.read_text())
+        #             self.add_transaction(Transaction(**data)) # This would call the new add_transaction
+        #         except (json.JSONDecodeError, ValidationError):
+        #             continue
 
         self._initialized = True
 
@@ -131,7 +138,9 @@ class DuckDBDataManager:
 
     # --- Path operations ---
     def get_all_paths(self) -> list[PathModel]:
-        rows = self.conn.execute("SELECT * FROM paths").fetchall()
+        rows = self.conn.execute(
+            "SELECT path_uuid, position, prev_uuid, uuid, status, mandate_id, is_canonical FROM paths"
+        ).fetchall()
         paths: list[PathModel] = []
         for row in rows:
             try:
@@ -142,15 +151,17 @@ class DuckDBDataManager:
                     "uuid": row[3],
                     "status": row[4],
                     "mandate_id": row[5] if row[5] else None,
+                    "is_canonical": row[6] if row[6] is not None else False,
                 }
                 paths.append(PathModel(**data))
-            except ValidationError:
+            except ValidationError:  # pragma: no cover
+                logger.warning(f"Failed to validate path data from DB: {row}", exc_info=True)
                 continue
         return paths
 
     def get_paths_by_position(self, position: int) -> list[PathModel]:
         rows = self.conn.execute(
-            "SELECT * FROM paths WHERE position=?",
+            "SELECT path_uuid, position, prev_uuid, uuid, status, mandate_id, is_canonical FROM paths WHERE position=?",
             (position,),
         ).fetchall()
         paths: list[PathModel] = []
@@ -163,9 +174,14 @@ class DuckDBDataManager:
                     "uuid": row[3],
                     "status": row[4],
                     "mandate_id": row[5] if row[5] else None,
+                    "is_canonical": row[6] if row[6] is not None else False,
                 }
                 paths.append(PathModel(**data))
-            except ValidationError:
+            except ValidationError:  # pragma: no cover
+                logger.warning(
+                    f"Failed to validate path data from DB for position {position}: {row}",
+                    exc_info=True,
+                )
                 continue
         return paths
 
@@ -173,17 +189,28 @@ class DuckDBDataManager:
         data = path.model_dump()
         self.conn.execute(
             """
-            INSERT INTO paths(path_uuid, position, prev_uuid, uuid, status, mandate_id)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(path_uuid) DO NOTHING
-            """,
+            INSERT INTO paths(path_uuid, position, prev_uuid, uuid, status, mandate_id, is_canonical)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(path_uuid) DO UPDATE SET
+                position = excluded.position,
+                prev_uuid = excluded.prev_uuid,
+                uuid = excluded.uuid,
+                status = excluded.status,
+                mandate_id = excluded.mandate_id,
+                is_canonical = excluded.is_canonical
+            """,  # Using ON CONFLICT DO UPDATE to handle potential re-additions or updates
             (
                 str(data["path_uuid"]),
                 data["position"],
-                str(data["prev_uuid"] or ""),
+                str(data["prev_uuid"])
+                if data["prev_uuid"]
+                else None,  # Store NULL for None prev_uuid
                 str(data["uuid"]),
-                data.get("status", "PENDING"),
-                str(data["mandate_id"] or ""),
+                data.get("status", PathStatus.PENDING.value),  # Use enum value
+                str(data["mandate_id"])
+                if data["mandate_id"]
+                else None,  # Store NULL for None mandate_id
+                data.get("is_canonical", False),
             ),
         )
 
@@ -207,7 +234,7 @@ class DuckDBDataManager:
 
     def get_path_by_uuid(self, path_uuid: str) -> PathModel | None:
         row = self.conn.execute(
-            "SELECT * FROM paths WHERE path_uuid=?",
+            "SELECT path_uuid, position, prev_uuid, uuid, status, mandate_id, is_canonical FROM paths WHERE path_uuid=?",
             (path_uuid,),
         ).fetchone()
         if not row:
@@ -219,11 +246,37 @@ class DuckDBDataManager:
             "uuid": row[3],
             "status": row[4],
             "mandate_id": row[5] if row[5] else None,
+            "is_canonical": row[6] if row[6] is not None else False,
         }
         try:
             return PathModel(**data)
-        except ValidationError:
+        except ValidationError:  # pragma: no cover
+            logger.warning(
+                f"Failed to validate path data from DB for path_uuid {path_uuid}: {row}",
+                exc_info=True,
+            )
             return None
+
+    def set_path_canonical_status(self, path_uuid: str, is_canonical: bool) -> None:
+        """Sets the is_canonical status for a specific path."""
+        self.conn.execute(
+            "UPDATE paths SET is_canonical=? WHERE path_uuid=?",
+            (is_canonical, path_uuid),
+        )
+
+    def clear_canonical_statuses_from_position(self, position: int) -> None:
+        """Sets is_canonical to FALSE for all paths at or after a given position."""
+        self.conn.execute(
+            "UPDATE paths SET is_canonical=? WHERE position >= ?",
+            (False, position),
+        )
+
+    def get_max_path_position(self) -> int | None:
+        """Gets the maximum position value from the paths table."""
+        result = self.conn.execute("SELECT MAX(position) FROM paths").fetchone()
+        if result and result[0] is not None:
+            return int(result[0])
+        return None
 
     # --- Vote operations ---
     def get_all_votes(self) -> list[Vote]:
@@ -284,37 +337,84 @@ class DuckDBDataManager:
 
     # --- Transaction operations ---
     def get_all_transactions(self) -> list[Transaction]:
-        rows = self.conn.execute("SELECT * FROM transactions").fetchall()
+        rows = self.conn.execute(
+            "SELECT uuid, timestamp, prev_transaction_uuid, initiating_path_uuid, votes_processed, promotions_granted FROM transactions"
+        ).fetchall()
         txs: list[Transaction] = []
-        for row in rows:
+        for row_data in rows:
             try:
-                data = json.loads(row[1])
-                txs.append(Transaction(**data))
-            except (json.JSONDecodeError, ValidationError):
+                content = TransactionContent(
+                    initiating_path_uuid=row_data[3],
+                    votes_processed=json.loads(row_data[4])
+                    if isinstance(row_data[4], str)
+                    else row_data[4],  # Handle if already list/dict
+                    promotions_granted=json.loads(row_data[5])
+                    if isinstance(row_data[5], str)
+                    else row_data[5],
+                )
+                tx = Transaction(
+                    uuid=row_data[0],
+                    timestamp=row_data[1],
+                    prev_uuid=row_data[2] if row_data[2] else None,
+                    content=content,
+                )
+                txs.append(tx)
+            except (json.JSONDecodeError, ValidationError, TypeError) as e:
+                logger.error(f"Error reconstructing transaction {row_data[0]} from DB: {e}")
                 continue
         return txs
 
     def add_transaction(self, transaction: Transaction) -> None:
-        data = transaction.model_dump()
+        # Convert lists of Pydantic models (like SessionVerdict in votes_processed)
+        # or lists of UUIDs (promotions_granted) to JSON strings for storage.
+        votes_processed_json = json.dumps(
+            [vote.model_dump() for vote in transaction.content.votes_processed], default=str
+        )
+        promotions_granted_json = json.dumps(
+            [str(uuid_val) for uuid_val in transaction.content.promotions_granted], default=str
+        )
+
         self.conn.execute(
             """
-            INSERT INTO transactions(uuid, data)
-            VALUES (?, ?)
+            INSERT INTO transactions(uuid, timestamp, prev_transaction_uuid, initiating_path_uuid, votes_processed, promotions_granted)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(uuid) DO NOTHING
             """,
-            (str(data["uuid"]), json.dumps(data, default=str)),
+            (
+                str(transaction.uuid),
+                transaction.timestamp,
+                str(transaction.prev_uuid) if transaction.prev_uuid else None,
+                str(transaction.content.initiating_path_uuid),
+                votes_processed_json,
+                promotions_granted_json,
+            ),
         )
 
     def get_transaction(self, tx_uuid: str) -> Transaction | None:
-        row = self.conn.execute(
-            "SELECT data FROM transactions WHERE uuid=?",
+        row_data = self.conn.execute(
+            "SELECT uuid, timestamp, prev_transaction_uuid, initiating_path_uuid, votes_processed, promotions_granted FROM transactions WHERE uuid=?",
             (tx_uuid,),
         ).fetchone()
-        if not row:
+        if not row_data:
             return None
         try:
-            return Transaction(**json.loads(row[0]))
-        except (json.JSONDecodeError, ValidationError):
+            content = TransactionContent(
+                initiating_path_uuid=row_data[3],
+                votes_processed=json.loads(row_data[4])
+                if isinstance(row_data[4], str)
+                else row_data[4],
+                promotions_granted=json.loads(row_data[5])
+                if isinstance(row_data[5], str)
+                else row_data[5],
+            )
+            return Transaction(
+                uuid=row_data[0],
+                timestamp=row_data[1],
+                prev_uuid=row_data[2] if row_data[2] else None,
+                content=content,
+            )
+        except (json.JSONDecodeError, ValidationError, TypeError) as e:
+            logger.error(f"Error reconstructing transaction {tx_uuid} from DB: {e}")
             return None
 
     # --- Hrönir operations ---

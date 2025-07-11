@@ -112,14 +112,17 @@ uv run hronir store drafts/chapter.md
 # Create the path
 uv run hronir path --position N --source <uuid_of_previous> --target <new_uuid>
 
-# Start judgment session
-uv run hronir session start --path-uuid <qualified_path_uuid>
+# Discover duels (after a path at N is QUALIFIED)
+uv run hronir query get-duel --position <P> # Where P < N
 
-# Commit session verdicts
-uv run hronir session commit --session-id <id> --verdicts '{"position": "winning_path_uuid"}'
+# Submit votes using a qualified mandate path
+# Mandate path at position N allows sqrt(N) votes.
+uv run hronir vote submit --mandate-path-uuid <qualified_path_uuid_at_pos_N> \
+  --votes-json '[{"position": "<P1>", "winner_hrönir_uuid": "...", "loser_hrönir_uuid": "...", "predecessor_hrönir_uuid": "..."}, \
+                   {"position": "<P2>", "winner_hrönir_uuid": "...", "loser_hrönir_uuid": "...", "predecessor_hrönir_uuid": "..."}]'
 
 # View rankings
-uv run hronir ranking <position>
+uv run hronir query ranking <position>
 
 # List paths (optional --position to filter)
 uv run hronir list-paths --position <position>
@@ -129,13 +132,13 @@ uv run hronir path-status <path_uuid>
 
 # Show canonical path status
 uv run hronir status
-uv run hronir status --counts
+uv run hronir query status --counts # Corrected command path
 
-# Get duel information
-uv run hronir get-duel --position <position>
+# Get duel information (used by agents to find duels to vote on)
+uv run hronir query get-duel --position <position> # Corrected command path
 
 # Trigger manual canonical path recovery
-uv run hronir recover-canon
+uv run hronir admin recover-canon # Corrected command path
 ```
 
 ## Architecture
@@ -159,10 +162,10 @@ uv run hronir recover-canon
 
 The system follows a Protocol v2 architecture with these key phases:
 
-1. **Path Creation**: Agents store new chapters and then register paths using the `path` command
-2. **Qualification**: Paths earn `QUALIFIED` status through duel performance
-3. **Judgment Sessions**: Qualified paths grant mandate to judge prior history
-4. **Temporal Cascade**: Session commits trigger canonical path recalculation
+1. **Path Creation**: Agents store new chapters and then register paths using the `hronir store` and `hronir path` commands.
+2. **Qualification**: Paths earn `QUALIFIED` status through strong performance in duels against other paths at their position.
+3. **Voting with Mandate**: A `QUALIFIED` path (at position `N`) grants a voting mandate. The agent can then use `hronir query get-duel` to find duels at prior positions and submit up to `sqrt(N)` votes using `hronir vote submit`.
+4. **Temporal Cascade**: Vote submissions are recorded as transactions and trigger a Temporal Cascade, which recalculates the canonical path based on updated Elo ratings.
 
 ### Key Components
 
@@ -171,11 +174,11 @@ The system follows a Protocol v2 architecture with these key phases:
 - **`cli.py`**: Main CLI interface with Typer commands for all user interactions
 - **`storage.py`**: Core data persistence via `DataManager`, UUID management, and data validation. Uses `duckdb_storage.py`.
 - **`duckdb_storage.py`**: DuckDB-based data access layer.
-- **`models.py`**: Pure Pydantic models for data validation and business logic.
+- **`models.py`**: Pure Pydantic models for data validation and business logic (including `Transaction`, `TransactionContent`, `SessionVerdict` for votes).
 - **`graph_logic.py`**: NetworkX-based narrative consistency validation (operates on data from DuckDB).
-- **`session_manager.py`**: Manages judgment sessions and dossier generation.
-- **`transaction_manager.py`**: Immutable ledger for session commits and path promotions (data stored in DuckDB).
-- **`ratings.py`**: Elo ranking system and duel determination logic (data stored in DuckDB).
+- **`transaction_manager.py`**: Manages the recording of vote transactions to the DuckDB ledger and triggers path promotions/qualifications.
+- **`ratings.py`**: Elo ranking system, duel determination logic (`get_max_entropy_duel`), and path qualification checks. Operates on data in DuckDB.
+- **`canon.py`**: Handles Temporal Cascade logic and derivation of the canonical path from DuckDB data.
 - **`gemini_util.py`**: AI generation utilities using Google Gemini.
 
 #### Data Structure
@@ -183,39 +186,40 @@ The system follows a Protocol v2 architecture with these key phases:
 ```
 data/
 ├── encyclopedia.duckdb    # Main DuckDB database file containing all persistent data (paths, votes, transactions, hrönirs, etc.)
-├── sessions/              # Active/completed judgment sessions (JSON files, might be moved to DB eventually)
 └── backup/                # Backups of previous data formats or DB states.
-# the_library/             # Hrönir Markdown files (Kept for now due to deletion issues, but canonical data is in DuckDB)
-# narrative_paths/         # (Legacy, data moved to DuckDB)
-# ratings/                 # (Legacy, data moved to DuckDB)
-# data/transactions/       # (Legacy, data moved to DuckDB)
-# data/canonical_path.json # (Legacy, data/logic moved to DuckDB or generated dynamically)
+# the_library/             # (Legacy) Hrönir Markdown files. Canonical content is in DuckDB's `hronirs` table.
+# narrative_paths/         # (Legacy) CSV storage for paths. Canonical data in DuckDB's `paths` table.
+# ratings/                 # (Legacy) CSV storage for votes. Canonical data in DuckDB's `votes` table.
+# data/transactions/       # (Legacy) JSON storage for transaction ledger. Canonical data in DuckDB's `transactions` table.
+# data/sessions/           # (Removed) No longer used with the new voting protocol.
+# data/canonical_path.json # (Legacy) Canonical path is now stored as `is_canonical` flags in DuckDB's `paths` table.
 ```
 
-Primary data (paths, votes, hrönir content, transactions) is stored in tables within the `data/encyclopedia.duckdb` file.
-The `data/sessions/` directory still holds JSON files for active sessions.
-The `the_library/` directory is currently left in the repository but its content is considered secondary to the `hronirs` table in DuckDB.
+Primary data (hrönir content, paths, votes, transactions) is stored in dedicated tables within the `data/encyclopedia.duckdb` file. The canonical path is determined by `is_canonical` flags on path records in the database.
 
 ### Key Protocol Concepts
 
 #### Path Status Lifecycle
 
 - `PENDING` → `QUALIFIED` → `SPENT`
-- Only `QUALIFIED` paths can initiate judgment sessions
-- Qualification requires strong duel performance (Elo-based)
+- Only `QUALIFIED` paths grant a voting mandate.
+- `QUALIFIED` status is earned through strong duel performance (Elo-based) against peers at its own position.
+- `SPENT` status indicates a path's voting mandate has been consumed.
 
-#### Session Workflow
+#### Voting Workflow (Replaces Session Workflow)
 
-1. Agent creates hrönir → receives `path_uuid`
-2. Path becomes `QUALIFIED` through competitive performance
-3. Agent uses qualified path to start session → receives dossier of maximum entropy duels
-4. Agent submits verdicts → triggers transaction recording and temporal cascade
+1. Agent creates a hrönir and its associated path (e.g., at position `N`).
+2. This path competes and, if successful, becomes `QUALIFIED`, granting a voting mandate.
+3. Agent uses the `QUALIFIED` path's UUID (`mandate_path_uuid`) to:
+    a. Discover duels at prior positions (`P < N`) using `hronir query get-duel --position <P>`.
+    b. Submit up to `sqrt(N)` votes for chosen duels using `hronir vote submit --mandate-path-uuid <mandate_path_uuid> --votes-json '[...]'`.
+4. Vote submission is recorded as a transaction, updates Elo ratings, marks the mandate path as `SPENT`, and triggers a Temporal Cascade.
 
 #### Temporal Cascade
 
-- Recalculates canonical path from oldest voted position forward (based on data in DuckDB).
-- Ensures narrative consistency after judgment sessions.
-- The canonical path is determined dynamically from DuckDB data or can be stored in a dedicated table/view within DuckDB if needed. The file `data/canonical_path.json` is no longer the primary source.
+- Recalculates the canonical path from the oldest voted-upon position forward, based on updated Elo ratings in DuckDB.
+- Ensures narrative consistency after vote submissions.
+- The canonical path is stored as `is_canonical` boolean flags on path records in the DuckDB `paths` table. The `data/canonical_path.json` file is legacy.
 
 ### UUID System
 
@@ -256,9 +260,9 @@ Tests focus on protocol dynamics:
 - The system uses DuckDB as its canonical storage for data, providing ACID transactions and SQL querying.
 - The `data/encyclopedia.duckdb` file is version-controlled.
 - All UUIDs are deterministic and content-addressed.
-- The canonical path is emergent, derived from data in DuckDB.
-- Session commits are atomic and trigger cascading updates, with transaction data stored in DuckDB.
-- Fork qualification uses Elo ratings with configurable thresholds (ratings stored in DuckDB).
+- The canonical path is emergent, derived from data in DuckDB (via `is_canonical` flags on paths).
+- Vote submissions result in atomic transactions (stored in DuckDB) that trigger cascading updates to the canonical path.
+- Path qualification (to `QUALIFIED` status, granting a voting mandate) uses Elo ratings with configurable thresholds.
 - NetworkX can be used to ensure narrative graph remains acyclic.
 
 ## Practical Testing Protocol
@@ -282,23 +286,39 @@ For comprehensive testing of the Hrönir Encyclopedia, follow this standardized 
 #### 2. Execute Complete Protocol Testing
 
 ```bash
-# Test the full happy path: store → path → session → vote
+# Test the full happy path: store → path → qualification → query duels → submit votes
 
 # Store all test hrönirs
 uv run hronir store test_temp/hrönir1.md
+# (Assume output is <hronir1_uuid>)
 uv run hronir store test_temp/hrönir2.md
-# ... (repeat for all test files)
+# (Assume output is <hronir2_uuid>)
+# ... create other hrönirs for duels, e.g. <hronir_alt1_uuid>
 
 # Create narrative paths
-uv run hronir path --position N --source <prev_uuid> --target <new_uuid>
+# e.g., Path P0 for position 0, using <hronir1_uuid>
+uv run hronir path --position 0 --target <hronir1_uuid>
+# (Assume output is <path_P0_uuid>)
 
-# Generate and execute judgment sessions
-uv run hronir session start --path-uuid <qualified_path_uuid>
-uv run hronir session commit --session-id <id> --verdicts '{"position": "winning_path_uuid"}'
+# e.g., Path P1 for position 1, using <hronir2_uuid>, prev <hronir1_uuid>
+uv run hronir path --position 1 --source <hronir1_uuid> --target <hronir2_uuid>
+# (Assume output is <path_P1_uuid>. This will be our mandate path after qualification)
+
+# Manually qualify path P1 for testing purposes (or ensure it wins duels)
+uv run hronir admin dev-qualify --path-uuid <path_P1_uuid>
+
+# Discover duels (e.g., for position 0)
+uv run hronir query get-duel --position 0
+# (Review output to find winner/loser UUIDs for the vote)
+
+# Submit votes (Path P1 is at N=1, so sqrt(1)=1 vote allowed)
+# Assume duel at pos 0 was between hronirX (winner) and hronirY (loser)
+uv run hronir vote submit --mandate-path-uuid <path_P1_uuid> \
+  --votes-json '[{"position": 0, "winner_hrönir_uuid": "<hronirX_uuid>", "loser_hrönir_uuid": "<hronirY_uuid>", "predecessor_hrönir_uuid": null}]'
 
 # Validate system state
-uv run hronir audit
-uv run hronir status --counts
+uv run hronir admin audit
+uv run hronir query status --counts
 ```
 
 #### 3. Collect Development Insights

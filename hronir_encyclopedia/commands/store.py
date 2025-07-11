@@ -4,7 +4,7 @@ from typing import Annotated
 
 import typer
 
-from .. import storage # Relative import
+from .. import storage  # Relative import
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,9 @@ def store(chapter: Annotated[Path, typer.Argument(exists=True, dir_okay=False, r
         raise typer.Exit(1)
 
 
-@store_app.command(help="Generate competing chapters from a predecessor and record an initial vote.")
+@store_app.command(
+    help="Generate competing chapters from a predecessor and record an initial vote."
+)
 def synthesize(
     position: Annotated[int, typer.Option(help="Chapter position for the new hrönirs.")],
     prev: Annotated[

@@ -1,15 +1,15 @@
 import logging
-import os # Required for _validate_path_inputs_helper, though it's in cli_utils
-import uuid # Required for PathModel
-from pathlib import Path
+import uuid  # Required for PathModel
 from typing import Annotated
 
 import pandas as pd
 import typer
 
-from .. import utils # Changed from cli_utils
-from .. import storage # Relative import
-from ..models import Path as PathModel # Relative import
+from .. import (
+    storage,  # Relative import
+    utils,  # Changed from cli_utils
+)
+from ..models import Path as PathModel  # Relative import
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ def path(
 
     path_uuid_obj = storage.compute_narrative_path_uuid(position, norm_source, target)
     dm = storage.DataManager()
-    if not dm._initialized: # Ensure DM is loaded
+    if not dm._initialized:  # Ensure DM is loaded
         dm.initialize_and_load()
     if any(p.path_uuid == path_uuid_obj for p in dm.get_paths_by_position(position)):
         typer.echo(f"Path already exists: {path_uuid_obj}")
@@ -45,7 +45,7 @@ def path(
             status="PENDING",
         )
     )
-    dm.save_all_data() # Ensure data is saved
+    dm.save_all_data()  # Ensure data is saved
     typer.echo(
         f"Created path: {path_uuid_obj} (Pos: {position}, Src: {norm_source or 'None'}, Tgt: {target}, Status: PENDING)"
     )
@@ -61,11 +61,11 @@ def list_paths(position: Annotated[int, typer.Option(help="Position to list path
     typer.echo(f"{'Paths at position ' + str(position) if position is not None else 'All paths'}:")
     # df = pd.DataFrame([p.dict() for p in paths_list]) # Use model_dump for Pydantic v2
     df = pd.DataFrame([p.model_dump() for p in paths_list])
-    for col in ["prev_uuid", "mandate_id"]: # Ensure these columns exist or handle missing
+    for col in ["prev_uuid", "mandate_id"]:  # Ensure these columns exist or handle missing
         if col in df.columns:
             df[col] = df[col].astype(str).replace("None", "")
         else:
-            df[col] = "" # Add empty column if missing
+            df[col] = ""  # Add empty column if missing
 
     typer.echo(
         df[["path_uuid", "position", "prev_uuid", "uuid", "status", "mandate_id"]].to_string(
@@ -113,34 +113,49 @@ def validate_paths_command():
     for p_obj in all_paths:
         # Basic check: hrönir existence
         if not dm.hrönir_exists(str(p_obj.uuid)):
-            typer.secho(f"Error: Path {p_obj.path_uuid} points to non-existent hrönir {p_obj.uuid}", fg=typer.colors.RED)
+            typer.secho(
+                f"Error: Path {p_obj.path_uuid} points to non-existent hrönir {p_obj.uuid}",
+                fg=typer.colors.RED,
+            )
             errors_found += 1
 
         if p_obj.position > 0:
             if not p_obj.prev_uuid:
-                typer.secho(f"Error: Path {p_obj.path_uuid} (Pos {p_obj.position}) is missing prev_uuid.", fg=typer.colors.RED)
-                errors_found +=1
+                typer.secho(
+                    f"Error: Path {p_obj.path_uuid} (Pos {p_obj.position}) is missing prev_uuid.",
+                    fg=typer.colors.RED,
+                )
+                errors_found += 1
             elif not dm.hrönir_exists(str(p_obj.prev_uuid)):
-                typer.secho(f"Error: Path {p_obj.path_uuid} points to non-existent prev_uuid hrönir {p_obj.prev_uuid}", fg=typer.colors.RED)
+                typer.secho(
+                    f"Error: Path {p_obj.path_uuid} points to non-existent prev_uuid hrönir {p_obj.prev_uuid}",
+                    fg=typer.colors.RED,
+                )
                 errors_found += 1
         elif p_obj.position == 0 and p_obj.prev_uuid is not None:
-            typer.secho(f"Error: Path {p_obj.path_uuid} (Pos 0) has a prev_uuid {p_obj.prev_uuid}. Should be None.", fg=typer.colors.RED)
+            typer.secho(
+                f"Error: Path {p_obj.path_uuid} (Pos 0) has a prev_uuid {p_obj.prev_uuid}. Should be None.",
+                fg=typer.colors.RED,
+            )
             errors_found += 1
 
         # Recompute path_uuid for verification
         expected_path_uuid = storage.compute_narrative_path_uuid(
-            p_obj.position,
-            str(p_obj.prev_uuid) if p_obj.prev_uuid else "",
-            str(p_obj.uuid)
+            p_obj.position, str(p_obj.prev_uuid) if p_obj.prev_uuid else "", str(p_obj.uuid)
         )
         if p_obj.path_uuid != expected_path_uuid:
-            typer.secho(f"Error: Path {p_obj.path_uuid} has mismatched UUID. Expected {expected_path_uuid}", fg=typer.colors.RED)
+            typer.secho(
+                f"Error: Path {p_obj.path_uuid} has mismatched UUID. Expected {expected_path_uuid}",
+                fg=typer.colors.RED,
+            )
             errors_found += 1
 
     if errors_found == 0:
         typer.secho("All narrative paths validated successfully.", fg=typer.colors.GREEN)
     else:
-        typer.secho(f"Found {errors_found} errors in narrative path validation.", fg=typer.colors.YELLOW)
+        typer.secho(
+            f"Found {errors_found} errors in narrative path validation.", fg=typer.colors.YELLOW
+        )
         raise typer.Exit(1)
     # Placeholder logic from original cli.py was minimal. This is a more fleshed out version.
     # This command was a placeholder in the original cli.py.

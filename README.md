@@ -23,10 +23,11 @@ Interfaces humanas (como um site de leitura) são possíveis e bem-vindas, mas s
 ```mermaid
 graph TD
     A[Agente] -- 1. Cria Path em N (Prova de Trabalho) --> B(Sistema);
-    B -- 2. Gera Dossiê de Duelos (N-1..0) --> A;
-    A -- 3. Submete Veredito Atômico (`session commit`) --> B;
-    B -- "4a. Registra no Ledger" --> C{Ledger};
-    B -- "4b. Aciona Cascata Temporal" --> D[data/canonical_path.json Atualizado];
+    B -- 2. Path se torna QUALIFIED (via Duelos) --> A;
+    A -- 3. Agente consulta Duelos (`hronir query get-duel`) --> B;
+    A -- 4. Submete Votos (`hronir vote submit` usando Mandato do Path Qualificado) --> B;
+    B -- "5a. Registra Transação de Votos no Ledger (DuckDB)" --> C{Ledger};
+    B -- "5b. Aciona Cascata Temporal" --> D[Canon Atualizado no DuckDB];
     C --> D;
 ```
 
@@ -92,8 +93,8 @@ The encyclopedia grows through interconnected processes:
 
 - **Generation**: AI creates new chapter variants (`hrönirs`) from the accumulated narrative space.
 - **Collaboration**: Human contributors submit chapter variants.
-- **Selection (Tribunal of the Future)**: The encyclopedia's canon evolves through the **Tribunal of the Future**. Instead of single votes, influence is now wielded through **Judgment Sessions**. When a contributor creates a new, high-quality path that proves its relevance by performing well in duels, it becomes **`QUALIFIED`**. This grants a one-time right to initiate a session, acting as a judge over all of prior history. This mechanism ensures that only meaningful contributions can shape the past, providing a robust defense against low-effort Sybil attacks.
-- **Evolution**: Veredicts from Judgment Sessions update Elo rankings for paths (stored in DuckDB). The **Temporal Cascade**, triggered by `session commit`, recalculates the canonical path, which is a sequence of path decisions representing the most "inevitable" narrative. This path is derived from data within DuckDB.
+- **Selection (Tribunal of the Future)**: The encyclopedia's canon evolves through the **Tribunal of the Future**. When a contributor creates a new, high-quality path that proves its relevance by performing well in duels against other paths at its position, it becomes **`QUALIFIED`**. This QUALIFIED path grants a "voting mandate" to its creator. The mandate allows the agent to submit a batch of up to `sqrt(N)` votes on duels at previous positions (where `N` is the position of the qualified path).
+- **Evolution**: Submitted votes update Elo rankings for paths (stored in DuckDB). The **Temporal Cascade**, triggered by the submission of votes (via `hronir vote submit`), recalculates the canonical path. The canonical path is a sequence of pathing decisions representing the most "inevitable" narrative, derived from the latest ratings in DuckDB and stored as flags on the paths themselves.
 
 ## 🤖 Daily Automated Generation
 
@@ -131,20 +132,24 @@ Agents (human or AI) interact with the protocol primarily through the Command Li
 
     The `store` command processes the Markdown file, stores its content in the database, and outputs the content-derived `<new_uuid>`, which you pass to `path`.
 
-3.  **Initiate a Judgment Session (`session start` command)**:
-    With the `path_uuid` obtained (representing your new `path` at Position `N`), you gain the right to start a "Judgment Session." This session will present you with a dossier of maximum entropy duels for all previous positions (`N-1` down to `0`).
-
+3.  **Qualify Your Path & Discover Duels**:
+    Your new path at Position `N` must become `QUALIFIED` by performing well in duels against other paths at position `N` (this happens automatically based on ongoing ratings). Once qualified, it grants you a voting mandate. You can discover duels to vote on using:
     ```bash
-    uv run hronir session start --path-uuid <your_path_uuid_from_position_N>
+    uv run hronir query get-duel --position <position_to_judge>
+    ```
+    You can do this for up to `sqrt(N)` positions prior to your mandate path's position.
+
+4.  **Submit Votes (`vote submit` command)**:
+    Using your qualified `path_uuid` (now a `mandate_path_uuid`), you submit your votes for the duels you choose to judge. This is an atomic act that records your votes and can trigger a "Temporal Cascade," potentially altering the canonical path of the story.
+    ```bash
+    # Example: Mandate path is at N=4, allowing sqrt(4)=2 votes.
+    # Votes are provided as a JSON string.
+    uv run hronir vote submit --mandate-path-uuid <your_qualified_path_uuid> \
+      --votes-json '[{"position": 0, "winner_hrönir_uuid": "uuid_for_pos0_winner", "loser_hrönir_uuid": "uuid_for_pos0_loser", "predecessor_hrönir_uuid": null}, \
+                       {"position": 2, "winner_hrönir_uuid": "uuid_for_pos2_winner", "loser_hrönir_uuid": "uuid_for_pos2_loser", "predecessor_hrönir_uuid": "uuid_of_pos1_canon_hrönir"}]'
     ```
 
-4.  **Submit Veredicts (`session commit` command)**:
-    After analyzing the dossier, you submit your veredicts for the duels you choose to judge. This is an atomic act that records your votes and can trigger a "Temporal Cascade," potentially altering the canonical path of the story.
-    ```bash
-    uv run hronir session commit --session-id <session_id> --verdicts '{"<pos>": "<winning_path_uuid>", ...}'
-    ```
-
-This cycle of `store` -> `session start` -> `session commit` is the main mechanism by which agents (whether they are humans operating the CLI or automated AI programs) interact with the protocol to shape the narrative. "Collaboration" occurs at the level of competition and judgment governed by the protocol.
+This cycle of `store` path -> path becomes `QUALIFIED` -> `query get-duel` -> `vote submit` is the main mechanism by which agents interact with the protocol.
 
 ---
 
@@ -156,7 +161,7 @@ Every new chapter (**n**):
 - Employs a sophisticated language model (LLM), guided by a carefully crafted **synthesis prompt** that encapsulates themes, motifs, characters, and ideas accumulated thus far.
 - Can exist in multiple variants (e.g., `2_a`, `2_b`, `2_c`), each exploring different interpretations of the collective narrative space.
 
-The narrative expands exponentially, creating a network of infinite possibilities. Each act of creation (generating a new hrönir and its associated `path_uuid`) grants the author a mandate to participate in a **Judgment Session**, potentially influencing the canonical interpretation of all preceding history.
+The narrative expands exponentially, creating a network of infinite possibilities. Each act of creation (generating a new hrönir and its associated `path_uuid`) that becomes `QUALIFIED` grants the author a mandate to submit votes, potentially influencing the canonical interpretation of preceding history.
 
 ---
 
@@ -164,16 +169,16 @@ The narrative expands exponentially, creating a network of infinite possibilitie
 
 The "true chapter," or more precisely, the **canonical path of `paths`** (narrative transitions), is not selected by a central authority but emerges through a continuous process of judgment and re-evaluation, called "The Tribunal of the Future." This is the heart of the protocol.
 
-- **Proof-of-Work and Mandate for Judgment**: By introducing a new `path` (a new narrative possibility) at Position `N` via the `store` command (which saves chapter content to DuckDB), an agent performs a "Proof-of-Work." This grants the agent a "mandate" to start a Judgment Session.
-- **Atomic Judgment Sessions**: Using the `path_uuid` from their contribution at `N`, the agent initiates a session (`session start`). The system presents a static "dossier" of the maximum entropy duels for all prior positions (`N-1` to `0`), based on data in DuckDB. The agent then submits their veredicts for any subset of these duels in a single `session commit`.
-- **Immutable Ledger and Temporal Cascade**: Each `session commit` is recorded as a transaction in the `transactions` table within the DuckDB database. Crucially, this commit triggers a "Temporal Cascade": the system recalculates the canonical path using data in DuckDB, starting from the oldest position affected by the agent's veredicts, propagating the changes forward.
-- **Elo Rankings and Emergence**: The votes (veredicts) update the Elo ratings of the competing `paths` (ratings stored in DuckDB). The canonical path is derived from these ratings. There are no fixed "canonical chapters," but rather a canonical path of _pathing decisions_ that is always subject to revision by the Temporal Cascade, based on new judgments.
+- **Proof-of-Work and Mandate for Judgment**: By introducing a new `path` (a new narrative possibility) at Position `N` (linking a new hrönir to a predecessor) and having this path become `QUALIFIED` through strong performance in duels, an agent performs a "Proof-of-Work and Relevance." This grants the agent a "voting mandate" tied to this qualified path.
+- **Exercising Voting Mandate**: The mandate from a qualified path at Position `N` allows the agent to submit up to `sqrt(N)` votes on duels at any prior positions (from `N-1` down to `0`). Agents can discover high-entropy duels using `hronir query get-duel --position <pos>`. Votes are submitted in a batch using `hronir vote submit --mandate-path-uuid <qualified_path_uuid> --votes-json <json_string_of_votes>`.
+- **Immutable Ledger and Temporal Cascade**: Each `vote submit` action is recorded as a transaction in the `transactions` table within the DuckDB database. This commit triggers a "Temporal Cascade": the system recalculates the canonical path using data in DuckDB (specifically, by updating `is_canonical` flags on paths), starting from the oldest position affected by the agent's votes and propagating the changes forward.
+- **Elo Rankings and Emergence**: The submitted votes update the Elo ratings of the competing `paths` (ratings stored in DuckDB). The canonical path is derived from these ratings during the Temporal Cascade. There are no fixed "canonical chapters," but rather a canonical sequence of _pathing decisions_ that is always subject to revision by new judgments.
 
 This mechanism ensures that:
 
-1.  Influence over the canon is earned through contribution (Proof-of-Work).
-2.  Judgment is comprehensive, allowing a new perspective at `N` to re-evaluate all of prior history.
-3.  All decisions are transparent and auditable via the transaction ledger.
+1.  Influence over the canon is earned through contribution and proven relevance (Proof-of-Work + Qualification).
+2.  Judgment allows a new perspective at `N` to influence prior history, with voting power scaled by `sqrt(N)`.
+3.  All voting decisions are transparent and auditable via the transaction ledger in DuckDB.
 4.  The canon is an emergent state of the system, reflecting the history of weighted judgments, rather than a static selection.
 
 The "Tribunal of the Future" is, therefore, the process by which the system continuously reinterprets its past in light of its expanding present, allowing a cohesive and "inevitable" narrative to emerge organically from the adversarial and regulated interaction of agents.
@@ -187,11 +192,10 @@ The primary data storage is the DuckDB database file `data/encyclopedia.duckdb`.
 ```
 data/
 ├── encyclopedia.duckdb    # Main DuckDB database file. Contains all core persistent data.
-├── sessions/              # Active judgment session files (e.g., <session_id>.json). These are temporary state files.
-│   └── consumed_path_uuids.json # Record of path_uuids used to start sessions.
 └── backup/                # Timestamped backups of data (e.g., from migrations).
 
 # Legacy directories (data migrated to DuckDB, kept for reference or due to deletion issues):
+# sessions/ directory and its contents are no longer used by the new voting protocol.
 # the_library/             # Original Markdown storage for hrönirs. Canonical content is now in DuckDB.
 # narrative_paths/         # Original CSV storage for narrative paths.
 # ratings/                 # Original CSV storage for votes/ratings.
@@ -207,36 +211,44 @@ Key data tables within `data/encyclopedia.duckdb` include:
 
 ---
 
-## ⚖️ The Tribunal of the Future: The Main Workflow
+## ⚖️ The Tribunal of the Future: The Main Workflow (New Voting Protocol)
 
-The core mechanism for evolving the canonical narrative is the "Tribunal of the Future." After your new path becomes **`QUALIFIED`** through duels, you can initiate a Judgment Session.
+The core mechanism for evolving the canonical narrative is the "Tribunal of the Future," which operates through a direct voting system.
 
-1.  **Initiate a Session (`session start`):**
-    Use your qualified `path_uuid` to start a session. The system provides a `session_id` and a "dossier" of duels for prior positions.
-
+1.  **Create and Qualify a Path**:
+    First, an agent creates a new hrönir and registers its path (e.g., at Position `N`):
     ```bash
-    # Your new path at position 10 has been QUALIFIED.
-    uv run hronir session start \
-      --path-uuid <your_qualified_path_uuid>
+    uv run hronir store drafts/my_new_chapter.md
+    uv run hronir path --position N --source <uuid_of_previous_hronir> --target <new_uuid_from_store>
+    ```
+    This path must then become `QUALIFIED` by performing well in duels against other paths at position `N`. Qualification is determined by the system based on ongoing ratings. A `QUALIFIED` path grants a voting mandate.
+
+2.  **Discover Duels to Vote On**:
+    With a qualified path (let's call its UUID `<mandate_path_uuid>`), the agent can identify duels at prior positions using:
+    ```bash
+    uv run hronir query get-duel --position <P>
+    ```
+    Where `<P>` is a position less than `N`. The agent can submit votes for up to `sqrt(N)` different prior positions.
+
+3.  **Submit Votes (`vote submit` command)**:
+    The agent submits their chosen votes in a single, atomic transaction. Votes are provided as a JSON string.
+    ```bash
+    # Example: Mandate path is at N=4 (allowing sqrt(4)=2 votes).
+    # Agent chooses to vote on positions 0 and 2.
+    uv run hronir vote submit \
+      --mandate-path-uuid <mandate_path_uuid> \
+      --votes-json '[
+        {"position": 0, "winner_hrönir_uuid": "winner_uuid_pos0", "loser_hrönir_uuid": "loser_uuid_pos0", "predecessor_hrönir_uuid": null},
+        {"position": 2, "winner_hrönir_uuid": "winner_uuid_pos2", "loser_hrönir_uuid": "loser_uuid_pos2", "predecessor_hrönir_uuid": "canon_hrönir_at_pos1"}
+      ]'
     ```
 
-2.  **Deliberate and Form Veredicts (Offline):**
-    Review the static dossier. For each duel you wish to judge, select a winner.
+**Consequences of Submitting Votes:**
 
-3.  **Commit Veredicts (`session commit`):**
-    Submit your veredicts in a single, atomic commit using the `session_id`.
-    ```bash
-    # Provide veredicts as a JSON string mapping position -> winning_path_uuid
-    uv run hronir session commit \
-      --session-id <your_session_id> \
-      --verdicts '{"9": "winning_path_for_pos9", "2": "winning_path_for_pos2"}'
-    ```
-
-**Consequences of Committing:**
-
-- Your veredicts are recorded as permanent votes in the DuckDB database.
-- The session is immutably logged in the `transactions` table within the DuckDB database.
-- The **Temporal Cascade** is triggered, recalculating the canonical path (derived from data in DuckDB) from the oldest position you judged. This is now the sole mechanism for updating the canon.
+- Your votes are recorded in the DuckDB database (affecting Elo ratings).
+- The voting action is immutably logged as a transaction in the `transactions` table (DuckDB).
+- The `mandate_path_uuid` is marked as `SPENT`.
+- The **Temporal Cascade** is triggered, recalculating the canonical path (by updating `is_canonical` flags on paths in DuckDB) from the oldest position you voted on. This is the sole mechanism for updating the canon.
 
 ---
 
@@ -275,21 +287,20 @@ uv run hronir audit
 # Remove invalid hrönirs, narrative paths, or votes
 uv run hronir clean --git
 
-# Get the current "Duel of Maximum Entropy" for a position (used internally by `session start`)
-# This can be useful to understand what duel a new session might present for a given position.
-# Under Protocol v2, this is mainly for inspection; user voting is via `session commit`.
-uv run hronir get-duel --position 1
+# Get the current "Duel of Maximum Entropy" for a position.
+# Agents use this to discover duels they can vote on using their mandate.
+uv run hronir query get-duel --position 1
 
 # Generate path status metrics in Prometheus format
 uv run hronir metrics
 
 # Recover canon / Consolidate book (trigger Temporal Cascade from position 0)
 # Under the "Tribunal of the Future" protocol, the canonical path is primarily updated
-# by the Temporal Cascade triggered by `session commit`.
-# The `recover-canon` (formerly `consolidate-book`) command serves as a manual way
+# by the Temporal Cascade triggered by `hronir vote submit`.
+# The `recover-canon` command serves as a manual way
 # to trigger this cascade from the very beginning (position 0), useful for initialization,
 # full recalculations, or recovery.
-uv run hronir recover-canon
+uv run hronir admin recover-canon
 ```
 
 ### Snapshot Management
@@ -307,7 +318,7 @@ uv run hronir push
 
 ## 🔏 Proof-of-Work (Mandate for Judgment)
 
-Under Protocol v2, Proof-of-Work has been elevated. Creating a new path is just the beginning. True influence—the **mandate for judgment**—is earned through **Proof of Relevance**. Only when your path proves its value in duels and becomes `QUALIFIED` do you gain the right to initiate a `session` and reshape the narrative's history.
+Creating a new path is just the beginning. True influence—the **mandate for judgment**—is earned through **Proof of Relevance**. Only when your path proves its value in duels (against other paths at its position) and becomes `QUALIFIED` do you gain the right to submit votes (up to `sqrt(N)` votes for a path at position `N`) and reshape the narrative's history. This mandate is consumed once votes are submitted.
 
 ## Development Setup
 
@@ -427,16 +438,31 @@ To influence the canonical narrative:
 
 1. **Create High-Quality Hrönirs**: Write Markdown chapters following Borgesian themes
 2. **Use the Protocol**: Store chapters via `uv run hronir store` and create paths with `uv run hronir path`
-3. **Earn Qualification**: Your path must prove itself through duel performance
-4. **Exercise Judgment**: Use qualified paths to start sessions and shape the canon
+3. **Earn Qualification**: Your path must prove itself through duel performance against other paths at its position.
+4. **Exercise Judgment**: Once your path (e.g., at position `N`) is `QUALIFIED`, use its UUID as a mandate to submit votes.
+    - Discover duels: `uv run hronir query get-duel --position <P>` (where P < N)
+    - Submit up to `sqrt(N)` votes: `uv run hronir vote submit --mandate-path-uuid <your_qualified_path_uuid> --votes-json '[...]'`
 
 ```bash
-# Example contribution workflow
+# Example contribution workflow (assuming your new path is at position N=4)
 uv run hronir store my_chapter.md
-uv run hronir path --position N --source <predecessor_uuid> --target <new_uuid>
-# Wait for path to become QUALIFIED through duels
-uv run hronir session start --path-uuid <qualified_path_uuid>
-uv run hronir session commit --session-id <id> --verdicts '{"pos": "winner"}'
+# Output: <new_hrönir_uuid>
+uv run hronir path --position 4 --source <predecessor_uuid_at_pos3> --target <new_hrönir_uuid>
+# Output: Path <your_new_path_uuid> created...
+# Wait for <your_new_path_uuid> to become QUALIFIED through duel performance.
+# Check status: uv run hronir path path-status --path-uuid <your_new_path_uuid>
+
+# Once QUALIFIED, discover duels for positions 0 to 3:
+uv run hronir query get-duel --position 0
+uv run hronir query get-duel --position 1
+# ... up to sqrt(4) = 2 votes allowed for chosen positions.
+
+# Submit votes (example for 2 votes):
+uv run hronir vote submit --mandate-path-uuid <your_new_path_uuid> \
+  --votes-json '[
+    {"position": 0, "winner_hrönir_uuid": "winner_for_0", "loser_hrönir_uuid": "loser_for_0", "predecessor_hrönir_uuid": null},
+    {"position": 2, "winner_hrönir_uuid": "winner_for_2", "loser_hrönir_uuid": "loser_for_2", "predecessor_hrönir_uuid": "canon_hrönir_at_pos1"}
+  ]'
 ```
 
 **Style Guidelines**: Write in concise, philosophical style with metafictional hints. Aim for 300-500 words per chapter. Reference earlier themes to maintain narrative continuity.

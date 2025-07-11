@@ -20,12 +20,12 @@ class JudgeAgent(BaseHronirAgent):
                 name="Judge",
                 role="Literary Critic",
                 goal="Evaluate hrönir chapters fairly and vote for the most compelling narratives",
-                backstory="""You are a discerning literary critic with deep appreciation for Borgesian 
-                philosophy. You evaluate texts not just for their prose quality, but for their 
+                backstory="""You are a discerning literary critic with deep appreciation for Borgesian
+                philosophy. You evaluate texts not just for their prose quality, but for their
                 metaphysical depth, narrative coherence, and contribution to the greater literary labyrinth.""",
                 competitive_mode=True,
                 temperature=0.3,  # Lower temperature for more consistent judgments
-                max_tokens=1000
+                max_tokens=1000,
             )
         super().__init__(config)
 
@@ -53,20 +53,23 @@ class JudgeAgent(BaseHronirAgent):
         # Record the vote
         vote_uuid = self._record_vote(position, judgment)
 
-        self.log_action("judgment_made", {
-            "session_id": session_id,
-            "position": position,
-            "winner": judgment["winner"],
-            "confidence": judgment["confidence"],
-            "vote_uuid": vote_uuid
-        })
+        self.log_action(
+            "judgment_made",
+            {
+                "session_id": session_id,
+                "position": position,
+                "winner": judgment["winner"],
+                "confidence": judgment["confidence"],
+                "vote_uuid": vote_uuid,
+            },
+        )
 
         return {
             "session_id": session_id,
             "position": position,
             "judgment": judgment,
             "vote_uuid": vote_uuid,
-            "agent": self.config.name
+            "agent": self.config.name,
         }
 
     def get_agent_prompt(self, task_data: dict[str, Any]) -> str:
@@ -77,7 +80,7 @@ class JudgeAgent(BaseHronirAgent):
         context = task_data.get("context", "")
 
         prompt = f"""
-        As a Judge Agent in the Hronir Encyclopedia, you must evaluate two competing hrönir chapters 
+        As a Judge Agent in the Hronir Encyclopedia, you must evaluate two competing hrönir chapters
         and determine which better serves the greater narrative.
 
         Position: {position}
@@ -118,12 +121,14 @@ class JudgeAgent(BaseHronirAgent):
         context = self.get_narrative_context(position)
 
         # Generate judgment prompt
-        prompt = self.get_agent_prompt({
-            "content_a": content_a,
-            "content_b": content_b,
-            "position": position,
-            "context": context
-        })
+        prompt = self.get_agent_prompt(
+            {
+                "content_a": content_a,
+                "content_b": content_b,
+                "position": position,
+                "context": context,
+            }
+        )
 
         # Get AI judgment
         judgment_text = self.generate_with_gemini(prompt)
@@ -135,7 +140,7 @@ class JudgeAgent(BaseHronirAgent):
 
     def _parse_judgment(self, judgment_text: str, duel: SessionDuel) -> dict[str, Any]:
         """Parse the AI judgment response."""
-        lines = judgment_text.strip().split('\n')
+        lines = judgment_text.strip().split("\n")
 
         winner = None
         confidence = 0.5
@@ -163,7 +168,7 @@ class JudgeAgent(BaseHronirAgent):
             "loser": duel.path_B_uuid if winner == duel.path_A_uuid else duel.path_A_uuid,
             "confidence": confidence,
             "reasoning": reasoning,
-            "duel_entropy": duel.entropy
+            "duel_entropy": duel.entropy,
         }
 
     def _get_hrönir_content(self, uuid: str) -> str | None:
@@ -201,29 +206,18 @@ class JudgeAgent(BaseHronirAgent):
                     continue
 
                 for position_str in session_data.dossier.duels.keys():
-                    result = self.execute_task({
-                        "session_id": session_id,
-                        "position": int(position_str)
-                    })
+                    result = self.execute_task(
+                        {"session_id": session_id, "position": int(position_str)}
+                    )
                     results.append(result)
 
             except Exception as e:
-                self.log_action("judgment_error", {
-                    "session_id": session_id,
-                    "error": str(e)
-                })
-                results.append({
-                    "error": str(e),
-                    "session_id": session_id
-                })
+                self.log_action("judgment_error", {"session_id": session_id, "error": str(e)})
+                results.append({"error": str(e), "session_id": session_id})
 
         return results
 
     def get_judgment_statistics(self) -> dict[str, Any]:
         """Get statistics about this judge's voting patterns."""
         # This would analyze voting history
-        return {
-            "total_votes": 0,
-            "avg_confidence": 0.0,
-            "decision_patterns": {}
-        }
+        return {"total_votes": 0, "avg_confidence": 0.0, "decision_patterns": {}}

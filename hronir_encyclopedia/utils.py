@@ -1,5 +1,7 @@
 import uuid
-from typing import Callable
+from collections.abc import Callable
+
+import typer  # Added import for typer.Exit
 
 from . import storage  # Assuming storage.py contains DataManager and Path models
 from .models import PathStatus
@@ -112,17 +114,21 @@ def dev_qualify_path_uuid(
         f"Path {path_uuid_to_qualify} has been QUALIFIED with Mandate ID: {new_mandate_id_str}."
     )
 
+
 # Need to import typer for Exit and secho, or pass them in always.
 # For now, assuming they are passed or handled by the caller context (like Typer).
 # Re-evaluating: validate_path_inputs_helper and dev_qualify_path_uuid use Typer funcs.
 # It's better if these utils don't directly depend on Typer for easier testing.
 # Let's adjust them to raise exceptions and let CLI handle Typer output.
 
+
 class UtilsError(Exception):
     pass
 
+
 class PathInputError(UtilsError):
     pass
+
 
 class PathNotFoundError(UtilsError):
     pass
@@ -152,10 +158,10 @@ def validate_path_inputs_helper_v2(
         # Source might be provided but will be ignored.
         # For consistency, we can enforce it to be empty or just normalize.
         if source:
-             # Optionally, log a warning that source is ignored for position 0
+            # Optionally, log a warning that source is ignored for position 0
             pass
         return ""
-    else: # position > 0
+    else:  # position > 0
         if not source:
             raise PathInputError(f"Source Hrönir UUID must be provided for position {position}.")
         try:
@@ -164,8 +170,9 @@ def validate_path_inputs_helper_v2(
         except ValueError:
             raise PathInputError(f"Source Hrönir UUID '{source}' is not a valid UUID.")
 
+
 def dev_qualify_path_uuid_v2(
-    dm: storage.DataManager, # Pass DataManager instance
+    dm: storage.DataManager,  # Pass DataManager instance
     path_uuid_to_qualify: str,
     mandate_id_override: str | None,
 ) -> tuple[str, str]:
@@ -191,12 +198,14 @@ def dev_qualify_path_uuid_v2(
         except ValueError:
             # Allow generating new one if override is invalid, or raise error?
             # For a dev tool, maybe flexibility is better. Let's raise for now.
-            raise PathInputError(f"Provided mandate_id_override '{mandate_id_override}' is not a valid UUID.")
+            raise PathInputError(
+                f"Provided mandate_id_override '{mandate_id_override}' is not a valid UUID."
+            )
     else:
         new_mandate_id_str = str(uuid.uuid4())
 
     dm.update_path_status(
-        path_uuid=str(path_to_qualify.path_uuid), # Ensure string
+        path_uuid=str(path_to_qualify.path_uuid),  # Ensure string
         status=PathStatus.QUALIFIED.value,
         mandate_id=new_mandate_id_str,
         set_mandate_explicitly=True,
@@ -204,27 +213,3 @@ def dev_qualify_path_uuid_v2(
     # dm.save_all_data() # Caller should handle saving
 
     return str(path_to_qualify.path_uuid), new_mandate_id_str
-
-
-def git_remove_deleted_files(deleted_paths: list[str], echo_func: Callable):
-    """
-    Placeholder for staging deleted files in Git.
-    """
-    if deleted_paths:
-        echo_func(f"Placeholder: {len(deleted_paths)} files would be staged for deletion with git rm.")
-        for p_str in deleted_paths:
-            echo_func(f"  - Would run: git rm --cached {p_str}") # --cached if only removing from index
-    else:
-        echo_func("Placeholder: No files to git rm.")
-    # Actual implementation would use subprocess to call git.
-    # import subprocess
-    # for p_str in deleted_paths:
-    #     try:
-    #         # Use --ignore-unmatch to avoid error if file is already deleted or not in git
-    #         subprocess.run(["git", "rm", "--cached", p_str], check=True, capture_output=True)
-    #         echo_func(f"Staged {p_str} for deletion.")
-    #     except subprocess.CalledProcessError as e:
-    #         echo_func(f"Failed to stage {p_str} for deletion: {e.stderr.decode()}", fg="yellow")
-    #     except FileNotFoundError:
-    #         echo_func("Error: git command not found. Is Git installed and in PATH?", fg="red")
-    #         break

@@ -1,5 +1,3 @@
-
-
 import uuid  # For UUID creation if needed for model instances
 
 from hronir_encyclopedia import (

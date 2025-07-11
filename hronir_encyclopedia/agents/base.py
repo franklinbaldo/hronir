@@ -16,6 +16,7 @@ from ..models import SystemConfig
 @dataclass
 class AgentConfig:
     """Configuration for Hronir AI agents."""
+
     name: str
     role: str
     goal: str
