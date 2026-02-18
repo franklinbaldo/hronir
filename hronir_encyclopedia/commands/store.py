@@ -1,97 +1,142 @@
 import logging
+import uuid
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Optional
 
 import typer
 
-from .. import storage # Relative import
+from .. import storage
+from ..models import Path as PathModel
+from ..models import Transaction, TransactionContent
+from .. import gemini_util
 
 logger = logging.getLogger(__name__)
 
-store_app = typer.Typer(help="Manage Hrönir storing and validation.", no_args_is_help=True)
+# Helper function (internal)
+def _create_path_for_hronir(dm: storage.DataManager, hronir_uuid: str, predecessor_uuid: str | None, position: int | None = None) -> None:
+    """Helper to create a path for a stored hrönir."""
+
+    if predecessor_uuid:
+        # Validate predecessor exists as a hrönir
+        if not dm.hrönir_exists(predecessor_uuid):
+             typer.secho(f"Error: Predecessor hrönir {predecessor_uuid} not found.", fg=typer.colors.RED)
+             raise typer.Exit(1)
+
+        # Determine position if not provided
+        if position is None:
+            # Find the path that introduced the predecessor to get its position
+            # We search all paths where uuid == predecessor_uuid
+            parent_path = None
+            for p in dm.get_all_paths():
+                if str(p.uuid) == predecessor_uuid:
+                    parent_path = p
+                    break
+
+            if parent_path:
+                position = parent_path.position + 1
+            else:
+                typer.secho(f"Error: Could not determine position from predecessor {predecessor_uuid}. Please specify --position.", fg=typer.colors.RED)
+                raise typer.Exit(1)
+    else:
+        # No predecessor -> Root?
+        if position is None:
+            position = 0
+
+    # Compute path UUID
+    pred_str = predecessor_uuid if predecessor_uuid else ""
+    path_uuid_obj = storage.compute_narrative_path_uuid(position, pred_str, hronir_uuid)
+
+    # Check if path exists
+    existing = dm.get_path_by_uuid(str(path_uuid_obj))
+    if existing:
+        typer.echo(f"Path already exists: {path_uuid_obj}")
+        return
+
+    # Create Path
+    new_path = PathModel(
+        path_uuid=path_uuid_obj,
+        position=position,
+        prev_uuid=uuid.UUID(predecessor_uuid) if predecessor_uuid else None,
+        uuid=uuid.UUID(hronir_uuid),
+        status="PENDING"
+    )
+
+    dm.add_path(new_path)
+
+    # Record Transaction
+    tx_content = TransactionContent(
+        action="create_path",
+        path_uuid=path_uuid_obj,
+        hrönir_uuid=uuid.UUID(hronir_uuid),
+        details={"position": position, "predecessor": predecessor_uuid}
+    )
+
+    transaction = Transaction(
+        uuid=uuid.uuid4(),
+        prev_uuid=None, # Simplified: not strictly chaining hashes for now, or fetch last tx?
+                        # Ideally we'd link to previous transaction for a proper ledger, but simpler is fine for now.
+        content=tx_content
+    )
+    dm.add_transaction(transaction)
+
+    dm.save_all_data()
+    typer.echo(f"Created path {path_uuid_obj} at position {position} linking to predecessor {predecessor_uuid or 'None'}.")
 
 
-@store_app.command(help="Validate a chapter file.")
-def validate(chapter: Annotated[Path, typer.Argument(exists=True, dir_okay=False, readable=True)]):
-    # TODO: Add more robust validation logic if needed
+def validate_command(chapter: Annotated[Path, typer.Argument(exists=True, dir_okay=False, readable=True)]):
+    """Validate a chapter file."""
     typer.echo(f"Chapter {chapter} exists and is readable.")
-    # Example: Check frontmatter, structure, etc.
-    # For now, it's a basic check.
-    # from ..storage import validate_chapter_structure # Hypothetical
-    # errors = validate_chapter_structure(chapter.read_text())
-    # if errors:
-    #     typer.secho(f"Validation errors found in {chapter}:", fg=typer.colors.RED)
-    #     for error in errors:
-    #         typer.secho(f"- {error}", fg=typer.colors.RED)
-    #     raise typer.Exit(1)
-    # else:
-    #     typer.secho(f"Chapter {chapter} structure is valid.", fg=typer.colors.GREEN)
+    # TODO: Add more robust validation logic if needed
 
 
-@store_app.command(help="Store a chapter by UUID.")
-def store(chapter: Annotated[Path, typer.Argument(exists=True, dir_okay=False, readable=True)]):
+def store_command(
+    chapter: Annotated[Path, typer.Argument(exists=True, dir_okay=False, readable=True)],
+    predecessor: Annotated[Optional[str], typer.Option("--predecessor", help="UUID of the predecessor hrönir.")] = None,
+    position: Annotated[Optional[int], typer.Option("--position", help="Explicit position (optional, inferred from predecessor).")] = None,
+):
+    """Store a chapter and link it to a predecessor."""
     try:
+        # Store content
         hronir_uuid = storage.store_chapter(chapter)
-        typer.echo(hronir_uuid)
+        typer.echo(f"Stored hrönir content: {hronir_uuid}")
+
+        # Create Path
+        dm = storage.DataManager()
+        _create_path_for_hronir(dm, hronir_uuid, predecessor, position)
+
     except Exception as e:
         logger.error(f"Error storing chapter {chapter}: {e}", exc_info=True)
         typer.secho(f"Error storing chapter: {e}", fg=typer.colors.RED)
         raise typer.Exit(1)
 
 
-@store_app.command(help="Generate competing chapters from a predecessor and record an initial vote.")
-def synthesize(
-    position: Annotated[int, typer.Option(help="Chapter position for the new hrönirs.")],
-    prev: Annotated[
-        str, typer.Option(help="UUID of the predecessor chapter to create a path from.")
-    ],
-    # Add other necessary parameters like number of variants, AI model, etc.
-    # For now, this is a placeholder matching the original CLI.
+def synthesize_command(
+    prev: Annotated[str, typer.Option("--prev", help="UUID of the predecessor hrönir.")],
+    position: Annotated[Optional[int], typer.Option("--position", help="Explicit position (optional).")] = None,
+    prompt: Annotated[str, typer.Option("--prompt", help="Custom prompt for generation.")] = None,
 ):
-    # This command is complex and likely involves:
-    # 1. Calling an AI agent to generate N chapter variants based on `prev` hrönir.
-    # 2. Storing each variant using `storage.store_chapter_text` or similar.
-    # 3. Creating paths for each new variant from `prev` at `position`.
-    # 4. Potentially initiating an initial vote or duel between variants.
-    # The original implementation was a placeholder.
-    typer.echo(
-        f"Placeholder for synthesize: position={position}, prev={prev}. "
-        "This command needs full implementation involving AI generation and storage."
-    )
-    logger.warning(
-        f"Synthesize command called for pos {position}, prev {prev}. Not fully implemented."
-    )
-    # Example steps (conceptual):
-    # from ..agents.chapter_writer import ChapterWriterAgent # Hypothetical
-    # from ..models import Path as PathModel
-    #
-    # data_manager = storage.DataManager()
-    # if not data_manager.hrönir_exists(prev):
-    #     typer.secho(f"Error: Predecessor hrönir '{prev}' not found.", fg=typer.colors.RED)
-    #     raise typer.Exit(1)
-    #
-    # writer_agent = ChapterWriterAgent() # Configure as needed
-    # generated_texts = writer_agent.generate_variants(predecessor_uuid=prev, num_variants=2)
-    #
-    # new_hronir_uuids = []
-    # for i, text_content in enumerate(generated_texts):
-    #     h_uuid = storage.store_chapter_text(text_content, title_prefix=f"Synth Variant {i+1}")
-    #     new_hronir_uuids.append(h_uuid)
-    #     typer.echo(f"Stored synthesized hrönir: {h_uuid}")
-    #
-    # for new_uuid_str in new_hronir_uuids:
-    #     path_uuid_obj = storage.compute_narrative_path_uuid(position, prev, new_uuid_str)
-    #     if not any(p.path_uuid == path_uuid_obj for p in data_manager.get_paths_by_position(position)):
-    #         data_manager.add_path(
-    #             PathModel(
-    #                 path_uuid=path_uuid_obj,
-    #                 position=position,
-    #                 prev_uuid=uuid.UUID(prev),
-    #                 uuid=uuid.UUID(new_uuid_str),
-    #                 status="PENDING",
-    #             )
-    #         )
-    #         typer.echo(f"Created path for {new_uuid_str}: {path_uuid_obj}")
-    # data_manager.save_all_data()
-    # typer.echo("Synthesize process placeholder complete.")
-    raise NotImplementedError("Synthesize command is not fully implemented yet.")
+    """Generate and store a new chapter using AI."""
+    try:
+        typer.echo(f"Synthesizing new chapter from predecessor {prev}...")
+
+        dm = storage.DataManager()
+        if not dm.hrönir_exists(prev):
+             typer.secho(f"Error: Predecessor hrönir {prev} not found.", fg=typer.colors.RED)
+             raise typer.Exit(1)
+
+        # Optional: fetch content to check context or just pass UUID to agent
+        # predecessor_content = dm.get_hrönir_content(prev)
+
+        if not prompt:
+            predecessor_content = dm.get_hrönir_content(prev)
+            prompt = f"Write the next chapter of a Borgesian encyclopedia, continuing from this text:\n\n{predecessor_content}\n\nMaintain the style and themes."
+
+        hronir_uuid = gemini_util.generate_chapter(prompt, prev)
+        typer.echo(f"Generated and stored hrönir: {hronir_uuid}")
+
+        _create_path_for_hronir(dm, hronir_uuid, prev, position)
+
+    except Exception as e:
+        logger.error(f"Error synthesizing chapter: {e}", exc_info=True)
+        typer.secho(f"Error synthesizing chapter: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
