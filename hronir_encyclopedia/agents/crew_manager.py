@@ -76,8 +76,8 @@ class HronirCrew:
         return Agent(
             role="Chapter Writer",
             goal="Create compelling hrönir chapters that advance the narrative while maintaining Borgesian philosophical depth",
-            backstory="""You are a literary agent inspired by Jorge Luis Borges, capable of weaving 
-            philosophical concepts into narrative prose. You understand the metaphysical implications 
+            backstory="""You are a literary agent inspired by Jorge Luis Borges, capable of weaving
+            philosophical concepts into narrative prose. You understand the metaphysical implications
             of forking narratives and the weight of each textual choice in shaping reality.""",
             verbose=self.config.verbose,
             llm=self._create_gemini_llm(),
@@ -90,8 +90,8 @@ class HronirCrew:
         return Agent(
             role="Literary Judge",
             goal="Evaluate hrönir chapters fairly and vote for the most compelling narratives",
-            backstory="""You are a discerning literary critic with deep appreciation for Borgesian 
-            philosophy. You evaluate texts not just for their prose quality, but for their 
+            backstory="""You are a discerning literary critic with deep appreciation for Borgesian
+            philosophy. You evaluate texts not just for their prose quality, but for their
             metaphysical depth, narrative coherence, and contribution to the greater literary labyrinth.""",
             verbose=self.config.verbose,
             llm=self._create_gemini_llm(),
@@ -108,10 +108,10 @@ class HronirCrew:
         writing_task = Task(
             description=f"""
             Write a new hrönir chapter for position {task_data.get('position', 0)}.
-            
+
             Context: {task_data.get('context', 'No previous context')}
             Theme: {task_data.get('theme', 'continuation')}
-            
+
             Requirements:
             - Maintain Borgesian philosophical style
             - Build meaningfully on previous content
@@ -139,20 +139,20 @@ class HronirCrew:
         judgment_task = Task(
             description=f"""
             Evaluate two competing hrönir chapters and determine the winner.
-            
+
             Position: {task_data.get('position', 0)}
             Context: {task_data.get('context', 'No previous context')}
-            
+
             Chapter A: {task_data.get('content_a', 'Content A')}
             Chapter B: {task_data.get('content_b', 'Content B')}
-            
+
             Evaluate based on:
             1. Borgesian style and philosophical depth
             2. Narrative coherence and progression
             3. Literary merit and prose quality
             4. Competitive strength
             5. Thematic resonance
-            
+
             Provide your judgment in this format:
             WINNER: [A or B]
             CONFIDENCE: [0.0-1.0]

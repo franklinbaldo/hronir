@@ -1,18 +1,17 @@
 import math
-from typing import Dict, List, Optional, Any
-from uuid import UUID
+from typing import Any
 
 from .models import Path as PathModel
 from .storage import DataManager
 
 
-def get_all_paths_graph(dm: DataManager) -> Dict[str, List[PathModel]]:
+def get_all_paths_graph(dm: DataManager) -> dict[str, list[PathModel]]:
     """
     Retrieves all paths and builds an adjacency list (parent_uuid -> list of child paths).
     parent_uuid is the hrönir UUID of the predecessor.
     """
     paths = dm.get_all_paths()
-    graph: Dict[str, List[PathModel]] = {}
+    graph: dict[str, list[PathModel]] = {}
 
     for path in paths:
         # Normalize parent UUID (handle None/empty for root)
@@ -24,7 +23,7 @@ def get_all_paths_graph(dm: DataManager) -> Dict[str, List[PathModel]]:
     return graph
 
 
-def calculate_canonical_path(dm: DataManager) -> List[Dict[str, Any]]:
+def calculate_canonical_path(dm: DataManager) -> list[dict[str, Any]]:
     """
     Calculates the canonical path using Quadratic Influence.
     Returns a list of dicts with {'position': int, 'path_uuid': str, 'hrönir_uuid': str}.
@@ -35,13 +34,13 @@ def calculate_canonical_path(dm: DataManager) -> List[Dict[str, Any]]:
         return []
 
     # Map hrönir_uuid -> Path object (to find the path that introduced a hrönir)
-    hronir_to_path: Dict[str, PathModel] = {}
+    hronir_to_path: dict[str, PathModel] = {}
     for p in paths:
         hronir_to_path[str(p.uuid)] = p
 
     # Adjacency list: predecessor_hronir_uuid -> List[PathModel]
     # Key "root" for position 0 (where prev_uuid is None)
-    graph: Dict[str, List[PathModel]] = {}
+    graph: dict[str, list[PathModel]] = {}
     for p in paths:
         prev = str(p.prev_uuid) if p.prev_uuid else "root"
         if prev not in graph:
@@ -50,7 +49,7 @@ def calculate_canonical_path(dm: DataManager) -> List[Dict[str, Any]]:
 
     # Calculate influence for every hrönir
     # Influence(H) = 1 + sqrt(count(children of H))
-    influence_map: Dict[str, float] = {}
+    influence_map: dict[str, float] = {}
 
     # We calculate influence for every hrönir known (those introduced by paths).
     for h_uuid in hronir_to_path.keys():
@@ -126,7 +125,7 @@ def calculate_canonical_path(dm: DataManager) -> List[Dict[str, Any]]:
     return canonical_chain
 
 
-def get_candidates_with_scores(dm: DataManager, position: int, predecessor_uuid: str | None = None) -> List[Dict[str, Any]]:
+def get_candidates_with_scores(dm: DataManager, position: int, predecessor_uuid: str | None = None) -> list[dict[str, Any]]:
     """
     Returns candidates for a given position/predecessor with their scores.
     Useful for 'ranking' command.
@@ -135,7 +134,7 @@ def get_candidates_with_scores(dm: DataManager, position: int, predecessor_uuid:
     hronir_to_path = {str(p.uuid): p for p in paths}
 
     # Build graph
-    graph: Dict[str, List[PathModel]] = {}
+    graph: dict[str, list[PathModel]] = {}
     for p in paths:
         prev = str(p.prev_uuid) if p.prev_uuid else "root"
         if prev not in graph:
@@ -143,7 +142,7 @@ def get_candidates_with_scores(dm: DataManager, position: int, predecessor_uuid:
         graph[prev].append(p)
 
     # Calculate influence map
-    influence_map: Dict[str, float] = {}
+    influence_map: dict[str, float] = {}
     for h_uuid in hronir_to_path.keys():
         children = graph.get(h_uuid, [])
         influence_map[h_uuid] = 1.0 + math.sqrt(len(children))

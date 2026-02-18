@@ -11,9 +11,9 @@ from pathlib import Path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-from hronir_encyclopedia import storage
-from hronir_encyclopedia.agents.base import AgentConfig
-from hronir_encyclopedia.agents.chapter_writer import ChapterWriterAgent
+from hronir_encyclopedia import storage  # noqa: E402
+from hronir_encyclopedia.agents.base import AgentConfig  # noqa: E402
+from hronir_encyclopedia.agents.chapter_writer import ChapterWriterAgent  # noqa: E402
 
 
 def test_basic_agent_functionality():
@@ -32,7 +32,7 @@ def test_basic_agent_functionality():
 
     # Test database connection
     try:
-        data_manager = storage.DataManager()
+        storage.DataManager()
         print("✅ Database connection successful")
     except Exception as e:
         print(f"❌ Database connection failed: {e}")
@@ -186,7 +186,7 @@ def show_system_status():
 
     # Check dependencies
     try:
-        import google.generativeai as genai
+        import google.generativeai as genai  # noqa: F401
         print("✅ Google Generative AI: Available")
     except ImportError:
         print("❌ Google Generative AI: Not available")
@@ -206,13 +206,13 @@ def show_system_status():
 
     # Check agent modules
     try:
-        from hronir_encyclopedia.agents.chapter_writer import ChapterWriterAgent
+        from hronir_encyclopedia.agents.chapter_writer import ChapterWriterAgent  # noqa: F401
         print("✅ Chapter Writer Agent: Available")
     except ImportError:
         print("❌ Chapter Writer Agent: Not available")
 
     try:
-        from hronir_encyclopedia.agents.judge import JudgeAgent
+        from hronir_encyclopedia.agents.judge import JudgeAgent  # noqa: F401
         print("✅ Judge Agent: Available")
     except ImportError:
         print("❌ Judge Agent: Not available")

@@ -20,8 +20,8 @@ class ChapterWriterAgent(BaseHronirAgent):
                 name="Chapter Writer",
                 role="Literary Creator",
                 goal="Create compelling hrönir chapters that advance the narrative while maintaining Borgesian philosophical depth",
-                backstory="""You are a literary agent inspired by Jorge Luis Borges, capable of weaving 
-                philosophical concepts into narrative prose. You understand the metaphysical implications 
+                backstory="""You are a literary agent inspired by Jorge Luis Borges, capable of weaving
+                philosophical concepts into narrative prose. You understand the metaphysical implications
                 of forking narratives and the weight of each textual choice in shaping reality.""",
                 competitive_mode=True,
                 temperature=0.8,  # Higher creativity for writing
@@ -97,17 +97,17 @@ class ChapterWriterAgent(BaseHronirAgent):
 
         # Enhance with agent-specific instructions
         agent_instructions = f"""
-        
+
         As a Chapter Writer Agent in the Hronir Encyclopedia, you must:
-        
+
         1. **Maintain Borgesian Style**: Write in the philosophical, erudite tone of Jorge Luis Borges
         2. **Advance the Narrative**: Build meaningfully on the previous content
         3. **Embrace Uncertainty**: Include metaphysical ambiguity and multiple interpretations
         4. **Consider Competition**: This chapter will compete with others for canonical inclusion
         5. **Theme Focus**: Emphasize the theme of "{theme}"
-        
+
         Previous Context: {context}
-        
+
         Write a compelling chapter that could win in competitive judgment against other alternatives.
         Aim for 300-800 words of dense, philosophical prose.
         """

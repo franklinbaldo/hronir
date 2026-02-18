@@ -1,14 +1,16 @@
 import uuid
 from unittest.mock import MagicMock
-import math
+
 import pytest
+
 from hronir_encyclopedia.canon_new import calculate_canonical_path
 from hronir_encyclopedia.models import Path as PathModel
 
 NAMESPACE = uuid.NAMESPACE_URL
 
 def to_uuid5(val):
-    if not val: return None
+    if not val:
+        return None
     return str(uuid.uuid5(NAMESPACE, val))
 
 # Helper to create paths easily

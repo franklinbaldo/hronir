@@ -5,9 +5,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v1
-        with:
-          uv-version: "latest" # ou uma versão específica como "0.1.15"
+      - uses: astral-sh/setup-uv@v5
+
       - name: Cache uv
         uses: actions/cache@v4
         with:
