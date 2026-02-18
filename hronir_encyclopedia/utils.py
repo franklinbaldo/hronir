@@ -1,5 +1,7 @@
 import uuid
-from typing import Callable
+from collections.abc import Callable
+
+import typer
 
 from . import storage  # Assuming storage.py contains DataManager and Path models
 from .models import PathStatus

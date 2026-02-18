@@ -1,14 +1,13 @@
 import logging
 import uuid
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 
-from .. import storage
+from .. import gemini_util, storage
 from ..models import Path as PathModel
 from ..models import Transaction, TransactionContent
-from .. import gemini_util
 
 logger = logging.getLogger(__name__)
 
@@ -91,8 +90,8 @@ def validate_command(chapter: Annotated[Path, typer.Argument(exists=True, dir_ok
 
 def store_command(
     chapter: Annotated[Path, typer.Argument(exists=True, dir_okay=False, readable=True)],
-    predecessor: Annotated[Optional[str], typer.Option("--predecessor", help="UUID of the predecessor hrönir.")] = None,
-    position: Annotated[Optional[int], typer.Option("--position", help="Explicit position (optional, inferred from predecessor).")] = None,
+    predecessor: Annotated[str | None, typer.Option("--predecessor", help="UUID of the predecessor hrönir.")] = None,
+    position: Annotated[int | None, typer.Option("--position", help="Explicit position (optional, inferred from predecessor).")] = None,
 ):
     """Store a chapter and link it to a predecessor."""
     try:
@@ -112,7 +111,7 @@ def store_command(
 
 def synthesize_command(
     prev: Annotated[str, typer.Option("--prev", help="UUID of the predecessor hrönir.")],
-    position: Annotated[Optional[int], typer.Option("--position", help="Explicit position (optional).")] = None,
+    position: Annotated[int | None, typer.Option("--position", help="Explicit position (optional).")] = None,
     prompt: Annotated[str, typer.Option("--prompt", help="Custom prompt for generation.")] = None,
 ):
     """Generate and store a new chapter using AI."""

@@ -5,8 +5,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 try:
-    from hronir_encyclopedia import storage
-    from hronir_encyclopedia import canon_new
+    from hronir_encyclopedia import canon_new, storage
 except ImportError:
     print(
         "Error: Could not import 'hronir_encyclopedia'. Ensure PYTHONPATH is set."

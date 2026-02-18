@@ -108,14 +108,14 @@ def test_judge_agent(
 
         # Mock content for testing
         content_a = """
-        In the labyrinthine corridors of memory, where time folds upon itself like 
-        parchment in an ancient library, I encountered a curious manuscript. The text 
+        In the labyrinthine corridors of memory, where time folds upon itself like
+        parchment in an ancient library, I encountered a curious manuscript. The text
         spoke of infinite realities, each word a doorway to possibility.
         """
 
         content_b = """
-        The garden of forking paths stretched before me, each route a different destiny. 
-        In one direction lay the certainty of knowledge; in another, the sweet 
+        The garden of forking paths stretched before me, each route a different destiny.
+        In one direction lay the certainty of knowledge; in another, the sweet
         uncertainty of mystery. I chose the path that led to both.
         """
 
@@ -333,7 +333,7 @@ def agent_status():
 
     # Check database
     try:
-        data_manager = storage.DataManager()
+        storage.DataManager()
         console.print("[green]✓ Database connection: OK[/green]")
 
         # Get some stats
