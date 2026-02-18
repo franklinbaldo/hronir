@@ -13,7 +13,7 @@ sys.path.insert(0, str(project_root))
 
 from hronir_encyclopedia import storage  # noqa: E402
 from hronir_encyclopedia.agents.base import AgentConfig  # noqa: E402
-from hronir_encyclopedia.agents.chapter_writer import ChapterWriterAgent  # noqa: E402
+from hronir_encyclopedia.agents.chapter_writer import ChapterWriterAgent  # noqa: F401, E402
 
 
 def test_basic_agent_functionality():
