@@ -14,9 +14,8 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GH_PAT }} # Use PAT for checkout
-      - uses: astral-sh/setup-uv@v1
-        with:
-          uv-version: "latest"
+      - uses: astral-sh/setup-uv@v5
+
       - name: Cache uv
         uses: actions/cache@v4
         with:
