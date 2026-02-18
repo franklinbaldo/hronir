@@ -1,14 +1,14 @@
-import datetime  # Added for Optional[datetime] type hint
+import datetime
 import json
-import logging  # Added to fix Ruff F821
+import logging
 from pathlib import Path
 
 import duckdb
 from pydantic import ValidationError
 
 from .models import Path as PathModel
-from .models import Transaction, Vote
-from .sharding import ShardingManager, SnapshotManifest  # Added
+from .models import Transaction
+from .sharding import ShardingManager, SnapshotManifest
 
 
 class DuckDBDataManager:
@@ -25,7 +25,6 @@ class DuckDBDataManager:
         self,
         db_path: str = "data/encyclopedia.duckdb",
         path_csv_dir: str | Path = "narrative_paths",
-        ratings_csv_dir: str | Path = "ratings",
         transactions_json_dir: str | Path = "data/transactions",
     ):
         if hasattr(self, "_initialized") and self._initialized:
@@ -33,7 +32,6 @@ class DuckDBDataManager:
 
         self.db_path = Path(db_path)
         self.path_csv_dir = Path(path_csv_dir)
-        self.ratings_csv_dir = Path(ratings_csv_dir)
         self.transactions_json_dir = Path(transactions_json_dir)
 
         self.conn = duckdb.connect(str(self.db_path))
@@ -53,17 +51,8 @@ class DuckDBDataManager:
             );
             """
         )
-        self.conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS votes(
-                uuid TEXT PRIMARY KEY,
-                position INTEGER,
-                voter TEXT,
-                winner TEXT,
-                loser TEXT
-            );
-            """
-        )
+        # votes table removed from creation in new installations
+        # transactions table persists
         self.conn.execute(
             """
             CREATE TABLE IF NOT EXISTS transactions(
@@ -72,7 +61,7 @@ class DuckDBDataManager:
             );
             """
         )
-        self.conn.execute(  # Add hronirs table creation
+        self.conn.execute(
             """
             CREATE TABLE IF NOT EXISTS hronirs (
                 uuid VARCHAR PRIMARY KEY,
@@ -102,16 +91,7 @@ class DuckDBDataManager:
                     except ValidationError:
                         continue
 
-        votes_empty = self.conn.execute("SELECT COUNT(*) FROM votes").fetchone()[0] == 0
-        if votes_empty:
-            votes_file = self.ratings_csv_dir / "votes.csv"
-            if votes_file.exists() and votes_file.stat().st_size > 0:
-                df = pd.read_csv(votes_file)
-                for _, row in df.iterrows():
-                    try:
-                        self.add_vote(Vote(**row.to_dict()))
-                    except ValidationError:
-                        continue
+        # Vote loading removed
 
         tx_empty = self.conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0] == 0
         if tx_empty and self.transactions_json_dir.exists():
@@ -127,7 +107,6 @@ class DuckDBDataManager:
     def save_all_data(self) -> None:
         """Commits the current transaction to the DuckDB database."""
         self.conn.commit()
-        # Removed logic that writes back to CSV/JSON files.
 
     # --- Path operations ---
     def get_all_paths(self) -> list[PathModel]:
@@ -225,62 +204,7 @@ class DuckDBDataManager:
         except ValidationError:
             return None
 
-    # --- Vote operations ---
-    def get_all_votes(self) -> list[Vote]:
-        rows = self.conn.execute("SELECT * FROM votes").fetchall()
-        votes: list[Vote] = []
-        for row in rows:
-            try:
-                votes.append(
-                    Vote(
-                        uuid=row[0],
-                        position=row[1],
-                        voter=row[2],
-                        winner=row[3],
-                        loser=row[4],
-                    )
-                )
-            except ValidationError:
-                continue
-        return votes
-
-    def add_vote(self, vote: Vote) -> None:
-        data = vote.model_dump()
-        self.conn.execute(
-            """
-            INSERT INTO votes(uuid, position, voter, winner, loser)
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(uuid) DO NOTHING
-            """,
-            (
-                data["uuid"],
-                data["position"],
-                data["voter"],
-                data["winner"],
-                data["loser"],
-            ),
-        )
-
-    def get_votes_by_position(self, position: int) -> list[Vote]:
-        rows = self.conn.execute(
-            "SELECT * FROM votes WHERE position=?",
-            (position,),
-        ).fetchall()
-        votes: list[Vote] = []
-        for row in rows:
-            try:
-                votes.append(
-                    Vote(
-                        uuid=row[0],
-                        position=row[1],
-                        voter=row[2],
-                        winner=row[3],
-                        loser=row[4],
-                    )
-                )
-            except ValidationError:
-                continue
-        return votes
+    # --- Vote operations removed ---
 
     # --- Transaction operations ---
     def get_all_transactions(self) -> list[Transaction]:
@@ -330,12 +254,6 @@ class DuckDBDataManager:
             created_at = datetime.datetime.now(datetime.timezone.utc)
         metadata_json = json.dumps(metadata) if metadata else "{}"
 
-        # Ensure the hronirs table exists (it should have been created by _create_tables via migration script)
-        # For robustness, we could add a check or ensure_table_exists call here if necessary.
-        # self._create_tables() # This would try to create all tables, maybe too broad.
-        # A more targeted "CREATE TABLE IF NOT EXISTS hronirs ..." could be used if this method
-        # could be called before the main initialization. Given current flow, it's likely fine.
-
         self.conn.execute(
             """
             INSERT INTO hronirs (uuid, content, created_at, metadata)
@@ -350,7 +268,6 @@ class DuckDBDataManager:
 
     def get_hronir_content(self, hronir_uuid: str) -> str | None:
         """Retrieves a hrönir's content from the hronirs table by its UUID."""
-        # Ensure the hronirs table exists.
         result = self.conn.execute(
             "SELECT content FROM hronirs WHERE uuid = ?", (hronir_uuid,)
         ).fetchone()
@@ -363,7 +280,7 @@ class DuckDBDataManager:
 
     def clear_in_memory_data(self) -> None:
         self.conn.execute("DELETE FROM paths")
-        self.conn.execute("DELETE FROM votes")
+        # votes delete removed
         self.conn.execute("DELETE FROM transactions")
         self.conn.commit()
 
@@ -388,8 +305,6 @@ class DuckDBDataManager:
             self.load_all_data()  # Ensure data is loaded and DB is consistent
 
         self.conn.commit()  # Ensure all current transactions are written to the DB file.
-        # Checkpoint might be good too, but commit should suffice for file consistency.
-        # self.conn.execute("CHECKPOINT;") # Force write WAL to main DB file.
 
         logging.info(f"Creating snapshot from DB: {self.db_path} into {output_dir}")
 

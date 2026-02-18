@@ -2,7 +2,7 @@ import datetime
 import pathlib
 import uuid
 from typing import Any
-from enum import Enum # Added Enum
+from enum import Enum
 
 from pydantic import UUID5, BaseModel, Field, field_validator
 
@@ -12,67 +12,23 @@ MandateID = uuid.UUID
 # --- Enums ---
 class PathStatus(str, Enum):
     PENDING = "PENDING"
+    VALID = "VALID"
+    INVALID = "INVALID"
+    # Legacy statuses kept for compatibility if needed, but not used in new protocol
     QUALIFIED = "QUALIFIED"
     SPENT = "SPENT"
-    INVALID = "INVALID" # Added for completeness, though not used everywhere yet
 
 # --- Base Models ---
-
-
-class Vote(BaseModel):
-    uuid: str
-    position: int
-    voter: str
-    winner: str
-    loser: str
-
 
 class Path(BaseModel):
     path_uuid: UUID5
     position: int
     prev_uuid: UUID5 | None = None
     uuid: UUID5
-    status: PathStatus = PathStatus.PENDING # Changed to PathStatus Enum
-    mandate_id: MandateID | None = None
-
-
-# --- Session Models ---
-
-
-class SessionDuel(BaseModel):
-    """A single duel between two competing hrönir at a specific position."""
-
-    path_A_uuid: UUID5
-    path_B_uuid: UUID5
-    entropy: float = Field(0.0, description="Entropy of the duel.")
-
-
-class SessionDossier(BaseModel):
-    """A collection of duels for a judgment session, keyed by position."""
-
-    duels: dict[str, SessionDuel] = Field(default_factory=dict)
-
-
-class Session(BaseModel):
-    """A judgment session."""
-
-    session_id: uuid.UUID = Field(default_factory=uuid.uuid4)
-    initiating_path_uuid: UUID5
-    mandate_id: MandateID
-    position_n: int
-    dossier: SessionDossier = Field(default_factory=SessionDossier)
-    status: str = Field("active", description="Session status (active, committed, aborted).")
-    committed_verdicts: dict[str, UUID5] | None = Field(None, description="Committed verdicts.")
-    created_at: datetime.datetime = Field(
-        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)
-    )
-    updated_at: datetime.datetime = Field(
-        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)
-    )
-
+    status: PathStatus = PathStatus.PENDING
+    mandate_id: MandateID | None = None # Deprecated but kept for schema compatibility
 
 # --- Hrönir Content Model ---
-
 
 class Hronir(BaseModel):
     """Represents the content of a hrönir with metadata."""
@@ -83,16 +39,13 @@ class Hronir(BaseModel):
     metadata: dict[str, Any] | None = None
     creation_timestamp: datetime.datetime
 
-
 # --- Canonical Path Models ---
-
 
 class CanonicalEntry(BaseModel):
     """An entry in the canonical path, linking a path to a hrönir."""
 
     path_uuid: UUID5
     hrönir_uuid: UUID5
-
 
 class CanonicalPath(BaseModel):
     """The canonical state of the encyclopedia."""
@@ -109,27 +62,18 @@ class CanonicalPath(BaseModel):
             }
         return value
 
-
-# --- Enhanced Transaction Models ---
-
-
-class SessionVerdict(BaseModel):
-    """A single verdict from a session."""
-
-    position: int
-    winner_hrönir_uuid: UUID5
-    loser_hrönir_uuid: UUID5
-    predecessor_hrönir_uuid: UUID5 | None
-
+# --- Transaction Models (Simplified) ---
 
 class TransactionContent(BaseModel):
-    """The content of a transaction, detailing session results."""
-
-    session_id: uuid.UUID
-    initiating_path_uuid: UUID5
-    verdicts_processed: list[SessionVerdict] = Field(default_factory=list)
-    promotions_granted: list[UUID5] = Field(default_factory=list)
-
+    """
+    The content of a transaction.
+    In the simplified protocol, this primarily records the creation of a hrönir/path.
+    Legacy session verdicts are removed from new transactions.
+    """
+    action: str = "create_path"
+    path_uuid: UUID5 | None = None
+    hrönir_uuid: UUID5 | None = None
+    details: dict[str, Any] = Field(default_factory=dict)
 
 class Transaction(BaseModel):
     uuid: UUID5
@@ -137,48 +81,7 @@ class Transaction(BaseModel):
     prev_uuid: UUID5 | None = None
     content: TransactionContent
 
-
-# --- Duel/Ranking Models ---
-
-
-class DuelResult(BaseModel):
-    """The result of a duel for Elo calculation."""
-
-    winner_uuid: UUID5
-    loser_uuid: UUID5
-
-
-class RankingEntry(BaseModel):
-    """An entry in the ranking list."""
-
-    path_uuid: UUID5
-    hrönir_uuid: UUID5
-    elo_rating: int
-    games_played: int
-    wins: int
-    losses: int
-
-
-# --- Mandate/Qualification Models ---
-
-
-class Mandate(BaseModel):
-    """A mandate for a path to initiate a judgment session."""
-
-    mandate_id: MandateID
-    path_uuid: UUID5
-    status: str = "unused"  # unused, used, expired
-
-
-class QualificationCriteria(BaseModel):
-    """Criteria for a path to become qualified."""
-
-    min_elo_rating: int = 1600
-    min_games_played: int = 10
-
-
 # --- Configuration Models ---
-
 
 class StoragePaths(BaseModel):
     """Defines the storage paths for various data components."""
@@ -203,16 +106,10 @@ class StoragePaths(BaseModel):
 
 class SystemConfig(BaseModel):
     """System-wide configuration."""
-
     storage_paths: StoragePaths = Field(default_factory=StoragePaths)
-    qualification_rules: QualificationCriteria = Field(default_factory=QualificationCriteria)
-    elo_k_factor: int = 32
-    entropy_saturation_threshold: float = 0.2
-    max_cascade_positions: int = 100
-
+    # Qualification and Elo settings are deprecated/removed
 
 # --- Validation Models ---
-
 
 class ValidationIssue(BaseModel):
     """An issue found during data validation."""
