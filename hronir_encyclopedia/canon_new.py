@@ -102,22 +102,24 @@ def calculate_canonical_path(dm: DataManager) -> list[dict[str, Any]]:
                 if len(children_paths) > len(graph.get(str(best_candidate.uuid), [])):
                     is_better = True
                 elif len(children_paths) == len(graph.get(str(best_candidate.uuid), [])):
-                     # Tie-breaker 2: Deterministic UUID string comparison (lexicographical asc)
-                     # Or consistent creation order if available (timestamp?) - Path doesn't have timestamp.
-                     # UUID is random but stable.
-                     if str(candidate.path_uuid) < str(best_candidate.path_uuid):
-                         is_better = True
+                    # Tie-breaker 2: Deterministic UUID string comparison (lexicographical asc)
+                    # Or consistent creation order if available (timestamp?) - Path doesn't have timestamp.
+                    # UUID is random but stable.
+                    if str(candidate.path_uuid) < str(best_candidate.path_uuid):
+                        is_better = True
 
             if is_better:
                 best_score = score
                 best_candidate = candidate
 
         if best_candidate:
-            canonical_chain.append({
-                "position": best_candidate.position,
-                "path_uuid": str(best_candidate.path_uuid),
-                "hrönir_uuid": str(best_candidate.uuid)
-            })
+            canonical_chain.append(
+                {
+                    "position": best_candidate.position,
+                    "path_uuid": str(best_candidate.path_uuid),
+                    "hrönir_uuid": str(best_candidate.uuid),
+                }
+            )
             current_predecessor = str(best_candidate.uuid)
         else:
             break
@@ -125,7 +127,9 @@ def calculate_canonical_path(dm: DataManager) -> list[dict[str, Any]]:
     return canonical_chain
 
 
-def get_candidates_with_scores(dm: DataManager, position: int, predecessor_uuid: str | None = None) -> list[dict[str, Any]]:
+def get_candidates_with_scores(
+    dm: DataManager, position: int, predecessor_uuid: str | None = None
+) -> list[dict[str, Any]]:
     """
     Returns candidates for a given position/predecessor with their scores.
     Useful for 'ranking' command.
@@ -157,9 +161,9 @@ def get_candidates_with_scores(dm: DataManager, position: int, predecessor_uuid:
             # Infer from canonical path
             canonical_chain = calculate_canonical_path(dm)
             # Find entry for position - 1
-            prev_entry = next((e for e in canonical_chain if e['position'] == position - 1), None)
+            prev_entry = next((e for e in canonical_chain if e["position"] == position - 1), None)
             if prev_entry:
-                target_predecessor = prev_entry['hrönir_uuid']
+                target_predecessor = prev_entry["hrönir_uuid"]
             else:
                 # Cannot determine predecessor
                 return []
@@ -182,14 +186,16 @@ def get_candidates_with_scores(dm: DataManager, position: int, predecessor_uuid:
             weight = influence_map.get(child_hronir, 1.0)
             score += weight
 
-        results.append({
-            "path_uuid": str(candidate.path_uuid),
-            "hrönir_uuid": str(candidate.uuid),
-            "score": score,
-            "continuations": len(children_paths)
-        })
+        results.append(
+            {
+                "path_uuid": str(candidate.path_uuid),
+                "hrönir_uuid": str(candidate.uuid),
+                "score": score,
+                "continuations": len(children_paths),
+            }
+        )
 
     # Sort by score (desc), continuations (desc), path_uuid (asc)
-    results.sort(key=lambda x: (-x['score'], -x['continuations'], x['path_uuid']))
+    results.sort(key=lambda x: (-x["score"], -x["continuations"], x["path_uuid"]))
 
     return results

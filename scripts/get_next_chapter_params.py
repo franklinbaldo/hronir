@@ -7,10 +7,9 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 try:
     from hronir_encyclopedia import canon_new, storage
 except ImportError:
-    print(
-        "Error: Could not import 'hronir_encyclopedia'. Ensure PYTHONPATH is set."
-    )
+    print("Error: Could not import 'hronir_encyclopedia'. Ensure PYTHONPATH is set.")
     sys.exit(1)
+
 
 def main():
     dm = storage.DataManager()
@@ -21,8 +20,8 @@ def main():
 
     if canonical_chain:
         tip = canonical_chain[-1]
-        next_pos = tip['position'] + 1
-        prev_hrönir_uuid = tip['hrönir_uuid']
+        next_pos = tip["position"] + 1
+        prev_hrönir_uuid = tip["hrönir_uuid"]
         print(f"Canonical path tip found at Position {tip['position']}.")
     else:
         # Start at 0
@@ -36,6 +35,7 @@ def main():
     # Save to files for GitHub Actions
     Path(".next_pos").write_text(str(next_pos))
     Path(".prev_uuid").write_text(str(prev_hrönir_uuid))
+
 
 if __name__ == "__main__":
     main()

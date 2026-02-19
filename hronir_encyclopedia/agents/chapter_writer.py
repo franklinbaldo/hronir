@@ -25,7 +25,7 @@ class ChapterWriterAgent(BaseHronirAgent):
                 of forking narratives and the weight of each textual choice in shaping reality.""",
                 competitive_mode=True,
                 temperature=0.8,  # Higher creativity for writing
-                max_tokens=1500
+                max_tokens=1500,
             )
         super().__init__(config)
 
@@ -48,12 +48,14 @@ class ChapterWriterAgent(BaseHronirAgent):
         context = self.get_narrative_context(position, predecessor_uuid)
 
         # Build the generation prompt
-        prompt = self.get_agent_prompt({
-            "position": position,
-            "context": context,
-            "theme": theme,
-            "target_audience": target_audience
-        })
+        prompt = self.get_agent_prompt(
+            {
+                "position": position,
+                "context": context,
+                "theme": theme,
+                "target_audience": target_audience,
+            }
+        )
 
         # Generate content
         content = self.generate_with_gemini(prompt)
@@ -65,12 +67,15 @@ class ChapterWriterAgent(BaseHronirAgent):
         consistency_score = self.evaluate_narrative_consistency(content, context)
 
         # Log the action
-        self.log_action("chapter_generated", {
-            "uuid": chapter_uuid,
-            "position": position,
-            "length": len(content),
-            "consistency_score": consistency_score
-        })
+        self.log_action(
+            "chapter_generated",
+            {
+                "uuid": chapter_uuid,
+                "position": position,
+                "length": len(content),
+                "consistency_score": consistency_score,
+            },
+        )
 
         return {
             "uuid": chapter_uuid,
@@ -78,7 +83,7 @@ class ChapterWriterAgent(BaseHronirAgent):
             "position": position,
             "predecessor_uuid": predecessor_uuid,
             "consistency_score": consistency_score,
-            "agent": self.config.name
+            "agent": self.config.name,
         }
 
     def get_agent_prompt(self, task_data: dict[str, Any]) -> str:
@@ -92,7 +97,7 @@ class ChapterWriterAgent(BaseHronirAgent):
             predecessor_text=context,
             predecessor_uuid="unknown",
             predecessor_position=max(0, position - 1),
-            next_position=position
+            next_position=position,
         )
 
         # Enhance with agent-specific instructions
@@ -114,19 +119,22 @@ class ChapterWriterAgent(BaseHronirAgent):
 
         return base_prompt + agent_instructions
 
-    def generate_competitive_chapter(self, position: int, predecessor_uuid: str,
-                                   opponent_strategy: str = "unknown") -> dict[str, Any]:
+    def generate_competitive_chapter(
+        self, position: int, predecessor_uuid: str, opponent_strategy: str = "unknown"
+    ) -> dict[str, Any]:
         """Generate a chapter specifically designed to compete against other agents."""
 
         # Analyze opponent strategy and adjust approach
         competitive_theme = self._analyze_competitive_landscape(position, opponent_strategy)
 
-        return self.execute_task({
-            "position": position,
-            "predecessor_uuid": predecessor_uuid,
-            "theme": competitive_theme,
-            "target_audience": "competitive"
-        })
+        return self.execute_task(
+            {
+                "position": position,
+                "predecessor_uuid": predecessor_uuid,
+                "theme": competitive_theme,
+                "target_audience": "competitive",
+            }
+        )
 
     def _analyze_competitive_landscape(self, position: int, opponent_strategy: str) -> str:
         """Analyze the competitive landscape and determine optimal theme."""
@@ -137,11 +145,13 @@ class ChapterWriterAgent(BaseHronirAgent):
             1: "philosophical_deepening",  # Position 0 reserved for Tlön
             2: "narrative_expansion",
             3: "metaphysical_culmination",
-            4: "temporal_recursion"
+            4: "temporal_recursion",
         }
 
         # Use position-based theme, with fallback for higher positions
-        return strategic_themes.get(position, strategic_themes.get((position - 1) % 4 + 1, "continuation"))
+        return strategic_themes.get(
+            position, strategic_themes.get((position - 1) % 4 + 1, "continuation")
+        )
 
     def batch_generate_chapters(self, requests: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Generate multiple chapters efficiently."""
@@ -152,13 +162,7 @@ class ChapterWriterAgent(BaseHronirAgent):
                 result = self.execute_task(request)
                 results.append(result)
             except Exception as e:
-                self.log_action("generation_error", {
-                    "request": request,
-                    "error": str(e)
-                })
-                results.append({
-                    "error": str(e),
-                    "request": request
-                })
+                self.log_action("generation_error", {"request": request, "error": str(e)})
+                results.append({"error": str(e), "request": request})
 
         return results

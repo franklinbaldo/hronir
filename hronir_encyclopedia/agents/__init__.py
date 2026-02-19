@@ -18,6 +18,7 @@ __all__ = [
 # Optional imports that may not be available
 try:
     from .crew_manager import HronirCrew  # noqa: F401
+
     __all__.append("HronirCrew")
 except ImportError:
     pass

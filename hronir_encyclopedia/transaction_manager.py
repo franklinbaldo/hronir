@@ -7,7 +7,7 @@ from typing import Any
 
 from .models import Transaction, TransactionContent
 
-logger = logging.getLogger(__name__) # Added logger
+logger = logging.getLogger(__name__)  # Added logger
 
 TRANSACTIONS_DIR = Path("data/transactions")
 # SNAPSHOTS_META_DIR removed
