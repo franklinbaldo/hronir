@@ -6,7 +6,7 @@ from . import storage
 
 # Environment variables are loaded from system environment
 
-MODEL_NAME = "gemini-2.5-flash-preview-05-20"
+MODEL_NAME = "gemini-2.5-flash"
 
 
 def _gemini_request(prompt: str) -> str:
