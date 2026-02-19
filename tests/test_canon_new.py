@@ -8,10 +8,12 @@ from hronir_encyclopedia.models import Path as PathModel
 
 NAMESPACE = uuid.NAMESPACE_URL
 
+
 def to_uuid5(val):
     if not val:
         return None
     return str(uuid.uuid5(NAMESPACE, val))
+
 
 # Helper to create paths easily
 def create_path(path_key, position, prev_key, hronir_key):
@@ -20,27 +22,27 @@ def create_path(path_key, position, prev_key, hronir_key):
         position=position,
         prev_uuid=to_uuid5(prev_key),
         uuid=to_uuid5(hronir_key),
-        status="PENDING"
+        status="PENDING",
     )
+
 
 @pytest.fixture
 def mock_dm():
     dm = MagicMock()
     return dm
 
+
 def test_simple_chain(mock_dm):
     # Root -> A -> B
-    paths = [
-        create_path("p0", 0, None, "a"),
-        create_path("p1", 1, "a", "b")
-    ]
+    paths = [create_path("p0", 0, None, "a"), create_path("p1", 1, "a", "b")]
     mock_dm.get_all_paths.return_value = paths
 
     canon = calculate_canonical_path(mock_dm)
 
     assert len(canon) == 2
-    assert canon[0]['hrönir_uuid'] == to_uuid5("a")
-    assert canon[1]['hrönir_uuid'] == to_uuid5("b")
+    assert canon[0]["hrönir_uuid"] == to_uuid5("a")
+    assert canon[1]["hrönir_uuid"] == to_uuid5("b")
+
 
 def test_fork_simple_majority(mock_dm):
     # Root -> A
@@ -83,11 +85,12 @@ def test_fork_simple_majority(mock_dm):
     # We need to know which is smaller.
 
     assert len(canon) == 3
-    assert canon[0]['hrönir_uuid'] == to_uuid5("a")
-    assert canon[1]['hrönir_uuid'] == to_uuid5("c")
+    assert canon[0]["hrönir_uuid"] == to_uuid5("a")
+    assert canon[1]["hrönir_uuid"] == to_uuid5("c")
 
-    winner_pos2 = canon[2]['hrönir_uuid']
+    winner_pos2 = canon[2]["hrönir_uuid"]
     assert winner_pos2 in [to_uuid5("d"), to_uuid5("e")]
+
 
 def test_quadratic_influence(mock_dm):
     # Root -> A
@@ -114,4 +117,4 @@ def test_quadratic_influence(mock_dm):
 
     canon = calculate_canonical_path(mock_dm)
 
-    assert canon[1]['hrönir_uuid'] == to_uuid5("b")
+    assert canon[1]["hrönir_uuid"] == to_uuid5("b")

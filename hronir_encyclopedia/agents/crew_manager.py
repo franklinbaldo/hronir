@@ -11,20 +11,27 @@ from typing import Any
 try:
     from crewai import Agent, Crew, Process, Task
     from crewai.llm import LLM
+
     CREWAI_AVAILABLE = True
 except ImportError:
     CREWAI_AVAILABLE = False
+
     # Fallback classes for when CrewAI is not available
     class Agent:
         pass
+
     class Task:
         pass
+
     class Crew:
         pass
+
     class Process:
         pass
+
     class LLM:
         pass
+
 
 from .. import storage
 
@@ -32,6 +39,7 @@ from .. import storage
 @dataclass
 class CrewConfig:
     """Configuration for a Hronir crew."""
+
     name: str
     agents: list[str]  # Agent types to include
     process: str = "sequential"  # or "hierarchical"
@@ -68,7 +76,7 @@ class HronirCrew:
         """Create a Gemini LLM instance for CrewAI."""
         return LLM(
             model="gemini/gemini-2.0-flash-experimental",
-            api_key="GEMINI_API_KEY"  # Will be read from environment
+            api_key="GEMINI_API_KEY",  # Will be read from environment
         )
 
     def _create_chapter_writer_crew_agent(self) -> Agent:
@@ -82,7 +90,7 @@ class HronirCrew:
             verbose=self.config.verbose,
             llm=self._create_gemini_llm(),
             allow_delegation=False,
-            max_iter=3
+            max_iter=3,
         )
 
     def _create_judge_crew_agent(self) -> Agent:
@@ -96,7 +104,7 @@ class HronirCrew:
             verbose=self.config.verbose,
             llm=self._create_gemini_llm(),
             allow_delegation=False,
-            max_iter=2
+            max_iter=2,
         )
 
     def create_writing_crew(self, task_data: dict[str, Any]) -> Crew:
@@ -107,10 +115,10 @@ class HronirCrew:
         # Create writing task
         writing_task = Task(
             description=f"""
-            Write a new hrönir chapter for position {task_data.get('position', 0)}.
+            Write a new hrönir chapter for position {task_data.get("position", 0)}.
 
-            Context: {task_data.get('context', 'No previous context')}
-            Theme: {task_data.get('theme', 'continuation')}
+            Context: {task_data.get("context", "No previous context")}
+            Theme: {task_data.get("theme", "continuation")}
 
             Requirements:
             - Maintain Borgesian philosophical style
@@ -120,14 +128,14 @@ class HronirCrew:
             - Consider competitive aspects
             """,
             expected_output="A complete hrönir chapter in Markdown format",
-            agent=self.agents["chapter_writer"]
+            agent=self.agents["chapter_writer"],
         )
 
         return Crew(
             agents=[self.agents["chapter_writer"]],
             tasks=[writing_task],
             process=Process.sequential,
-            verbose=self.config.verbose
+            verbose=self.config.verbose,
         )
 
     def create_judgment_crew(self, task_data: dict[str, Any]) -> Crew:
@@ -140,11 +148,11 @@ class HronirCrew:
             description=f"""
             Evaluate two competing hrönir chapters and determine the winner.
 
-            Position: {task_data.get('position', 0)}
-            Context: {task_data.get('context', 'No previous context')}
+            Position: {task_data.get("position", 0)}
+            Context: {task_data.get("context", "No previous context")}
 
-            Chapter A: {task_data.get('content_a', 'Content A')}
-            Chapter B: {task_data.get('content_b', 'Content B')}
+            Chapter A: {task_data.get("content_a", "Content A")}
+            Chapter B: {task_data.get("content_b", "Content B")}
 
             Evaluate based on:
             1. Borgesian style and philosophical depth
@@ -159,14 +167,14 @@ class HronirCrew:
             REASONING: [Detailed explanation]
             """,
             expected_output="A structured judgment with winner, confidence, and reasoning",
-            agent=self.agents["judge"]
+            agent=self.agents["judge"],
         )
 
         return Crew(
             agents=[self.agents["judge"]],
             tasks=[judgment_task],
             process=Process.sequential,
-            verbose=self.config.verbose
+            verbose=self.config.verbose,
         )
 
     async def execute_writing_task(self, task_data: dict[str, Any]) -> dict[str, Any]:
@@ -185,15 +193,11 @@ class HronirCrew:
                 "content": content,
                 "position": task_data.get("position", 0),
                 "crew": self.config.name,
-                "success": True
+                "success": True,
             }
 
         except Exception as e:
-            return {
-                "error": str(e),
-                "crew": self.config.name,
-                "success": False
-            }
+            return {"error": str(e), "crew": self.config.name, "success": False}
 
     async def execute_judgment_task(self, task_data: dict[str, Any]) -> dict[str, Any]:
         """Execute a judgment task."""
@@ -205,22 +209,14 @@ class HronirCrew:
             # Parse the judgment result
             judgment = self._parse_crew_judgment(str(result))
 
-            return {
-                "judgment": judgment,
-                "crew": self.config.name,
-                "success": True
-            }
+            return {"judgment": judgment, "crew": self.config.name, "success": True}
 
         except Exception as e:
-            return {
-                "error": str(e),
-                "crew": self.config.name,
-                "success": False
-            }
+            return {"error": str(e), "crew": self.config.name, "success": False}
 
     def _parse_crew_judgment(self, result: str) -> dict[str, Any]:
         """Parse judgment result from CrewAI output."""
-        lines = result.strip().split('\n')
+        lines = result.strip().split("\n")
 
         winner = None
         confidence = 0.5
@@ -238,15 +234,11 @@ class HronirCrew:
             elif line.startswith("REASONING:"):
                 reasoning = line.split(":", 1)[1].strip()
 
-        return {
-            "winner": winner,
-            "confidence": confidence,
-            "reasoning": reasoning
-        }
+        return {"winner": winner, "confidence": confidence, "reasoning": reasoning}
 
-    async def run_competitive_writing_session(self, position: int,
-                                            predecessor_uuid: str | None = None,
-                                            num_chapters: int = 3) -> list[dict[str, Any]]:
+    async def run_competitive_writing_session(
+        self, position: int, predecessor_uuid: str | None = None, num_chapters: int = 3
+    ) -> list[dict[str, Any]]:
         """Run a competitive writing session with multiple chapters."""
 
         # Get context
@@ -263,8 +255,8 @@ class HronirCrew:
                 "position": position,
                 "predecessor_uuid": predecessor_uuid,
                 "context": context,
-                "theme": f"variation_{i+1}",
-                "iteration": i+1
+                "theme": f"variation_{i + 1}",
+                "iteration": i + 1,
             }
             tasks.append(self.execute_writing_task(task_data))
 
@@ -280,5 +272,5 @@ class HronirCrew:
             "agents": list(self.agents.keys()),
             "tasks_completed": 0,  # Would track actual statistics
             "success_rate": 0.0,
-            "avg_execution_time": 0.0
+            "avg_execution_time": 0.0,
         }

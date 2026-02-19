@@ -24,7 +24,7 @@ class JudgeAgent(BaseHronirAgent):
                 backstory="""You are a discerning literary critic.""",
                 competitive_mode=True,
                 temperature=0.3,
-                max_tokens=1000
+                max_tokens=1000,
             )
         super().__init__(config)
 
@@ -32,7 +32,10 @@ class JudgeAgent(BaseHronirAgent):
         """Execute a judgment task."""
         # Legacy session logic removed.
         # Could be adapted to evaluate candidates for 'ranking' command.
-        return {"status": "NotImplemented", "message": "Judge agent logic needs update for Protocol v3"}
+        return {
+            "status": "NotImplemented",
+            "message": "Judge agent logic needs update for Protocol v3",
+        }
 
     def get_agent_prompt(self, task_data: dict[str, Any]) -> str:
         """Generate the judgment prompt."""

@@ -9,6 +9,7 @@ from pydantic import UUID5, BaseModel, Field, field_validator
 # --- Type Aliases ---
 MandateID = uuid.UUID
 
+
 # --- Enums ---
 class PathStatus(str, Enum):
     PENDING = "PENDING"
@@ -18,7 +19,9 @@ class PathStatus(str, Enum):
     QUALIFIED = "QUALIFIED"
     SPENT = "SPENT"
 
+
 # --- Base Models ---
+
 
 class Path(BaseModel):
     path_uuid: UUID5
@@ -26,9 +29,11 @@ class Path(BaseModel):
     prev_uuid: UUID5 | None = None
     uuid: UUID5
     status: PathStatus = PathStatus.PENDING
-    mandate_id: MandateID | None = None # Deprecated but kept for schema compatibility
+    mandate_id: MandateID | None = None  # Deprecated but kept for schema compatibility
+
 
 # --- Hrönir Content Model ---
+
 
 class Hronir(BaseModel):
     """Represents the content of a hrönir with metadata."""
@@ -39,13 +44,16 @@ class Hronir(BaseModel):
     metadata: dict[str, Any] | None = None
     creation_timestamp: datetime.datetime
 
+
 # --- Canonical Path Models ---
+
 
 class CanonicalEntry(BaseModel):
     """An entry in the canonical path, linking a path to a hrönir."""
 
     path_uuid: UUID5
     hrönir_uuid: UUID5
+
 
 class CanonicalPath(BaseModel):
     """The canonical state of the encyclopedia."""
@@ -62,7 +70,9 @@ class CanonicalPath(BaseModel):
             }
         return value
 
+
 # --- Transaction Models (Simplified) ---
+
 
 class TransactionContent(BaseModel):
     """
@@ -70,10 +80,12 @@ class TransactionContent(BaseModel):
     In the simplified protocol, this primarily records the creation of a hrönir/path.
     Legacy session verdicts are removed from new transactions.
     """
+
     action: str = "create_path"
     path_uuid: UUID5 | None = None
     hrönir_uuid: UUID5 | None = None
     details: dict[str, Any] = Field(default_factory=dict)
+
 
 class Transaction(BaseModel):
     uuid: UUID5
@@ -81,7 +93,9 @@ class Transaction(BaseModel):
     prev_uuid: UUID5 | None = None
     content: TransactionContent
 
+
 # --- Configuration Models ---
+
 
 class StoragePaths(BaseModel):
     """Defines the storage paths for various data components."""
@@ -106,10 +120,13 @@ class StoragePaths(BaseModel):
 
 class SystemConfig(BaseModel):
     """System-wide configuration."""
+
     storage_paths: StoragePaths = Field(default_factory=StoragePaths)
     # Qualification and Elo settings are deprecated/removed
 
+
 # --- Validation Models ---
+
 
 class ValidationIssue(BaseModel):
     """An issue found during data validation."""

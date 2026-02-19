@@ -13,6 +13,7 @@ from rich.text import Text
 
 console = Console()
 
+
 def show_intro():
     """Show introduction to the demo."""
     Text("🎭 Hronir Encyclopedia AI Agent Demo", style="bold blue")
@@ -33,6 +34,7 @@ philosophical and competitive principles of the Hronir Encyclopedia.
     console.print(Panel(intro_text, title="🎭 Hronir AI Agents", border_style="blue"))
     console.print()
 
+
 def show_agent_capabilities():
     """Show what the agents can do."""
 
@@ -42,11 +44,14 @@ def show_agent_capabilities():
         "🎯 **Competitive Mode**: Agents compete to create the most compelling content",
         "🔄 **Batch Processing**: Generate multiple chapters efficiently",
         "📊 **Quality Metrics**: Evaluate narrative consistency and literary merit",
-        "🧠 **Strategic Thinking**: Adapt writing style based on competitive context"
+        "🧠 **Strategic Thinking**: Adapt writing style based on competitive context",
     ]
 
-    console.print(Panel("\n".join(capabilities), title="🚀 Agent Capabilities", border_style="green"))
+    console.print(
+        Panel("\n".join(capabilities), title="🚀 Agent Capabilities", border_style="green")
+    )
     console.print()
+
 
 def show_working_commands():
     """Show the working CLI commands."""
@@ -57,11 +62,14 @@ def show_working_commands():
         "✅ `uv run hronir agent test-writer --theme 'philosophical_maze'` - Themed generation",
         "✅ `uv run hronir agent test-writer --position 1 --predecessor-uuid <uuid>` - Continue narrative",
         "🔧 `uv run hronir agent competitive-session` - Multi-agent competition (in development)",
-        "🔧 `uv run hronir agent test-crew` - CrewAI integration (in development)"
+        "🔧 `uv run hronir agent test-crew` - CrewAI integration (in development)",
     ]
 
-    console.print(Panel("\n".join(working_commands), title="🎮 Available Commands", border_style="yellow"))
+    console.print(
+        Panel("\n".join(working_commands), title="🎮 Available Commands", border_style="yellow")
+    )
     console.print()
+
 
 def show_example_output():
     """Show example of generated content."""
@@ -86,8 +94,11 @@ Consistency Score: 0.80
 Length: 2,314 characters
 """
 
-    console.print(Panel(example_content, title="📖 Example Generated Content", border_style="magenta"))
+    console.print(
+        Panel(example_content, title="📖 Example Generated Content", border_style="magenta")
+    )
     console.print()
+
 
 def show_technical_details():
     """Show technical implementation details."""
@@ -116,6 +127,7 @@ def show_technical_details():
     console.print(Panel(tech_details, title="⚙️ Technical Implementation", border_style="cyan"))
     console.print()
 
+
 def show_next_steps():
     """Show what to do next."""
 
@@ -141,6 +153,7 @@ def show_next_steps():
     console.print(Panel(next_steps, title="🎯 Next Steps", border_style="bright_green"))
     console.print()
 
+
 def simulate_agent_interaction():
     """Simulate an agent interaction for demo purposes."""
 
@@ -153,7 +166,7 @@ def simulate_agent_interaction():
         "📝 Generating Borgesian prose...",
         "🎭 Applying philosophical themes...",
         "⚖️ Evaluating narrative consistency...",
-        "✨ Finalizing hrönir chapter..."
+        "✨ Finalizing hrönir chapter...",
     ]
 
     for step in track(steps, description="Agent Processing"):
@@ -162,17 +175,20 @@ def simulate_agent_interaction():
     console.print("✅ [bold green]Agent task completed successfully![/bold green]")
     console.print()
 
+
 def main():
     """Main demo function."""
 
     # Check if API key is set
     if not os.getenv("GEMINI_API_KEY"):
-        console.print(Panel(
-            "⚠️ GEMINI_API_KEY not set. Please configure it to run the actual agents:\n\n"
-            "export GEMINI_API_KEY='your-api-key-here'",
-            title="⚠️ Configuration Required",
-            border_style="yellow"
-        ))
+        console.print(
+            Panel(
+                "⚠️ GEMINI_API_KEY not set. Please configure it to run the actual agents:\n\n"
+                "export GEMINI_API_KEY='your-api-key-here'",
+                title="⚠️ Configuration Required",
+                border_style="yellow",
+            )
+        )
         console.print()
 
     show_intro()
@@ -183,8 +199,11 @@ def main():
     simulate_agent_interaction()
     show_next_steps()
 
-    console.print("🎉 [bold]Demo completed![/bold] The Hronir AI Agent System is ready for experimentation.")
+    console.print(
+        "🎉 [bold]Demo completed![/bold] The Hronir AI Agent System is ready for experimentation."
+    )
     console.print()
+
 
 if __name__ == "__main__":
     main()

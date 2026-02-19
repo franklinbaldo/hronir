@@ -7,6 +7,7 @@ from hronir_encyclopedia import transaction_manager as tm
 # If transaction_manager.py is heavily refactored or removed, these tests will need significant updates
 # or may become obsolete. For now, we move them as is, assuming the functions still exist.
 
+
 @pytest.fixture
 def sample_transactions_data() -> list[str]:
     """Provides a sample list of transaction data strings."""
@@ -29,9 +30,11 @@ def test_merkle_tree_and_proof_dynamics(sample_transactions_data: list[str]):
     Tests the dynamics of Merkle root computation, proof generation, and verification.
     """
     # These functions might not exist if transaction_manager is simplified.
-    if not hasattr(tm, "compute_merkle_root") or \
-       not hasattr(tm, "generate_merkle_proof") or \
-       not hasattr(tm, "verify_merkle_proof"):
+    if (
+        not hasattr(tm, "compute_merkle_root")
+        or not hasattr(tm, "generate_merkle_proof")
+        or not hasattr(tm, "verify_merkle_proof")
+    ):
         pytest.skip("Merkle tree functions not found in transaction_manager, skipping test.")
 
     merkle_root = tm.compute_merkle_root(sample_transactions_data)
@@ -87,9 +90,10 @@ def test_trust_check_sampling_dynamics(sample_transactions_data: list[str]):
     """
     Tests the trust check mechanism using cryptographic sampling.
     """
-    if not hasattr(tm, "compute_merkle_root") or \
-       not hasattr(tm, "perform_trust_check_sampling"):
-        pytest.skip("Merkle or trust check functions not found in transaction_manager, skipping test.")
+    if not hasattr(tm, "compute_merkle_root") or not hasattr(tm, "perform_trust_check_sampling"):
+        pytest.skip(
+            "Merkle or trust check functions not found in transaction_manager, skipping test."
+        )
 
     merkle_root = tm.compute_merkle_root(sample_transactions_data)
     assert merkle_root is not None

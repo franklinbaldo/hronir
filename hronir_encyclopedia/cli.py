@@ -23,6 +23,7 @@ app = typer.Typer(
 # Add AI agents commands
 try:
     from .agents.cli_commands import agent_app
+
     app.add_typer(agent_app, name="agent")
 except ImportError:
     # Agents module not available
@@ -30,7 +31,9 @@ except ImportError:
 
 # Register top-level commands from store module
 app.command(name="store", help="Store a chapter and link it to a predecessor.")(store_command)
-app.command(name="synthesize", help="Generate and store a new chapter using AI.")(synthesize_command)
+app.command(name="synthesize", help="Generate and store a new chapter using AI.")(
+    synthesize_command
+)
 app.command(name="validate", help="Validate a chapter file.")(validate_command)
 
 
@@ -43,7 +46,9 @@ def recover_canon(
         int, typer.Option(help="Maximum number of positions to attempt to rebuild.")
     ] = 100,
 ):
-    typer.echo("Refactoring in progress. This command may be deprecated or updated to use new canon logic.")
+    typer.echo(
+        "Refactoring in progress. This command may be deprecated or updated to use new canon logic."
+    )
     # Placeholder for new logic if needed, or removal.
 
 
@@ -97,7 +102,7 @@ def init_test(
     from .models import Path as PathModel
 
     data_manager = storage_module.DataManager()
-    if not data_manager._initialized: # Ensure DM is loaded
+    if not data_manager._initialized:  # Ensure DM is loaded
         data_manager.initialize_and_load()
 
     p0_path_uuid_val = storage_module.compute_narrative_path_uuid(0, "", h0_uuid_str)
@@ -134,13 +139,15 @@ def status():
 
     typer.echo("Canonical Path:")
     for entry in canonical_chain:
-        typer.echo(f"Pos {entry['position']}: Path {entry['path_uuid']} (Hrönir {entry['hrönir_uuid']})")
+        typer.echo(
+            f"Pos {entry['position']}: Path {entry['path_uuid']} (Hrönir {entry['hrönir_uuid']})"
+        )
 
 
 @app.command(help="Show rankings (quadratic influence scores) for a chapter position.")
 def ranking(
     position: Annotated[int, typer.Argument(help="The chapter position to rank.")],
-    predecessor: Annotated[str, typer.Option(help="Filter by predecessor hrönir UUID.")] = None
+    predecessor: Annotated[str, typer.Option(help="Filter by predecessor hrönir UUID.")] = None,
 ):
     dm = storage_module.DataManager()
     if not dm._initialized:
@@ -155,12 +162,14 @@ def ranking(
     typer.echo(f"Candidates for Position {position}:")
     table_data = []
     for cand in candidates:
-        table_data.append({
-            "Score": f"{cand['score']:.2f}",
-            "Continuations": cand['continuations'],
-            "Hrönir": cand['hrönir_uuid'],
-            "Path": cand['path_uuid']
-        })
+        table_data.append(
+            {
+                "Score": f"{cand['score']:.2f}",
+                "Continuations": cand["continuations"],
+                "Hrönir": cand["hrönir_uuid"],
+                "Path": cand["path_uuid"],
+            }
+        )
 
     df = pd.DataFrame(table_data)
     typer.echo(df.to_string(index=False))
@@ -261,7 +270,7 @@ def main_callback(ctx: typer.Context):
     )
     logger.debug("CLI main_callback: Initializing DataManager...")
     try:
-        data_manager = storage_module.DataManager() # Use the alias
+        data_manager = storage_module.DataManager()  # Use the alias
         if not hasattr(data_manager, "_initialized") or not data_manager._initialized:
             logger.info("DataManager not initialized in callback. Calling initialize_and_load().")
             data_manager.initialize_and_load()

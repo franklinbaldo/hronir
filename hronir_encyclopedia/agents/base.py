@@ -16,11 +16,12 @@ from ..models import SystemConfig
 @dataclass
 class AgentConfig:
     """Configuration for Hronir AI agents."""
+
     name: str
     role: str
     goal: str
     backstory: str
-    gemini_model: str = "gemini-2.5-flash-preview-05-20"
+    gemini_model: str = "gemini-2.5-flash"
     temperature: float = 0.7
     max_tokens: int = 2000
     verbose: bool = False
