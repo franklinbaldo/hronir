@@ -28,3 +28,7 @@ data/canonical_path.json
 
 # Un-ignore the main DuckDB database file
 !data/encyclopedia.duckdb
+
+# Gemini CLI
+.gemini/
+gha-creds-*.json
